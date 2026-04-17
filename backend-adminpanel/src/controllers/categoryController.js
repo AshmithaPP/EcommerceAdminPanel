@@ -1,11 +1,13 @@
 const categoryService = require('../services/categoryService');
 const { 
     categorySchema, 
+    subCategorySchema,
     assignAttributesSchema, 
     uuidSchema 
 } = require('../validators/categoryValidator');
 
 const categoryController = {
+    // Parent Category Handlers
     createCategory: async (req, res, next) => {
         try {
             const { error } = categorySchema.validate(req.body);
@@ -20,7 +22,7 @@ const categoryController = {
             res.status(201).json({
                 success: true,
                 message: 'Category created successfully',
-                data: category, // Direct object
+                data: category,
                 error: null
             });
         } catch (error) {
@@ -39,7 +41,7 @@ const categoryController = {
                 success: true,
                 message: 'Categories fetched successfully',
                 data: {
-                    items: categories, // Normalized list
+                    items: categories,
                     pagination: {
                         total,
                         page,
@@ -62,7 +64,144 @@ const categoryController = {
                 success: true,
                 message: 'Category tree fetched successfully',
                 data: {
-                    items: tree // Trees are lists of root nodes
+                    items: tree
+                },
+                error: null
+            });
+        } catch (error) {
+            next(error);
+        }
+    },
+
+    // Sub Category Handlers
+    createSubCategory: async (req, res, next) => {
+        try {
+            const { error } = subCategorySchema.validate(req.body);
+            if (error) {
+                const err = new Error(error.details[0].message);
+                err.statusCode = 400;
+                throw err;
+            }
+
+            const subCategory = await categoryService.createSubCategory(req.body, req.user.user_id);
+
+            res.status(201).json({
+                success: true,
+                message: 'Sub-category created successfully',
+                data: subCategory,
+                error: null
+            });
+        } catch (error) {
+            next(error);
+        }
+    },
+
+    getSubCategoriesByCategoryId: async (req, res, next) => {
+        try {
+            const { category_id } = req.params;
+            const subCategories = await categoryService.getSubCategoriesByCategoryId(category_id);
+
+            res.status(200).json({
+                success: true,
+                message: 'Sub-categories fetched successfully',
+                data: {
+                    items: subCategories
+                },
+                error: null
+            });
+        } catch (error) {
+            next(error);
+        }
+    },
+
+    updateSubCategory: async (req, res, next) => {
+        try {
+            const { sub_category_id } = req.params;
+            const { error } = subCategorySchema.validate(req.body);
+            if (error) {
+                const err = new Error(error.details[0].message);
+                err.statusCode = 400;
+                throw err;
+            }
+
+            const subCategory = await categoryService.updateSubCategory(sub_category_id, req.body, req.user.user_id);
+
+            res.status(200).json({
+                success: true,
+                message: 'Sub-category updated successfully',
+                data: subCategory,
+                error: null
+            });
+        } catch (error) {
+            next(error);
+        }
+    },
+
+    deleteSubCategory: async (req, res, next) => {
+        try {
+            const { sub_category_id } = req.params;
+            await categoryService.deleteSubCategory(sub_category_id, req.user.user_id);
+
+            res.status(200).json({
+                success: true,
+                message: 'Sub-category deleted successfully',
+                data: null,
+                error: null
+            });
+        } catch (error) {
+            next(error);
+        }
+    },
+
+    assignSubCategoryAttributes: async (req, res, next) => {
+        try {
+            const { sub_category_id } = req.params;
+            const { error } = assignAttributesSchema.validate(req.body);
+            if (error) {
+                const err = new Error(error.details[0].message);
+                err.statusCode = 400;
+                throw err;
+            }
+
+            const result = await categoryService.assignSubCategoryAttributes(sub_category_id, req.body.attribute_ids, req.user.user_id);
+
+            res.status(200).json({
+                success: true,
+                message: 'Sub-category attribute assignment completed',
+                data: result,
+                error: null
+            });
+        } catch (error) {
+            next(error);
+        }
+    },
+
+    unassignSubCategoryAttribute: async (req, res, next) => {
+        try {
+            const { sub_category_id, attribute_id } = req.params;
+            await categoryService.unassignSubCategoryAttribute(sub_category_id, attribute_id);
+
+            res.status(200).json({
+                success: true,
+                message: 'Attribute removed from sub-category',
+                data: null,
+                error: null
+            });
+        } catch (error) {
+            next(error);
+        }
+    },
+
+    getSubCategoryAttributes: async (req, res, next) => {
+        try {
+            const { sub_category_id } = req.params;
+            const attributes = await categoryService.getSubCategoryAttributes(sub_category_id);
+
+            res.status(200).json({
+                success: true,
+                message: 'Sub-category attributes fetched successfully',
+                data: {
+                    items: attributes
                 },
                 error: null
             });
@@ -82,7 +221,7 @@ const categoryController = {
             res.status(200).json({
                 success: true,
                 message: 'Category fetched successfully',
-                data: category, // Direct object
+                data: category,
                 error: null
             });
         } catch (error) {
@@ -108,7 +247,7 @@ const categoryController = {
             res.status(200).json({
                 success: true,
                 message: 'Category updated successfully',
-                data: category, // Direct object
+                data: category,
                 error: null
             });
         } catch (error) {
@@ -153,7 +292,7 @@ const categoryController = {
             res.status(200).json({
                 success: true,
                 message: 'Attribute assignment completed',
-                data: result, // { assigned, skipped }
+                data: result,
                 error: null
             });
         } catch (error) {
@@ -193,7 +332,7 @@ const categoryController = {
                 success: true,
                 message: 'Category attributes fetched successfully',
                 data: {
-                    items: attributes // Nested list
+                    items: attributes
                 },
                 error: null
             });

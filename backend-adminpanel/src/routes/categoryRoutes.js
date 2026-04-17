@@ -6,6 +6,7 @@ const { protect } = require('../middlewares/authMiddleware');
 // All routes are protected
 router.use(protect);
 
+// Parent Categories
 router.post('/category-create', categoryController.createCategory);
 router.get('/category-list', categoryController.getCategories);
 router.get('/category-tree', categoryController.getCategoryTree);
@@ -13,7 +14,18 @@ router.get('/category-view/:category_id', categoryController.getCategoryById);
 router.put('/category-update/:category_id', categoryController.updateCategory);
 router.delete('/category-delete/:category_id', categoryController.deleteCategory);
 
-// Category-Attribute Mapping
+// Sub Categories
+router.post('/sub-category-create', categoryController.createSubCategory);
+router.get('/sub-category-list/:category_id', categoryController.getSubCategoriesByCategoryId);
+router.put('/sub-category-update/:sub_category_id', categoryController.updateSubCategory);
+router.delete('/sub-category-delete/:sub_category_id', categoryController.deleteSubCategory);
+
+// Sub Category Attribute Mapping
+router.post('/sub-category-attribute-assign/:sub_category_id', categoryController.assignSubCategoryAttributes);
+router.get('/sub-category-attribute-get/:sub_category_id', categoryController.getSubCategoryAttributes);
+router.delete('/sub-category-attribute-unassign/:sub_category_id/:attribute_id', categoryController.unassignSubCategoryAttribute);
+
+// Category-Attribute Mapping (Parent)
 router.post('/category-attribute-assign/:category_id', categoryController.assignAttributes);
 router.get('/category-attribute-get/:category_id', categoryController.getCategoryAttributes);
 router.delete('/category-attribute-unassign/:category_id/:attribute_id', categoryController.unassignAttribute);

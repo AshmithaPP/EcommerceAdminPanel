@@ -11,12 +11,15 @@ import {
   Link as LinkIcon,
   Loader,
   X,
-  Plus
+  Plus,
+  Video
 } from 'lucide-react';
 import Button from '../../components/ui/Button';
 import { privateApi, publicApi } from '../../services/api';
 import { productService } from '../../services/productService';
 import styles from './EditProduct.module.css';
+import Modal from '../../components/common/Modal';
+import toast from 'react-hot-toast';
 
 const STORAGE_URL = 'http://localhost:5000';
 
@@ -45,7 +48,8 @@ const EditProduct = () => {
   const [productData, setProductData] = useState({
     name: '',
     description: '',
-    category_id: '',
+    category_id: '', // Parent Category
+    sub_category_id: '', // Link ONLY to sub_categories
     brand: '',
     base_price: '',
     meta_title: '',
@@ -60,19 +64,38 @@ const EditProduct = () => {
     variant_id: null,
     sku: '',
     price: '',
-    color: '',
-    fabric: '',
+    attributeValues: {}, // { [attrId]: { id, name } }
     stock: 0,
     images: []
   });
   const [editingVariantIndex, setEditingVariantIndex] = useState(null);
 
-  // Categories and attributes
+  // Categories and sub-categories
   const [categories, setCategories] = useState([]);
+  const [subCategories, setSubCategories] = useState([]);
   const [attributeMap, setAttributeMap] = useState({});
 
   // Product-level images (synchronized with first variant)
   const [productImages, setProductImages] = useState([]);
+  const [productVideo, setProductVideo] = useState(null);
+
+  // Attributes Management State
+  const [categoryAttributes, setCategoryAttributes] = useState([]);
+  const [allAttributes, setAllAttributes] = useState([]); // Master list of global attributes
+  const [isMappingModalOpen, setIsMappingModalOpen] = useState(false);
+  const [selectedAttributeIds, setSelectedAttributeIds] = useState([]);
+
+  const [isGlobalAttrModalOpen, setIsGlobalAttrModalOpen] = useState(false);
+  const [newAttrName, setNewAttrName] = useState('');
+  const [editingAttr, setEditingAttr] = useState(null);
+  const [editingAttrName, setEditingAttrName] = useState('');
+
+  const [isValueModalOpen, setIsValueModalOpen] = useState(false);
+  const [currentAttribute, setCurrentAttribute] = useState(null);
+  const [attributeValues, setAttributeValues] = useState([]);
+  const [newValueInput, setNewValueInput] = useState('');
+  const [editingValue, setEditingValue] = useState(null);
+  const [editingValueText, setEditingValueText] = useState('');
 
   // ──────────────────────────────────────────────────────────────────
   // 1. Fetch Initial Data
@@ -107,18 +130,34 @@ const EditProduct = () => {
       const res = await privateApi.get(`/products/${id}`);
       const data = res.data.data;
 
+      // Extract category_id from the joined sub_category info if needed, 
+      // but my backend Product.findById now returns sub_category_id AND category_id (from join)
       setProductData({
         name: data.name || '',
         description: data.description || '',
         category_id: data.category_id || '',
+        sub_category_id: data.sub_category_id || '',
         brand: data.brand || '',
         base_price: data.base_price || '',
         meta_title: data.meta_title || '',
         meta_description: data.meta_description || '',
-        slug: data.slug || ''
+        slug: data.slug || '',
+        video_url: data.video_url || null
       });
+      
+      if (data.video_url) {
+        setProductVideo({
+          url: data.video_url,
+          file: null
+        });
+      }
       setProductStatus(data.status === 1);
       
+      // Load sub-categories for the selected parent category
+      if (data.category_id) {
+        fetchSubCategories(data.category_id);
+      }
+
       // Variants
       if (data.variants && data.variants.length > 0) {
         setVariants(data.variants.map(v => ({
@@ -130,11 +169,10 @@ const EditProduct = () => {
           stock: v.stock || 0
         })));
 
-        // Load images from the first variant into the main imagery card
         const mainImages = data.variants[0].images || [];
         setProductImages(mainImages.map(img => ({
           ...img,
-          url: img.image_url // Ensure compatibility with the image display logic
+          url: img.image_url
         })));
       }
     } catch (err) {
@@ -143,18 +181,38 @@ const EditProduct = () => {
     }
   };
 
-  // When category changes, load its attributes
+  // When category changes, load its sub-categories
   useEffect(() => {
     if (productData.category_id) {
-      fetchCategoryAttributes(productData.category_id);
+      fetchSubCategories(productData.category_id);
+    } else {
+      setSubCategories([]);
     }
   }, [productData.category_id]);
 
-  const fetchCategoryAttributes = async (categoryId) => {
+  // When sub-category changes, load its attributes
+  useEffect(() => {
+    if (productData.sub_category_id) {
+      fetchSubCategoryAttributes(productData.sub_category_id);
+    } else {
+      setAttributeMap({});
+    }
+  }, [productData.sub_category_id]);
+
+  const fetchSubCategories = async (categoryId) => {
     try {
-      const res = await privateApi.get(`/categories/category-attribute-get/${categoryId}`);
-      let attrs = res.data?.data || res.data;
-      if (!Array.isArray(attrs)) attrs = [];
+      const res = await privateApi.get(`/categories/sub-category-list/${categoryId}`);
+      setSubCategories(res.data?.data?.items || []);
+    } catch (err) {
+      console.error('Error fetching sub-categories', err);
+    }
+  };
+
+  const fetchSubCategoryAttributes = async (subCategoryId) => {
+    try {
+      const res = await privateApi.get(`/categories/sub-category-attribute-get/${subCategoryId}`);
+      let attrs = res.data?.data?.items || [];
+      setCategoryAttributes(attrs);
 
       const map = {};
       attrs.forEach(attr => {
@@ -172,31 +230,175 @@ const EditProduct = () => {
     }
   };
 
+  // ---------- Attributes Management API ----------
+  const fetchAllAttributes = async () => {
+    try {
+      const { data } = await privateApi.get('/attributes/attribute-list?page=1&limit=100');
+      setAllAttributes(data.data.items);
+    } catch (error) {
+      toast.error('Failed to load global attributes');
+    }
+  };
+
+  const assignAttributesToCategory = async (attributeIds) => {
+    if (!productData.sub_category_id) return;
+    try {
+      await privateApi.post(`/categories/sub-category-attribute-assign/${productData.sub_category_id}`, {
+        attribute_ids: attributeIds
+      });
+      toast.success('Attributes assigned');
+      fetchSubCategoryAttributes(productData.sub_category_id);
+      fetchAllAttributes();
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to assign attributes');
+    }
+  };
+
+  const unassignAttribute = async (attributeId) => {
+    if (!productData.sub_category_id) return;
+    try {
+      await privateApi.delete(`/categories/sub-category-attribute-unassign/${productData.sub_category_id}/${attributeId}`);
+      toast.success('Attribute removed');
+      fetchSubCategoryAttributes(productData.sub_category_id);
+    } catch (error) {
+      toast.error('Failed to unassign attribute');
+    }
+  };
+
+  const handleCreateGlobalAttr = async () => {
+    if (!newAttrName.trim()) return;
+    try {
+      await privateApi.post('/attributes/attribute-create', { name: newAttrName });
+      toast.success('Attribute created');
+      setNewAttrName('');
+      fetchAllAttributes();
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to create attribute');
+    }
+  };
+
+  const submitUpdateGlobalAttr = async () => {
+    if (!editingAttrName.trim() || !editingAttr) return;
+    try {
+      await privateApi.put(`/attributes/attribute-update/${editingAttr.attribute_id}`, { name: editingAttrName });
+      toast.success('Attribute updated');
+      setEditingAttr(null);
+      fetchAllAttributes();
+      if (productData.sub_category_id) fetchSubCategoryAttributes(productData.sub_category_id);
+    } catch (error) {
+      toast.error('Failed to update attribute');
+    }
+  };
+
+  const handleUpdateGlobalAttr = (attr) => {
+    setEditingAttr(attr);
+    setEditingAttrName(attr.name);
+  };
+
+  const deleteAttribute = async (attributeId) => {
+    if (!window.confirm('Delete this attribute globally? This will affect all categories using it.')) return;
+    try {
+      await privateApi.delete(`/attributes/attribute-delete/${attributeId}`);
+      toast.success('Attribute deleted');
+      fetchAllAttributes();
+      if (productData.sub_category_id) fetchSubCategoryAttributes(productData.sub_category_id);
+    } catch (error) {
+      toast.error('Failed to delete attribute');
+    }
+  };
+
+  const fetchAttributeValues = async (attributeId) => {
+    try {
+      const { data } = await privateApi.get(`/attributes/attribute-values-get/${attributeId}`);
+      setAttributeValues(data.data.items);
+    } catch (error) {
+      toast.error('Failed to load values');
+    }
+  };
+
+  const addAttributeValue = async (attributeId, value) => {
+    if (!value.trim()) return;
+    try {
+      await privateApi.post(`/attributes/attribute-values-add/${attributeId}`, { values: [value.trim()] });
+      toast.success('Value added');
+      fetchAttributeValues(attributeId);
+      if (productData.sub_category_id) fetchSubCategoryAttributes(productData.sub_category_id);
+    } catch (error) {
+      toast.error('Failed to add value');
+    }
+  };
+
+  const updateAttributeValue = async (valueId, newValue) => {
+    try {
+      await privateApi.put(`/attributes/attribute-value-update/${valueId}`, { value: newValue });
+      toast.success('Value updated');
+      if (currentAttribute) fetchAttributeValues(currentAttribute.attribute_id);
+      if (productData.sub_category_id) fetchSubCategoryAttributes(productData.sub_category_id);
+    } catch (error) {
+      toast.error('Failed to update value');
+    }
+  };
+
+  const deleteAttributeValue = async (valueId) => {
+    try {
+      await privateApi.delete(`/attributes/attribute-value-delete/${valueId}`);
+      toast.success('Value deleted');
+      if (currentAttribute) fetchAttributeValues(currentAttribute.attribute_id);
+      if (productData.sub_category_id) fetchSubCategoryAttributes(productData.sub_category_id);
+    } catch (error) {
+      toast.error('Failed to delete value');
+    }
+  };
+
+  const openMappingModal = () => {
+    setSelectedAttributeIds(categoryAttributes.map(a => a.attribute_id));
+    fetchAllAttributes();
+    setIsMappingModalOpen(true);
+  };
+
+  const openGlobalAttrModal = () => {
+    fetchAllAttributes();
+    setIsGlobalAttrModalOpen(true);
+  };
+
+  const openValueModal = (attr) => {
+    setCurrentAttribute(attr);
+    fetchAttributeValues(attr.attribute_id);
+    setIsValueModalOpen(true);
+  };
+
+  const handleAssign = () => {
+    assignAttributesToCategory(selectedAttributeIds);
+    setIsMappingModalOpen(false);
+  };
+
   // ──────────────────────────────────────────────────────────────────
   // 2. Event Handlers
   // ──────────────────────────────────────────────────────────────────
   const handleProductChange = (e) => {
     const { name, value } = e.target;
     setProductData(prev => ({ ...prev, [name]: value }));
+    if (name === 'category_id') {
+      setProductData(prev => ({ ...prev, sub_category_id: '' }));
+    }
   };
 
   const openVariantModal = (index = null) => {
     if (index !== null) {
       const v = variants[index];
-      // Try to find the color and fabric from attributes
-      const getAttrValue = (attrName) => {
-        const attrId = attributeMap[attrName]?.id;
-        if (!attrId) return '';
-        const attr = v.attributes?.find(a => a.attribute_id === attrId);
-        return attr?.attribute_value_name || attr?.value || attr?.attribute_value || '';
-      };
+      const attrVals = {};
+      v.attributes?.forEach(attr => {
+        attrVals[attr.attribute_id] = {
+          id: attr.attribute_value_id,
+          name: attr.attribute_value_name || attr.value || attr.attribute_value
+        };
+      });
 
       setCurrentVariant({
         variant_id: v.variant_id || null,
         sku: v.sku,
         price: v.price,
-        color: getAttrValue('color'),
-        fabric: getAttrValue('fabric'),
+        attributeValues: attrVals,
         stock: v.stock || 0,
         images: v.images || []
       });
@@ -206,8 +408,7 @@ const EditProduct = () => {
         variant_id: null,
         sku: '',
         price: '',
-        color: '',
-        fabric: '',
+        attributeValues: {},
         stock: 0,
         images: []
       });
@@ -226,27 +427,13 @@ const EditProduct = () => {
     setError('');
 
     try {
-      const attributes = [];
-      if (currentVariant.color && attributeMap.color) {
-        const colorValue = attributeMap.color.values.find(v => v.value_name === currentVariant.color);
-        if (colorValue) {
-          attributes.push({
-            attribute_id: attributeMap.color.id,
-            attribute_value_id: colorValue.attribute_value_id,
-            attribute_value_name: colorValue.value_name
-          });
-        }
-      }
-      if (currentVariant.fabric && attributeMap.fabric) {
-        const fabricValue = attributeMap.fabric.values.find(v => v.value_name === currentVariant.fabric);
-        if (fabricValue) {
-          attributes.push({
-            attribute_id: attributeMap.fabric.id,
-            attribute_value_id: fabricValue.attribute_value_id,
-            attribute_value_name: fabricValue.value_name
-          });
-        }
-      }
+      const attributes = Object.entries(currentVariant.attributeValues)
+        .filter(([_, val]) => val !== null)
+        .map(([attrId, val]) => ({
+          attribute_id: attrId,
+          attribute_value_id: val.id,
+          attribute_value_name: val.name
+        }));
 
       const uploadedImages = [];
       for (const img of currentVariant.images) {
@@ -334,10 +521,26 @@ const EditProduct = () => {
 
   const handleVariantImageUpload = (e) => {
     const files = Array.from(e.target.files);
-    const newImages = files.map(file => ({
-      url: URL.createObjectURL(file),
-      file
-    }));
+    
+    // Total count validation
+    if (currentVariant.images.length + files.length > 5) {
+      toast.error('Limit: 5 images per variant');
+      return;
+    }
+
+    const newImages = [];
+    for (const file of files) {
+      if (file.size > 10 * 1024 * 1024) {
+        toast.error(`File ${file.name} is too large (max 10MB)`);
+        continue;
+      }
+      newImages.push({
+        url: URL.createObjectURL(file),
+        file,
+        is_new: true
+      });
+    }
+
     setCurrentVariant(prev => ({
       ...prev,
       images: [...prev.images, ...newImages]
@@ -354,16 +557,55 @@ const EditProduct = () => {
   // Product-level image management
   const handleProductImageUpload = (e) => {
     const files = Array.from(e.target.files);
-    const newImages = files.map(file => ({
-      url: URL.createObjectURL(file),
-      file,
-      is_new: true
-    }));
+
+    // Total count validation
+    if (productImages.length + files.length > 5) {
+      toast.error('Limit: 5 images for the product');
+      return;
+    }
+
+    const newImages = [];
+    for (const file of files) {
+      if (file.size > 10 * 1024 * 1024) {
+        toast.error(`File ${file.name} is too large (max 10MB)`);
+        continue;
+      }
+      newImages.push({
+        url: URL.createObjectURL(file),
+        file,
+        is_new: true
+      });
+    }
     setProductImages(prev => [...prev, ...newImages]);
   };
 
   const removeProductImage = (index) => {
     setProductImages(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleVideoUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (file.size > 50 * 1024 * 1024) {
+      toast.error('Video must be under 50MB');
+      return;
+    }
+
+    if (!file.type.startsWith('video/')) {
+      toast.error('Please upload a valid video file');
+      return;
+    }
+
+    setProductVideo({
+      url: URL.createObjectURL(file),
+      file
+    });
+  };
+
+  const removeVideo = () => {
+    if (productVideo?.url && productVideo.file) URL.revokeObjectURL(productVideo.url);
+    setProductVideo(null);
   };
 
   const handleSubmit = async () => {
@@ -415,7 +657,12 @@ const EditProduct = () => {
         });
       });
 
-      // 4. Append the JSON metadata
+      // 4. Attach Product Video if present
+      if (productVideo?.file) {
+        formData.append('product_video', productVideo.file);
+      }
+
+      // 5. Append the JSON metadata
       formData.append('productData', JSON.stringify(metadata));
 
       await productService.updateProduct(id, formData);
@@ -454,7 +701,7 @@ const EditProduct = () => {
                 />
               </div>
               <div className={styles.halfWidth}>
-                <label className={styles.label}>Category *</label>
+                <label className={styles.label}>Parent Category *</label>
                 <select
                   name="category_id"
                   value={productData.category_id}
@@ -465,6 +712,23 @@ const EditProduct = () => {
                   {categories.map(cat => (
                     <option key={cat.category_id} value={cat.category_id}>
                       {cat.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className={styles.halfWidth}>
+                <label className={styles.label}>Sub-Category *</label>
+                <select
+                  name="sub_category_id"
+                  value={productData.sub_category_id}
+                  onChange={handleProductChange}
+                  className={styles.select}
+                  disabled={!productData.category_id}
+                >
+                  <option value="">Select sub-category</option>
+                  {subCategories.map(sub => (
+                    <option key={sub.sub_category_id} value={sub.sub_category_id}>
+                      {sub.name}
                     </option>
                   ))}
                 </select>
@@ -555,12 +819,67 @@ const EditProduct = () => {
         </div>
 
         <div className={styles.rightColumn}>
+          {/* Sub-Category Attributes Management Card */}
+          <section className={styles.card}>
+            <div className={styles.cardHeaderAction}>
+              <h3 className={styles.cardTitle}>Sub-Category Attributes</h3>
+              <div className={styles.panelActions}>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={openMappingModal}
+                  disabled={!productData.sub_category_id}
+                >
+                  Assign
+                </Button>
+                <Button variant="outline" size="sm" onClick={openGlobalAttrModal}>Manage</Button>
+              </div>
+            </div>
+
+            {!productData.sub_category_id ? (
+              <div className={styles.emptyPrompt}>
+                <span className="material-symbols-outlined">info</span>
+                <p>Please select a sub-category to manage its attributes.</p>
+              </div>
+            ) : (
+              <div className={styles.attributesMiniGrid}>
+                {categoryAttributes.length === 0 ? (
+                  <p className={styles.emptyText}>No attributes assigned yet. Use "Assign" to add some.</p>
+                ) : (
+                  categoryAttributes.map(attr => (
+                    <div key={attr.attribute_id} className={styles.attrMiniCard}>
+                      <div className={styles.attrMiniHeader}>
+                        <span className={styles.attrMiniName}>{attr.name}</span>
+                        <div className={styles.attrMiniActions}>
+                          <button className={styles.miniIconBtn} onClick={() => openValueModal(attr)} title="Manage Values">
+                            <span className="material-symbols-outlined">tune</span>
+                          </button>
+                          <button className={styles.miniIconBtn} onClick={() => unassignAttribute(attr.attribute_id)} title="Unassign">
+                            <span className="material-symbols-outlined">link_off</span>
+                          </button>
+                        </div>
+                      </div>
+                      <div className={styles.attrMiniValues}>
+                        {attr.values?.length > 0 ? (
+                          attr.values.map(val => (
+                            <span key={val.attribute_value_id} className={styles.miniChip}>{val.value}</span>
+                          ))
+                        ) : (
+                          <span className={styles.noValues}>No values defined</span>
+                        )}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+          </section>
+
           <section className={styles.card}>
             <div className={styles.cardHeaderAction}>
               <h3 className={styles.cardTitle}>Product Imagery</h3>
-              <span className={styles.limitLabel}>MAX 10MB</span>
+              <span className={styles.limitLabel}>{productImages.length}/5 Images</span>
             </div>
-
             <div className={styles.uploadZone} onClick={() => document.getElementById('productImageInput').click()}>
               <CloudUpload size={28} className={styles.uploadIcon} />
               <p className={styles.uploadText}>Drag & drop your textures here</p>
@@ -574,7 +893,6 @@ const EditProduct = () => {
                 onChange={handleProductImageUpload}
               />
             </div>
-
             <div className={styles.imageGrid}>
               {productImages.map((img, idx) => (
                 <div key={idx} className={styles.imageItem}>
@@ -591,51 +909,103 @@ const EditProduct = () => {
                   )}
                 </div>
               ))}
-              <div className={styles.addImage} onClick={() => document.getElementById('productImageInput').click()}>
-                <Plus size={18} />
-              </div>
+              {productImages.length < 5 && (
+                <div className={styles.addImage} onClick={() => document.getElementById('productImageInput').click()}>
+                  <Plus size={18} />
+                </div>
+              )}
             </div>
+
+            {/* Video Upload Section */}
+            <div className={styles.videoSection}>
+              <div className={styles.cardHeaderAction}>
+                <h4 className={styles.label}>Product Video (Optional)</h4>
+                {productVideo && <span className={styles.limitLabel}>1/1 Video</span>}
+              </div>
+              
+              {!productVideo ? (
+                <div className={styles.videoUploadZone} onClick={() => document.getElementById('productVideoInput').click()}>
+                  <Video size={24} className={styles.uploadIcon} />
+                  <p className={styles.uploadText}>Add a video for your product</p>
+                  <p className={styles.uploadSubtext}>MP4, WebM or MOV (Max 50MB)</p>
+                  <input
+                    id="productVideoInput"
+                    type="file"
+                    accept="video/*"
+                    style={{ display: 'none' }}
+                    onChange={handleVideoUpload}
+                  />
+                </div>
+              ) : (
+                <div className={styles.videoPreviewContainer}>
+                  <video src={getImageUrl(productVideo)} className={styles.videoPreview} controls />
+                  <button className={styles.removeVideoBtn} onClick={removeVideo}>
+                    <X size={16} />
+                  </button>
+                </div>
+              )}
+            </div>
+
             <p className={styles.helperText}>
-              These images are associated with the primary variant.
+              Images will be automatically optimized for high performance.
             </p>
           </section>
 
           <section className={styles.card}>
             <h3 className={styles.cardTitle}>Product Variants *</h3>
             <div className={styles.tableWrapper}>
-              <table className={styles.table}>
-                <thead>
-                  <tr>
-                    <th>SKU</th>
-                    <th>Color</th>
-                    <th>Fabric</th>
-                    <th>Stock</th>
-                    <th>Price</th>
-                    <th></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {variants.map((variant, idx) => (
-                    <tr key={idx}>
-                      <td>{variant.sku}</td>
-                      <td>{variant.attributes?.find(a => a.attribute_id === attributeMap.color?.id)?.attribute_value || '-'}</td>
-                      <td>{variant.attributes?.find(a => a.attribute_id === attributeMap.fabric?.id)?.attribute_value || '-'}</td>
-                      <td>
-                         <span className={variant.stock > 5 ? styles.badgeGreen : styles.badgeRed}>
-                           {variant.stock} In Stock
-                         </span>
-                      </td>
-                      <td className={styles.variantPrice}>${variant.price}</td>
-                      <td className={styles.variantDel}>
-                        <button className={styles.variantEditBtn} onClick={() => openVariantModal(idx)}>Edit</button>
-                        <button className={styles.deleteBtn} onClick={() => deleteVariant(idx)}><Trash2 size={13} /></button>
-                      </td>
+              {!productData.sub_category_id ? (
+                 <div className={styles.emptyPrompt}>
+                   <p>Select a sub-category first.</p>
+                 </div>
+              ) : variants.length === 0 ? (
+                <div className={styles.emptyVariants}>
+                  <p>No variants added yet. Click below to add one.</p>
+                </div>
+              ) : (
+                <table className={styles.table}>
+                  <thead>
+                    <tr>
+                      <th>SKU</th>
+                      {categoryAttributes.map(attr => (
+                        <th key={attr.attribute_id}>{attr.name}</th>
+                      ))}
+                      <th>Stock</th>
+                      <th>Price</th>
+                      <th></th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {variants.map((variant, idx) => (
+                      <tr key={idx}>
+                        <td>{variant.sku}</td>
+                        {categoryAttributes.map(attr => (
+                          <td key={attr.attribute_id}>
+                            {variant.attributes?.find(a => a.attribute_id === attr.attribute_id)
+                              ?.attribute_value_name || variant.attributes?.find(a => a.attribute_id === attr.attribute_id)?.attribute_value || '-'}
+                          </td>
+                        ))}
+                        <td>
+                           <span className={variant.stock > 5 ? styles.badgeGreen : styles.badgeRed}>
+                             {variant.stock} In Stock
+                           </span>
+                        </td>
+                        <td className={styles.variantPrice}>${variant.price}</td>
+                        <td className={styles.variantDel}>
+                          <button className={styles.variantEditBtn} onClick={() => openVariantModal(idx)}>Edit</button>
+                          <button className={styles.deleteBtn} onClick={() => deleteVariant(idx)}><Trash2 size={13} /></button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
             </div>
-            <button className={styles.addVariant} onClick={() => openVariantModal()}>
+            <button 
+              className={styles.addVariant} 
+              onClick={() => openVariantModal()}
+              disabled={!productData.sub_category_id}
+            >
               <Plus size={13} /> Add Variant
             </button>
           </section>
@@ -644,9 +1014,84 @@ const EditProduct = () => {
 
       <div className={styles.actionBar}>
         <Button variant="primary" className={styles.publishBtn} onClick={handleSubmit} disabled={loading}>
-          {loading ? <Loader size={16} className={styles.spinner} /> : 'Publish to Boutique'}
+          {loading ? <Loader size={16} className={styles.spinner} /> : 'Update Product'}
         </Button>
       </div>
+
+      {/* --- Attribute Modals --- */}
+
+      {/* 1. Assign Attributes (Mapping) Modal */}
+      <Modal isOpen={isMappingModalOpen} onClose={() => setIsMappingModalOpen(false)} title="Assign Attributes"
+        footer={<><Button variant="ghost" onClick={() => setIsMappingModalOpen(false)}>Cancel</Button><Button variant="primary" onClick={handleAssign}>Save</Button></>}>
+        <div className={styles.modalScrollList}>
+          {allAttributes.length === 0 ? (
+            <p>No global attributes available. Create some first.</p>
+          ) : (
+            allAttributes.map(attr => (
+              <label key={attr.attribute_id} className={styles.checkboxItem}>
+                <input type="checkbox" checked={selectedAttributeIds.includes(attr.attribute_id)} onChange={(e) => {
+                  if (e.target.checked) setSelectedAttributeIds([...selectedAttributeIds, attr.attribute_id]);
+                  else setSelectedAttributeIds(selectedAttributeIds.filter(id => id !== attr.attribute_id));
+                }} />
+                <span>{attr.name}</span>
+              </label>
+            ))
+          )}
+        </div>
+      </Modal>
+
+      {/* 2. Global Attributes Management Modal */}
+      <Modal isOpen={isGlobalAttrModalOpen} onClose={() => setIsGlobalAttrModalOpen(false)} title="Global Attributes" size="large"
+        footer={<Button variant="primary" onClick={() => setIsGlobalAttrModalOpen(false)}>Close</Button>}>
+        <div className={styles.globalAttrContainer}>
+          <div className={styles.addAttrRow}>
+            <input type="text" placeholder="New attribute name" value={newAttrName} onChange={(e) => setNewAttrName(e.target.value)} className={styles.input} />
+            <Button variant="primary" size="sm" onClick={handleCreateGlobalAttr}>Create</Button>
+          </div>
+          <div className={styles.attrTable}>
+            {allAttributes.map(attr => (
+              <div key={attr.attribute_id} className={styles.attrRow}>
+                {editingAttr?.attribute_id === attr.attribute_id ? (
+                  <input value={editingAttrName} onChange={(e) => setEditingAttrName(e.target.value)} onBlur={submitUpdateGlobalAttr} onKeyDown={(e) => e.key === 'Enter' && submitUpdateGlobalAttr()} autoFocus className={styles.editInput} />
+                ) : (
+                  <span className={styles.attrName}>{attr.name}</span>
+                )}
+                <div className={styles.attrRowActions}>
+                  <button className={styles.miniIconBtn} onClick={() => openValueModal(attr)}><span className="material-symbols-outlined">format_list_bulleted</span></button>
+                  <button className={styles.miniIconBtn} onClick={() => handleUpdateGlobalAttr(attr)}><span className="material-symbols-outlined">edit</span></button>
+                  <button className={styles.miniIconBtn} onClick={() => deleteAttribute(attr.attribute_id)}><span className="material-symbols-outlined">delete</span></button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </Modal>
+
+      {/* 3. Attribute Values Management Modal */}
+      <Modal isOpen={isValueModalOpen} onClose={() => setIsValueModalOpen(false)} title={`Manage Values: ${currentAttribute?.name}`}
+        footer={<Button variant="primary" onClick={() => setIsValueModalOpen(false)}>Close</Button>}>
+        <div className={styles.valueManager}>
+          <div className={styles.addValueRow}>
+            <input type="text" placeholder="New value" value={newValueInput} onChange={(e) => setNewValueInput(e.target.value)} className={styles.input} />
+            <Button variant="primary" size="sm" onClick={() => addAttributeValue(currentAttribute.attribute_id, newValueInput)}>Add</Button>
+          </div>
+          <div className={styles.valuesList}>
+            {attributeValues.map(val => (
+              <div key={val.attribute_value_id} className={styles.valueRow}>
+                {editingValue === val.attribute_value_id ? (
+                  <input value={editingValueText} onChange={(e) => setEditingValueText(e.target.value)} onBlur={() => { updateAttributeValue(val.attribute_value_id, editingValueText); setEditingValue(null); }} onKeyDown={(e) => e.key === 'Enter' && updateAttributeValue(val.attribute_value_id, editingValueText)} autoFocus className={styles.editInput} />
+                ) : (
+                  <span>{val.value}</span>
+                )}
+                <div className={styles.attrRowActions}>
+                  <button className={styles.miniIconBtn} onClick={() => { setEditingValue(val.attribute_value_id); setEditingValueText(val.value); }}><span className="material-symbols-outlined">edit</span></button>
+                  <button className={styles.miniIconBtn} onClick={() => deleteAttributeValue(val.attribute_value_id)}><span className="material-symbols-outlined">delete</span></button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </Modal>
 
       {showVariantModal && (
         <div className={styles.modalOverlay}>
@@ -680,36 +1125,34 @@ const EditProduct = () => {
                   onChange={e => setCurrentVariant(prev => ({ ...prev, stock: e.target.value }))}
                 />
               </div>
-              {attributeMap.color && (
-                <div className={styles.formGroup}>
-                  <label>Color</label>
+              {categoryAttributes.map(attr => (
+                <div key={attr.attribute_id} className={styles.formGroup}>
+                  <label>{attr.name}</label>
                   <select
-                    value={currentVariant.color}
-                    onChange={e => setCurrentVariant(prev => ({ ...prev, color: e.target.value }))}
+                    value={currentVariant.attributeValues[attr.attribute_id]?.name || ''}
+                    onChange={e => {
+                      const valName = e.target.value;
+                      const valObj = attr.values.find(v => v.value === valName || v.value_name === valName);
+                      setCurrentVariant(prev => ({
+                        ...prev,
+                        attributeValues: {
+                          ...prev.attributeValues,
+                          [attr.attribute_id]: valObj ? { id: valObj.attribute_value_id, name: valObj.value || valObj.value_name } : null
+                        }
+                      }));
+                    }}
                   >
-                    <option value="">Select color</option>
-                    {attributeMap.color.values.map(val => (
-                      <option key={val.attribute_value_id} value={val.value_name}>{val.value_name}</option>
+                    <option value="">Select {attr.name.toLowerCase()}</option>
+                    {attr.values.map(val => (
+                      <option key={val.attribute_value_id || val.id} value={val.value || val.value_name}>
+                        {val.value || val.value_name}
+                      </option>
                     ))}
                   </select>
                 </div>
-              )}
-              {attributeMap.fabric && (
-                <div className={styles.formGroup}>
-                  <label>Fabric</label>
-                  <select
-                    value={currentVariant.fabric}
-                    onChange={e => setCurrentVariant(prev => ({ ...prev, fabric: e.target.value }))}
-                  >
-                    <option value="">Select fabric</option>
-                    {attributeMap.fabric.values.map(val => (
-                      <option key={val.attribute_value_id} value={val.value_name}>{val.value_name}</option>
-                    ))}
-                  </select>
-                </div>
-              )}
+              ))}
               <div className={styles.formGroup}>
-                <label>Variant Images</label>
+                <label>Variant Images ({currentVariant.images.length}/5)</label>
                 <div className={styles.imageUploadArea}>
                   <button type="button" onClick={() => document.getElementById('vImgInput').click()} className={styles.uploadBtn}>Upload</button>
                   <input id="vImgInput" type="file" multiple accept="image/*" style={{ display: 'none' }} onChange={handleVariantImageUpload} />

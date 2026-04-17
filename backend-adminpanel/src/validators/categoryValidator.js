@@ -2,8 +2,14 @@ const Joi = require('joi');
 
 const categorySchema = Joi.object({
     name: Joi.string().min(2).max(255).required(),
-    parent_category_id: Joi.string().guid({ version: 'uuidv4' }).allow(null).optional(),
     display_order: Joi.number().integer().min(0).optional()
+});
+
+const subCategorySchema = Joi.object({
+    name: Joi.string().min(2).max(255).required(),
+    category_id: Joi.string().guid({ version: 'uuidv4' }).required(),
+    display_order: Joi.number().integer().min(0).optional(),
+    slug: Joi.string().max(255).optional()
 });
 
 const assignAttributesSchema = Joi.object({
@@ -14,6 +20,7 @@ const uuidSchema = Joi.string().guid({ version: 'uuidv4' }).required();
 
 module.exports = {
     categorySchema,
+    subCategorySchema,
     assignAttributesSchema,
     uuidSchema
 };

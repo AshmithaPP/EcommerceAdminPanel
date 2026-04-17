@@ -196,6 +196,43 @@
 .priceCell    { font-weight: 500; white-space: nowrap; font-size: 0.9375rem; }
 .categoryCell { color: var(--on-surface-variant); white-space: nowrap; font-size: 0.875rem; }
 
+.stockCell {
+  text-align: left;
+}
+
+.stockCount {
+  font-family: var(--font-sans);
+  font-weight: 600;
+  color: var(--on-surface);
+  background-color: rgba(193, 181, 160, 0.1);
+  padding: 0.2rem 0.6rem;
+  border-radius: 4px;
+  font-size: 0.8125rem;
+}
+
+.categoryBreadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.parentName {
+  font-size: 0.75rem;
+  color: var(--on-surface-variant);
+  opacity: 0.8;
+}
+
+.categorySeparator {
+  font-size: 0.65rem;
+  color: #C1B5A0;
+}
+
+.subName {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--on-surface-variant);
+}
+
 .actions {
   display: flex;
   align-items: center;
@@ -405,10 +442,22 @@
   flex-wrap: wrap;
 }
 
+.mobilePriceStock {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
 .mobilePrice {
   font-size: 0.9375rem;
   font-weight: 700;
   color: var(--on-surface);
+}
+
+.mobileStock {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--on-surface-variant);
 }
 
 .mobileToggleRow {

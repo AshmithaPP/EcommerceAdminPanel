@@ -1,5 +1,6 @@
 const Product = require('../models/productModel');
 const Category = require('../models/categoryModel');
+const SubCategory = require('../models/subCategoryModel');
 const Attribute = require('../models/attributeModel');
 const inventoryService = require('./inventoryService');
 const db = require('../config/database');
@@ -8,12 +9,12 @@ const { v4: uuidv4 } = require('uuid');
 
 const productService = {
     createProduct: async (productData) => {
-        const { name, category_id, brand, base_price, variants } = productData;
+        const { name, sub_category_id, brand, base_price, variants } = productData;
 
-        // 1. Validation: Category
-        const category = await Category.findById(category_id);
-        if (!category) {
-            const error = new Error('Invalid category ID');
+        // 1. Validation: Sub-Category
+        const subCategory = await SubCategory.findById(sub_category_id);
+        if (!subCategory) {
+            const error = new Error('Invalid sub-category ID');
             error.statusCode = 400;
             throw error;
         }
@@ -32,8 +33,8 @@ const productService = {
             throw error;
         }
 
-        // Get allowed attributes for category
-        const allowedMapping = await Category.getAttributesFlat(category_id);
+        // Get allowed attributes for sub-category
+        const allowedMapping = await SubCategory.getAttributesFlat(sub_category_id);
         // Map of attr_id -> Set of value_ids
         const attrMap = {};
         allowedMapping.forEach(m => {
@@ -98,9 +99,10 @@ const productService = {
                 name,
                 slug,
                 description: productData.description || '',
-                category_id,
+                sub_category_id,
                 brand,
-                base_price: base_price || 0
+                base_price: base_price || 0,
+                video_url: productData.video_url || null
             }, connection);
 
             // 2. Insert Variants
@@ -164,14 +166,14 @@ const productService = {
             throw error;
         }
 
-        const { name, category_id, brand, base_price, status } = productData;
+        const { name, sub_category_id, brand, base_price, status, video_url } = productData;
 
-        // Validation: Category
-        const targetCategoryId = category_id || existing.category_id;
-        if (category_id && category_id !== existing.category_id) {
-            const category = await Category.findById(category_id);
-            if (!category) {
-                const error = new Error('Invalid category ID');
+        // Validation: Sub-Category
+        const targetSubCategoryId = sub_category_id || existing.sub_category_id;
+        if (sub_category_id && sub_category_id !== existing.sub_category_id) {
+            const subCategory = await SubCategory.findById(sub_category_id);
+            if (!subCategory) {
+                const error = new Error('Invalid sub-category ID');
                 error.statusCode = 400;
                 throw error;
             }
@@ -196,10 +198,11 @@ const productService = {
                 name: name || existing.name,
                 slug,
                 description: productData.description !== undefined ? productData.description : existing.description,
-                category_id: targetCategoryId,
+                sub_category_id: targetSubCategoryId,
                 brand: brand || existing.brand,
                 base_price: base_price !== undefined ? base_price : existing.base_price,
-                status: status !== undefined ? status : existing.status
+                status: status !== undefined ? status : existing.status,
+                video_url: video_url !== undefined ? video_url : existing.video_url
             }, connection);
 
             // 2. Sync Variants (if provided)
@@ -321,7 +324,7 @@ const productService = {
         }
 
         // Validate Attributes
-        const allowedMapping = await Category.getAttributesFlat(product.category_id);
+        const allowedMapping = await SubCategory.getAttributesFlat(product.sub_category_id);
         const attrMap = {};
         allowedMapping.forEach(m => {
             if (!attrMap[m.attribute_id]) attrMap[m.attribute_id] = new Set();

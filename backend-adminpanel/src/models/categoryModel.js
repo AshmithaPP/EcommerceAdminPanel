@@ -3,15 +3,15 @@ const { v4: uuidv4 } = require('uuid');
 
 const Category = {
     create: async (categoryData, createdBy) => {
-        const { name, parent_category_id, display_order } = categoryData;
+        const { name, display_order } = categoryData;
         const categoryId = uuidv4();
         
         await db.query(
-            'INSERT INTO categories (category_id, name, parent_category_id, display_order, created_by) VALUES (?, ?, ?, ?, ?)',
-            [categoryId, name, parent_category_id || null, display_order || 0, createdBy]
+            'INSERT INTO categories (category_id, name, display_order, created_by) VALUES (?, ?, ?, ?)',
+            [categoryId, name, display_order || 0, createdBy]
         );
         
-        return { category_id: categoryId, name, parent_category_id, display_order };
+        return { category_id: categoryId, name, display_order };
     },
 
     getAll: async (limit = 10, offset = 0) => {
@@ -47,14 +47,14 @@ const Category = {
     },
 
     update: async (categoryId, categoryData, updatedBy) => {
-        const { name, parent_category_id, display_order } = categoryData;
+        const { name, display_order } = categoryData;
         
         await db.query(
-            'UPDATE categories SET name = ?, parent_category_id = ?, display_order = ?, updated_by = ? WHERE category_id = ?',
-            [name, parent_category_id || null, display_order || 0, updatedBy, categoryId]
+            'UPDATE categories SET name = ?, display_order = ?, updated_by = ? WHERE category_id = ?',
+            [name, display_order || 0, updatedBy, categoryId]
         );
         
-        return { category_id: categoryId, name, parent_category_id, display_order };
+        return { category_id: categoryId, name, display_order };
     },
 
     softDelete: async (categoryId, updatedBy) => {
@@ -98,9 +98,9 @@ const Category = {
     },
 
     // Dependency checks
-    countActiveChildren: async (categoryId) => {
+    countActiveSubCategories: async (categoryId) => {
         const [rows] = await db.query(
-            'SELECT COUNT(*) as count FROM categories WHERE parent_category_id = ? AND status = 1',
+            'SELECT COUNT(*) as count FROM sub_categories WHERE category_id = ? AND status = 1',
             [categoryId]
         );
         return rows[0].count;

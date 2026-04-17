@@ -1,4 +1,5 @@
 const Category = require('../models/categoryModel');
+const SubCategory = require('../models/subCategoryModel');
 const Attribute = require('../models/attributeModel');
 const db = require('../config/database');
 
@@ -43,17 +44,193 @@ const categoryService = {
 
     getCategoryTree: async () => {
         const categories = await Category.getTree();
+        const { sub_categories } = await SubCategory.getAll(1000, 0);
         
-        const buildTree = (items, parentId = null) => {
-            return items
-                .filter(item => item.parent_category_id === parentId)
-                .map(item => ({
-                    ...item,
-                    children: buildTree(items, item.category_id)
-                }));
-        };
+        return categories.map(category => ({
+            ...category,
+            children: sub_categories
+                .filter(sub => sub.category_id === category.category_id)
+                .map(sub => ({
+                    ...sub,
+                    category_id: sub.sub_category_id, // For tree consistency if needed, or keep as is
+                    parent_category_id: sub.category_id
+                }))
+        }));
+    },
 
-        return buildTree(categories);
+    // Sub Category Methods
+    createSubCategory: async (subCategoryData, createdBy) => {
+        const trimmedName = subCategoryData.name.trim();
+        const existing = await SubCategory.findByName(trimmedName, subCategoryData.category_id);
+        if (existing) {
+            const error = new Error('Sub-category with this name already exists in this category');
+            error.statusCode = 400;
+            throw error;
+        }
+
+        const connection = await db.getConnection();
+        try {
+            await connection.beginTransaction();
+            const result = await SubCategory.create({ ...subCategoryData, name: trimmedName }, createdBy);
+            await connection.commit();
+            return result;
+        } catch (error) {
+            await connection.rollback();
+            throw error;
+        } finally {
+            connection.release();
+        }
+    },
+
+    getSubCategoriesByCategoryId: async (categoryId) => {
+        return await SubCategory.getByCategoryId(categoryId);
+    },
+
+    getSubCategoryById: async (subCategoryId) => {
+        const subCategory = await SubCategory.findById(subCategoryId);
+        if (!subCategory) {
+            const error = new Error('Sub-category not found');
+            error.statusCode = 404;
+            throw error;
+        }
+        return subCategory;
+    },
+
+    updateSubCategory: async (subCategoryId, subCategoryData, updatedBy) => {
+        const trimmedName = subCategoryData.name ? subCategoryData.name.trim() : null;
+        const subCategory = await SubCategory.findById(subCategoryId);
+        if (!subCategory) {
+            const error = new Error('Sub-category not found');
+            error.statusCode = 404;
+            throw error;
+        }
+
+        if (trimmedName) {
+            const existing = await SubCategory.findByName(trimmedName, subCategoryData.category_id || subCategory.category_id);
+            if (existing && existing.sub_category_id !== subCategoryId) {
+                const error = new Error('Sub-category with this name already exists in this category');
+                error.statusCode = 400;
+                throw error;
+            }
+        }
+
+        const connection = await db.getConnection();
+        try {
+            await connection.beginTransaction();
+            const result = await SubCategory.update(subCategoryId, { 
+                ...subCategoryData, 
+                name: trimmedName || subCategory.name,
+                category_id: subCategoryData.category_id || subCategory.category_id
+            }, updatedBy);
+            await connection.commit();
+            return result;
+        } catch (error) {
+            await connection.rollback();
+            throw error;
+        } finally {
+            connection.release();
+        }
+    },
+
+    deleteSubCategory: async (subCategoryId, updatedBy) => {
+        const subCategory = await SubCategory.findById(subCategoryId);
+        if (!subCategory) {
+            const error = new Error('Sub-category not found');
+            error.statusCode = 404;
+            throw error;
+        }
+
+        const hasProducts = await SubCategory.hasProducts(subCategoryId);
+        if (hasProducts) {
+            const error = new Error('Cannot delete sub-category with linked products');
+            error.statusCode = 400;
+            throw error;
+        }
+
+        const connection = await db.getConnection();
+        try {
+            await connection.beginTransaction();
+            await SubCategory.softDelete(subCategoryId, updatedBy);
+            await connection.commit();
+        } catch (error) {
+            await connection.rollback();
+            throw error;
+        } finally {
+            connection.release();
+        }
+    },
+
+    assignSubCategoryAttributes: async (subCategoryId, attributeIds, createdBy) => {
+        const subCategory = await SubCategory.findById(subCategoryId);
+        if (!subCategory) {
+            const error = new Error('Sub-category not found');
+            error.statusCode = 404;
+            throw error;
+        }
+
+        const connection = await db.getConnection();
+        try {
+            await connection.beginTransaction();
+
+            for (const attrId of attributeIds) {
+                const attr = await Attribute.findById(attrId);
+                if (!attr) throw new Error(`Attribute with ID ${attrId} not found`);
+            }
+
+            const currentMapped = await SubCategory.getAttributesFlat(subCategoryId);
+            const currentMappedIds = [...new Set(currentMapped.map(m => m.attribute_id))];
+            
+            const toAssign = attributeIds.filter(id => !currentMappedIds.includes(id));
+            const skipped = attributeIds.filter(id => currentMappedIds.includes(id));
+
+            if (toAssign.length > 0) {
+                await SubCategory.assignAttributes(subCategoryId, toAssign, createdBy, connection);
+            }
+
+            await connection.commit();
+            return { assigned: toAssign, skipped };
+        } catch (error) {
+            await connection.rollback();
+            throw error;
+        } finally {
+            connection.release();
+        }
+    },
+
+    unassignSubCategoryAttribute: async (subCategoryId, attributeId) => {
+        const connection = await db.getConnection();
+        try {
+            await connection.beginTransaction();
+            await SubCategory.unassignAttribute(subCategoryId, attributeId, connection);
+            await connection.commit();
+        } catch (error) {
+            await connection.rollback();
+            throw error;
+        } finally {
+            connection.release();
+        }
+    },
+
+    getSubCategoryAttributes: async (subCategoryId) => {
+        const flatData = await SubCategory.getAttributesFlat(subCategoryId);
+        return flatData.reduce((acc, row) => {
+            let attr = acc.find(a => a.attribute_id === row.attribute_id);
+            if (!attr) {
+                attr = {
+                    attribute_id: row.attribute_id,
+                    name: row.attribute_name,
+                    values: []
+                };
+                acc.push(attr);
+            }
+            if (row.attribute_value_id) {
+                attr.values.push({
+                    attribute_value_id: row.attribute_value_id,
+                    value: row.attribute_value
+                });
+            }
+            return acc;
+        }, []);
     },
 
     updateCategory: async (categoryId, categoryData, updatedBy) => {
@@ -96,9 +273,9 @@ const categoryService = {
             throw error;
         }
 
-        const childCount = await Category.countActiveChildren(categoryId);
-        if (childCount > 0) {
-            const error = new Error(`Cannot delete category with ${childCount} active sub-categories`);
+        const subCount = await Category.countActiveSubCategories(categoryId);
+        if (subCount > 0) {
+            const error = new Error(`Cannot delete category with ${subCount} active sub-categories`);
             error.statusCode = 400;
             throw error;
         }

@@ -137,10 +137,18 @@ const Products = () => {
     );
   };
 
-  const getStatusVariant = (status) => {
-    if (status === 'In Stock')  return 'in-stock';
-    if (status === 'Low Stock') return 'low-stock';
-    return 'out-of-stock';
+  const getStockStatus = (totalStock) => {
+    const stockCount = parseInt(totalStock || 0);
+    if (stockCount === 0) return 'Out of Stock';
+    if (stockCount <= 10) return 'Low Stock';
+    return 'In Stock';
+  };
+
+  const getStatusVariant = (totalStock) => {
+    const stockCount = parseInt(totalStock || 0);
+    if (stockCount === 0) return 'out-of-stock';
+    if (stockCount <= 10) return 'low-stock';
+    return 'in-stock';
   };
 
   return (
@@ -183,6 +191,7 @@ const Products = () => {
               <th className={styles.thDetails}>Product Details</th>
               <th>Price</th>
               <th>Category</th>
+              <th>Stock</th>
               <th>Status</th>
               <th>Availability</th>
               <th className={styles.thActions}>Actions</th>
@@ -194,7 +203,7 @@ const Products = () => {
                 <td>
                   <div className={styles.imageContainer}>
                     <img 
-                      src={getImageUrl(product.image)} 
+                      src={getImageUrl(product.thumbnail || product.image)} 
                       alt={product.name} 
                       className={styles.productImg} 
                     />
@@ -207,10 +216,19 @@ const Products = () => {
                   </div>
                 </td>
                 <td className={styles.priceCell}>${product.base_price}</td>
-                <td className={styles.categoryCell}>{product.category_name}</td>
+                <td className={styles.categoryCell}>
+                  <div className={styles.categoryBreadcrumb}>
+                    <span className={styles.parentName}>{product.category_name}</span>
+                    <span className={styles.categorySeparator}>&gt;</span>
+                    <span className={styles.subName}>{product.sub_category_name}</span>
+                  </div>
+                </td>
+                <td className={styles.stockCell}>
+                  <span className={styles.stockCount}>{product.total_stock || 0}</span>
+                </td>
                 <td>
-                  <Badge variant={getStatusVariant(product.status || 'In Stock')}>
-                    {product.status || 'In Stock'}
+                  <Badge variant={getStatusVariant(product.total_stock)}>
+                    {getStockStatus(product.total_stock)}
                   </Badge>
                 </td>
                 <td>
@@ -258,7 +276,7 @@ const Products = () => {
             <div className={styles.mobileCardTop}>
               <div className={styles.mobileImageWrap}>
                 <img 
-                  src={getImageUrl(product.image)} 
+                  src={getImageUrl(product.thumbnail || product.image)} 
                   alt={product.name} 
                   className={styles.productImg} 
                 />
@@ -266,7 +284,7 @@ const Products = () => {
               <div className={styles.mobileCardMeta}>
                 <span className={styles.productName}>{product.name}</span>
                 <span className={styles.sku}>SKU: {product.product_id}</span>
-                <span className={styles.mobileCategory}>{product.category_name}</span>
+                <span className={styles.mobileCategory}>{product.category_name} &gt; {product.sub_category_name}</span>
               </div>
               <div className={styles.mobileCardActions}>
                 <button className={styles.actionBtn} onClick={() => navigate(`/products/edit/${product.product_id}`)}>
@@ -281,9 +299,12 @@ const Products = () => {
               </div>
             </div>
             <div className={styles.mobileCardBottom}>
-              <span className={styles.mobilePrice}>${product.base_price}</span>
-              <Badge variant={getStatusVariant(product.status || 'In Stock')}>
-                {product.status || 'In Stock'}
+              <div className={styles.mobilePriceStock}>
+                <span className={styles.mobilePrice}>${product.base_price}</span>
+                <span className={styles.mobileStock}>Stock: {product.total_stock || 0}</span>
+              </div>
+              <Badge variant={getStatusVariant(product.total_stock)}>
+                {getStockStatus(product.total_stock)}
               </Badge>
               <div className={styles.mobileToggleRow}>
                 <span className={styles.mobileToggleLabel}>Available</span>

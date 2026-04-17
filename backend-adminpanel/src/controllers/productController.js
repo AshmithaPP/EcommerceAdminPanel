@@ -1,15 +1,29 @@
 const productService = require('../services/productService');
+const imageService = require('../services/imageService');
 
 /**
  * Helper to inject an uploaded file path into the product data structure
  * based on the fieldname (e.g., "product_img_0" or "variant_0_img_2").
  */
-const injectFileUrl = (data, fieldname, url) => {
+const injectFileUrl = (data, fieldname, urls) => {
+    // urls can be a string (single url) or an object (multiple sizes)
+    const image_url = typeof urls === 'string' ? urls : urls.main_url;
+    const thumbnail_url = urls.thumbnail_url || urls.thumb_url || null;
+    const mini_thumbnail_url = urls.mini_thumbnail_url || urls.mini_url || null;
+
+    if (fieldname === 'product_video') {
+        data.video_url = image_url;
+        return;
+    }
+
     if (fieldname.startsWith('product_img_')) {
-        const index = parseInt(fieldname.split('_')[2]);
+        const parts = fieldname.split('_');
+        const index = parseInt(parts[parts.length - 1]);
         if (!data.images) data.images = [];
         if (!data.images[index]) data.images[index] = {};
-        data.images[index].image_url = url;
+        data.images[index].image_url = image_url;
+        data.images[index].thumbnail_url = thumbnail_url;
+        data.images[index].mini_thumbnail_url = mini_thumbnail_url;
     } else if (fieldname.startsWith('variant_')) {
         const parts = fieldname.split('_');
         const vIndex = parseInt(parts[1]);
@@ -18,7 +32,9 @@ const injectFileUrl = (data, fieldname, url) => {
         if (!data.variants[vIndex]) data.variants[vIndex] = { images: [] };
         if (!data.variants[vIndex].images) data.variants[vIndex].images = [];
         if (!data.variants[vIndex].images[imgIndex]) data.variants[vIndex].images[imgIndex] = {};
-        data.variants[vIndex].images[imgIndex].image_url = url;
+        data.variants[vIndex].images[imgIndex].image_url = image_url;
+        data.variants[vIndex].images[imgIndex].thumbnail_url = thumbnail_url;
+        data.variants[vIndex].images[imgIndex].mini_thumbnail_url = mini_thumbnail_url;
     }
 };
 
@@ -34,13 +50,18 @@ const productController = {
 
             // Associate uploaded files
             if (req.files && req.files.length > 0) {
-                // We expect placeholders in the JSON like "file_0", "file_1" etc.
-                // Or we can just match by fieldname if provided
-                req.files.forEach(file => {
-                    const fieldname = file.fieldname; // e.g., "product_img_0" or "variant_0_img_1"
-                    // Helper to inject URL into the right place in productData
-                    injectFileUrl(productData, fieldname, `/uploads/${file.filename}`);
-                });
+                for (const file of req.files) {
+                    const fieldname = file.fieldname;
+                    
+                    if (file.mimetype.startsWith('image/')) {
+                        // Process images into multiple sizes
+                        const processedUrls = await imageService.processProductImage(file);
+                        injectFileUrl(productData, fieldname, processedUrls);
+                    } else if (file.mimetype.startsWith('video/')) {
+                        // Video files go direct
+                        injectFileUrl(productData, fieldname, `/uploads/${file.filename}`);
+                    }
+                }
             }
 
             // MAPPING FIX: Assign top-level product images to the first variant
@@ -105,10 +126,18 @@ const productController = {
 
             // Associate uploaded files
             if (req.files && req.files.length > 0) {
-                req.files.forEach(file => {
+                for (const file of req.files) {
                     const fieldname = file.fieldname;
-                    injectFileUrl(productData, fieldname, `/uploads/${file.filename}`);
-                });
+                    
+                    if (file.mimetype.startsWith('image/')) {
+                        // Process images into multiple sizes
+                        const processedUrls = await imageService.processProductImage(file);
+                        injectFileUrl(productData, fieldname, processedUrls);
+                    } else if (file.mimetype.startsWith('video/')) {
+                        // Video files go direct
+                        injectFileUrl(productData, fieldname, `/uploads/${file.filename}`);
+                    }
+                }
             }
 
             // MAPPING FIX: Assign top-level product images to the first variant

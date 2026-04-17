@@ -4,26 +4,37 @@ const { v4: uuidv4 } = require('uuid');
 const Product = {
     // === Product Core ===
     create: async (productData, connection = db) => {
-        const { product_id, name, slug, description, category_id, brand, base_price } = productData;
+        const { product_id, name, slug, description, sub_category_id, brand, base_price, video_url } = productData;
         const sql = `
-            INSERT INTO products (product_id, name, slug, description, category_id, brand, base_price)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO products (product_id, name, slug, description, sub_category_id, brand, base_price, video_url)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         `;
-        await connection.query(sql, [product_id, name, slug, description, category_id, brand, base_price]);
+        await connection.query(sql, [product_id, name, slug, description, sub_category_id, brand, base_price, video_url || null]);
         return product_id;
     },
 
     findAll: async (limit = 10, offset = 0) => {
         const sql = `
-            SELECT p.*, c.name as category_name,
+            SELECT p.*, sc.name as sub_category_name, c.name as category_name,
                    (SELECT vi.image_url 
                     FROM product_variants pv 
                     JOIN variant_images vi ON pv.variant_id = vi.variant_id 
                     WHERE pv.product_id = p.product_id 
                     ORDER BY vi.is_primary DESC, vi.created_at ASC 
-                    LIMIT 1) as image
+                    LIMIT 1) as image,
+                   (SELECT vi.thumbnail_url 
+                    FROM product_variants pv 
+                    JOIN variant_images vi ON pv.variant_id = vi.variant_id 
+                    WHERE pv.product_id = p.product_id 
+                    ORDER BY vi.is_primary DESC, vi.created_at ASC 
+                    LIMIT 1) as thumbnail,
+                   (SELECT SUM(COALESCE(inv.quantity, 0))
+                    FROM product_variants pv
+                    LEFT JOIN inventory_levels inv ON pv.variant_id = inv.variant_id
+                    WHERE pv.product_id = p.product_id AND pv.status = 1) as total_stock
             FROM products p
-            LEFT JOIN categories c ON p.category_id = c.category_id
+            LEFT JOIN sub_categories sc ON p.sub_category_id = sc.sub_category_id
+            LEFT JOIN categories c ON sc.category_id = c.category_id
             WHERE p.status = 1
             ORDER BY p.created_at DESC
             LIMIT ? OFFSET ?
@@ -36,9 +47,10 @@ const Product = {
 
     findById: async (productId) => {
         const sql = `
-            SELECT p.*, c.name as category_name
+            SELECT p.*, sc.name as sub_category_name, c.name as category_name
             FROM products p
-            LEFT JOIN categories c ON p.category_id = c.category_id
+            LEFT JOIN sub_categories sc ON p.sub_category_id = sc.sub_category_id
+            LEFT JOIN categories c ON sc.category_id = c.category_id
             WHERE p.product_id = ? AND p.status = 1
         `;
         const [rows] = await db.query(sql, [productId]);
@@ -59,15 +71,15 @@ const Product = {
     },
 
     update: async (productId, productData, connection = db) => {
-        const { name, slug, description, category_id, brand, base_price, status } = productData;
+        const { name, slug, description, sub_category_id, brand, base_price, status, video_url } = productData;
         const sql = `
             UPDATE products 
-            SET name = ?, slug = ?, description = ?, category_id = ?, brand = ?, base_price = ?, status = ?
+            SET name = ?, slug = ?, description = ?, sub_category_id = ?, brand = ?, base_price = ?, status = ?, video_url = ?
             WHERE product_id = ?
         `;
         await connection.query(sql, [
-            name, slug, description, category_id, brand, base_price, 
-            status !== undefined ? status : 1, productId
+            name, slug, description, sub_category_id, brand, base_price, 
+            status !== undefined ? status : 1, video_url || null, productId
         ]);
     },
 
@@ -199,20 +211,22 @@ const Product = {
                 uuidv4(),
                 variantId,
                 img.image_url,
+                img.thumbnail_url || null,
+                img.mini_thumbnail_url || null,
                 img.is_primary || false
             ]);
         
         if (values.length === 0) return;
 
-        const sql = 'INSERT INTO variant_images (image_id, variant_id, image_url, is_primary) VALUES ?';
+        const sql = 'INSERT INTO variant_images (image_id, variant_id, image_url, thumbnail_url, mini_thumbnail_url, is_primary) VALUES ?';
         await connection.query(sql, [values]);
     },
 
     addVariantImage: async (variantId, imageData, connection = db) => {
-        const { image_url, is_primary } = imageData;
+        const { image_url, thumbnail_url, mini_thumbnail_url, is_primary } = imageData;
         const imageId = uuidv4();
-        const sql = 'INSERT INTO variant_images (image_id, variant_id, image_url, is_primary) VALUES (?, ?, ?, ?)';
-        await connection.query(sql, [imageId, variantId, image_url, is_primary || false]);
+        const sql = 'INSERT INTO variant_images (image_id, variant_id, image_url, thumbnail_url, mini_thumbnail_url, is_primary) VALUES (?, ?, ?, ?, ?, ?)';
+        await connection.query(sql, [imageId, variantId, image_url, thumbnail_url || null, mini_thumbnail_url || null, is_primary || false]);
         return imageId;
     },
 

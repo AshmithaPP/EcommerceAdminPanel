@@ -4,7 +4,7 @@ const attributeController = require('../controllers/attributeController');
 const { protect } = require('../middlewares/authMiddleware');
 
 // All routes are protected
-// router.use(protect);
+router.use(protect);
 
 router.post('/attribute-create', attributeController.createAttribute);
 router.get('/attribute-list', attributeController.getAttributes);
