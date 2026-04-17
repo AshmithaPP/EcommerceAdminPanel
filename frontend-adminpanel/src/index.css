@@ -1,0 +1,151 @@
+/* Global Styles - The Silk Curator Dashboard */
+
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=DM+Sans:wght@400;500;700&family=Inter:wght@400;500;600;700&family=Noto+Serif:wght@400;600;700&family=JetBrains+Mono:wght@400;500&family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap');
+
+:root {
+  /* Color Palette - Luxury Theme */
+  --primary: #755b00;
+  --primary-container: #c9a84c;
+  --on-primary-container: #503d00;
+  --primary-fixed: #ffe08f;
+  --on-primary-fixed-variant: #584400;
+  
+  --surface: #fbf9f6;
+  --on-surface: #1b1c1a;
+  --on-surface-variant: #4d4637;
+  
+  --sidebar-bg: #1C1C1E;
+  --sidebar-text: rgba(208, 197, 178, 0.6);
+  --sidebar-active: #C9A84C;
+  --sidebar-tagline: rgba(208, 197, 178, 0.4);
+  
+  --secondary: #51634d;
+  --secondary-container: #d3e9cd;
+  --on-secondary-container: #576953;
+  
+  --tertiary: #5f5e60;
+  
+  --error: #ba1a1a;
+  --error-container: #ffdad6;
+  --on-error-container: #93000a;
+  
+  --outline-variant: #d0c5b2;
+  --outline: #7e7665;
+  --inverse-surface: #30312f;
+  
+  --surface-container-low: #f5f3f0;
+  --surface-container-high: #eae8e5;
+  --surface-container-highest: #e4e2df;
+  --surface-container-lowest: #ffffff;
+  
+  /* Status Colors */
+  --status-in-stock: #8A9E85;
+  --status-low-stock: #E8A020;
+  --status-out-of-stock: #C0392B;
+  
+  /* Fonts */
+  --font-serif: 'Cormorant Garamond', serif;
+  --font-headline: 'Noto Serif', serif;
+  --font-sans: 'DM Sans', sans-serif;
+  --font-inter: 'Inter', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+
+  
+  --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  --shadow-ambient: 0px 12px 32px rgba(28, 28, 30, 0.04);
+  --shadow-premium: 0px 12px 32px rgba(28, 28, 30, 0.04);
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-inter);
+  background-color: var(--surface);
+  color: var(--on-surface);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+}
+
+h1, h2, h3, h4, h5, h6, .font-serif {
+  font-family: var(--font-serif);
+}
+
+.font-headline {
+  font-family: var(--font-headline);
+}
+
+.font-sans, .font-dm-sans {
+  font-family: var(--font-sans);
+}
+
+.font-inter, .font-body {
+  font-family: var(--font-inter);
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--surface);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--outline-variant);
+  border-radius: 10px;
+}
+
+/* Premium Utilities */
+.text-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  font-weight: 700;
+  color: var(--on-surface-variant);
+}
+
+.tracking-premium {
+  letter-spacing: 0.2em;
+}
+
+.hover-sage-row:hover {
+  background-color: rgba(245, 243, 240, 0.5) !important;
+}
+
+.shadow-premium {
+  box-shadow: var(--shadow-premium);
+}
+
+.glass-header {
+  background: rgba(250, 248, 245, 0.8);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.btn-luxury {
+  background-color: var(--primary-container);
+  color: white;
+  border: none;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  transition: var(--transition-smooth);
+}
+
+.btn-luxury:hover {
+  filter: brightness(1.1);
+  transform: translateY(-1px);
+}
+
+.btn-luxury:active {
+  transform: scale(0.98);
+}

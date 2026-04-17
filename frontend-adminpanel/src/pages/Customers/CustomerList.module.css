@@ -1,0 +1,412 @@
+.customerPageContent {
+  padding: 0 2.5rem 1rem;
+  background-color: #FAF8F5;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.pageHeader {
+  margin-bottom: 2.5rem;
+}
+
+.pageTitle {
+  font-size: 40px;
+  font-weight: 700;
+  color: var(--on-surface);
+  margin-bottom: 8px;
+  line-height: 1.1;
+}
+
+.pageSubtitle {
+  font-family: var(--font-sans);
+  color: var(--on-surface-variant);
+  font-style: italic;
+  font-size: 16px;
+  margin: 0;
+  max-width: 600px;
+}
+
+/* Filter Bar */
+/* Filter Bar Override for Shared Component */
+.searchFilterOverride {
+  padding-top: 0 !important;
+  margin-bottom: 1.5rem !important;
+  align-items: center !important;
+  flex-wrap: nowrap !important;
+}
+
+/* Ensure controls stack on mobile */
+@media (max-width: 768px) {
+  .searchFilterOverride {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    flex-wrap: wrap !important;
+    margin-bottom: 2rem !important;
+  }
+}
+
+/* Fix for the shared SearchFilter icon positioning */
+.searchFilterOverride :global(.material-symbols-outlined) {
+  position: absolute !important;
+  left: 1rem !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  color: #7e7665 !important;
+  font-size: 1.25rem !important;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.statusSelect {
+  background-color: #f5f3f0;
+  border: none;
+  border-radius: 8px;
+  padding: 0.75rem 2rem 0.75rem 1rem;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.875rem;
+  color: #4d4637;
+  min-width: 160px;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' height='24' viewBox='0 -960 960 960' width='24'%3E%3Cpath d='M480-345 240-585l56-56 184 184 184-184 56 56-240 240Z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.75rem center;
+  background-size: 1.25rem;
+}
+
+.topPagination {
+  display: flex;
+  align-items: center;
+  background-color: #f5f3f0;
+  border-radius: 8px;
+  padding: 0 0.5rem;
+  height: 45px;
+}
+
+.pageNavBtn {
+  background: none;
+  border: none;
+  padding: 0.5rem 0.75rem;
+  color: #1C1C1E;
+  opacity: 0.4;
+  cursor: pointer;
+  transition: opacity 0.2s;
+  display: flex;
+  align-items: center;
+}
+
+.pageNavBtn:hover {
+  opacity: 1;
+}
+
+.paginationText {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  padding: 0 1rem;
+  color: #1C1C1E;
+}
+
+/* Table Canvas */
+.tableWrapper {
+  flex: 1;
+  background-color: #ffffff;
+  border-radius: 12px;
+  border: 1px solid rgba(208, 197, 178, 0.2);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.tableScrollArea {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.customerTable {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.tableHeader {
+  position: sticky;
+  top: 0;
+  background-color: #ffffff;
+  z-index: 10;
+  border-bottom: 1px solid rgba(208, 197, 178, 0.1);
+}
+
+.tableHeader th {
+  padding: 1.25rem 1.5rem;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  color: #1C1C1E;
+  font-weight: 700;
+}
+
+.tableRow {
+  border-bottom: 1px solid rgba(208, 197, 178, 0.1);
+  transition: background-color 0.2s;
+}
+
+.tableRow:hover {
+  background-color: #f5f3f0;
+}
+
+.tableCell {
+  padding: 1rem 1.5rem;
+  vertical-align: middle;
+}
+
+.patronCell {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.patronImageWrapper {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  overflow: hidden;
+  background-color: #eae8e5;
+  border: 1px solid rgba(208, 197, 178, 0.2);
+  flex-shrink: 0;
+}
+
+.patronImage {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.patronName {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #1C1C1E;
+  margin: 0;
+}
+
+.patronContact {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.75rem;
+  color: #1C1C1E;
+  opacity: 0.5;
+  margin: 0;
+}
+
+.standardText {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.875rem;
+  color: #1C1C1E;
+  opacity: 0.7;
+}
+
+.ltvText {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: #1C1C1E;
+}
+
+.statusBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.625rem;
+  border-radius: 9999px;
+  font-size: 0.625rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.statusActive {
+  background-color: #d3e9cd;
+  color: #576953;
+}
+
+.statusBlocked {
+  background-color: #ffdad6;
+  color: #93000a;
+}
+
+.actionBtn {
+  padding: 0.5rem 1.5rem;
+  border: 1px solid #1C1C1E;
+  background: transparent;
+  border-radius: 8px;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  cursor: pointer;
+  transition: all 0.2s;
+  color: #1C1C1E;
+}
+
+.actionBtn:hover {
+  background-color: #e4e2df;
+}
+
+/* Footer Pagination */
+.tableFooter {
+  padding: 1rem 2rem;
+  background-color: #f5f3f0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-top: 1px solid rgba(208, 197, 178, 0.1);
+}
+
+.footerInfo {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.75rem;
+  color: #1C1C1E;
+  opacity: 0.5;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.paginationControls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.pageBtn {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.pageBtnActive {
+  background-color: #ffffff;
+  border: 1px solid rgba(208, 197, 178, 0.4);
+  color: #1C1C1E;
+}
+
+.pageBtnInactive {
+  border: none;
+  background: transparent;
+  color: #1C1C1E;
+  opacity: 0.5;
+}
+
+.pageBtnInactive:hover {
+  background-color: rgba(208, 197, 178, 0.2);
+  opacity: 1;
+}
+
+.ellipsis {
+  color: #1C1C1E;
+  opacity: 0.5;
+  font-size: 0.75rem;
+}
+
+/* --- Responsive Layout --- */
+
+/* Tablet & Large Mobile (up to 1024px) */
+@media (max-width: 1024px) {
+  .customerPageContent {
+    padding: 1rem 1.5rem;
+  }
+
+  .customerTable {
+    min-width: 900px; /* Keep all columns readable */
+  }
+
+  .tableScrollArea {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+/* Mobile Portrait & Small Tablets (up to 768px) */
+@media (max-width: 768px) {
+  .customerPageContent {
+    padding: 1rem 1rem 2rem;
+    height: auto;
+    min-height: calc(100vh - 80px);
+    overflow-y: auto;
+  }
+
+  .searchContainer {
+    max-width: 100%;
+    width: 100%;
+  }
+
+  .statusSelect {
+    width: 100%;
+    min-width: auto;
+  }
+
+  .topPagination {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .tableWrapper {
+    height: auto;
+    flex: none;
+    margin-bottom: 1.5rem;
+  }
+
+  .tableScrollArea {
+    max-height: 70vh;
+  }
+
+  .patronCell {
+    min-width: 280px;
+  }
+
+  .tableFooter {
+    flex-direction: column;
+    gap: 1.25rem;
+    padding: 1.5rem 1rem;
+    text-align: center;
+  }
+
+  .paginationControls {
+    width: 100%;
+    justify-content: center;
+    gap: 0.25rem;
+  }
+}
+
+/* Very Small Mobile (up to 480px) */
+@media (max-width: 480px) {
+  .paginationText {
+    font-size: 0.65rem;
+    padding: 0 0.5rem;
+  }
+
+  .patronName {
+    font-size: 1rem;
+  }
+
+  .patronContact {
+    font-size: 0.65rem;
+    white-space: normal;
+  }
+
+  .pageBtn {
+    width: 28px;
+    height: 28px;
+    font-size: 0.7rem;
+  }
+}

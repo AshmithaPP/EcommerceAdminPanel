@@ -1,0 +1,83 @@
+.layoutWrapper {
+  display: flex;
+  height: 100vh;
+  background-color: var(--surface);
+  overflow: hidden;
+}
+
+.mainContent {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  transition: var(--transition-smooth);
+  overflow: hidden;
+  min-width: 0;
+  /* margin-left is set inline via JS (sidebarWidth) */
+}
+
+.fixedHeader {
+  position: fixed;
+  top: 0;
+  right: 0;
+  z-index: 40;
+  background-color: var(--surface);
+  transition: var(--transition-smooth);
+  display: flex;
+  flex-direction: column;
+  /* left is set inline via JS (sidebarWidth) */
+}
+
+.pageContent {
+  padding: 0 40px;
+  flex: 1;
+  min-width: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  /* paddingTop is set inline via JS (navbarHeight) */
+}
+
+/* .collapsed kept for any external references, but margin is now JS-driven */
+.collapsed {
+  margin-left: 80px;
+}
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+  z-index: 45;
+  transition: opacity 0.3s ease;
+}
+
+/* ── Tablet ── */
+@media (max-width: 1024px) {
+  .mainContent {
+    margin-left: 0 !important;
+    overflow-x: hidden;
+  }
+
+  .fixedHeader {
+    left: 0 !important;
+  }
+
+  .pageContent {
+    padding-right: 20px;
+    padding-left: 20px;
+    overflow-x: hidden;
+  }
+}
+
+/* ── Mobile ── */
+@media (max-width: 767px) {
+  .mainContent {
+    overflow-x: hidden;
+  }
+
+  .pageContent {
+    padding-right: 16px;
+    padding-left: 16px;
+    overflow-x: hidden;
+  }
+}

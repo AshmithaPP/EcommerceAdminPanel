@@ -1,0 +1,23 @@
+.badge {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 9999px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  white-space: nowrap;
+  color: #ffffff;
+}
+
+.in-stock {
+  background-color: var(--status-in-stock);
+}
+
+.low-stock {
+  background-color: var(--status-low-stock);
+}
+
+.out-of-stock {
+  background-color: var(--status-out-of-stock);
+}

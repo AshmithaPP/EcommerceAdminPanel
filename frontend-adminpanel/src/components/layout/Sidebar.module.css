@@ -1,0 +1,182 @@
+.sidebar {
+  width: 256px;
+  height: 100vh;
+  position: fixed;
+  left: 0;
+  top: 0;
+  background-color: #1C1C1E;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid rgba(208, 197, 178, 0.05);
+  color: #ffffff;
+  z-index: 50;
+  transition: width 0.3s ease, transform 0.3s ease;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.isCollapsed {
+  width: 80px;
+}
+
+/* ── Logo ── */
+.logoContainer {
+  padding: 32px 32px 0;
+  margin-bottom: 3rem;
+  flex-shrink: 0;
+}
+
+.brandTitle {
+  font-family: var(--font-serif);
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: #C9A84C;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  margin: 0 0 4px;
+}
+
+.brandTitleMini {
+  font-family: var(--font-serif);
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #C9A84C;
+  text-align: center;
+  margin: 0;
+}
+
+.tagline {
+  font-family: var(--font-sans);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  color: rgba(208, 197, 178, 0.4);
+  text-transform: uppercase;
+  margin: 0;
+}
+
+/* ── Nav links ── */
+.navMenu {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.navLink {
+  display: flex;
+  align-items: center;
+  padding: 16px 32px;
+  text-decoration: none;
+  transition: background-color 0.2s ease, color 0.2s ease;
+  color: rgba(208, 197, 178, 0.6);
+  border-left: 4px solid transparent;
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.navLink:hover {
+  background-color: rgba(201, 168, 76, 0.1);
+  color: #C9A84C;
+}
+
+.activeLink {
+  background-color: rgba(201, 168, 76, 0.05);
+  color: #C9A84C;
+  border-left-color: #C9A84C;
+}
+
+.icon {
+  font-size: 20px;
+  flex-shrink: 0;
+  margin-right: 16px;
+}
+
+.isCollapsed .navLink {
+  justify-content: center;
+  padding: 16px;
+}
+
+.isCollapsed .icon {
+  margin-right: 0;
+}
+
+.linkText {
+  white-space: nowrap;
+}
+
+/* ── Bottom actions ── */
+.bottomActions {
+  padding: 24px 32px 32px;
+  border-top: 1px solid rgba(208, 197, 178, 0.1);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: auto;
+  flex-shrink: 0;
+}
+
+.bottomLink {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  color: rgba(208, 197, 178, 0.6);
+  text-decoration: none;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  transition: color 0.2s ease;
+  white-space: nowrap;
+}
+
+.bottomLink:hover {
+  color: #C9A84C;
+}
+
+.logout:hover {
+  color: var(--error);
+}
+
+/* ── Overlay (mobile) ── */
+.overlay {
+  display: none;
+}
+
+/* ── Tablet & Mobile ── */
+@media (max-width: 1024px) {
+  .sidebar {
+    width: 256px;
+    transform: translateX(-100%);
+  }
+
+  /* Override collapsed styles inside drawer — always show full labels */
+  .sidebar.isMobileOpen {
+    transform: translateX(0);
+  }
+
+  .sidebar.isCollapsed.isMobileOpen .navLink {
+    justify-content: flex-start;
+    padding: 16px 32px;
+  }
+
+  .sidebar.isCollapsed.isMobileOpen .icon {
+    margin-right: 16px;
+  }
+
+  .overlay {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.55);
+    z-index: 49;
+    cursor: pointer;
+  }
+}

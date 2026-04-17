@@ -1,0 +1,141 @@
+.navbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 40px;
+  height: 72px;
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(208, 197, 178, 0.15);
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.leftSection {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.hamburger {
+  display: none;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  color: rgba(27, 28, 26, 0.6);
+  line-height: 1;
+  flex-shrink: 0;
+  transition: color 0.2s ease;
+}
+
+.hamburger:hover {
+  color: var(--primary-container);
+}
+
+.hamburger .material-symbols-outlined {
+  font-size: 22px;
+  display: flex;
+}
+
+.brandTitle {
+  font-family: var(--font-serif);
+  font-size: 1.25rem;
+  font-weight: 500;
+  font-style: italic;
+  color: var(--on-surface);
+  white-space: nowrap;
+  margin: 0;
+  letter-spacing: -0.01em;
+  flex-shrink: 0;
+}
+
+.rightSection {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.actionItems {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+
+.notificationWrapper {
+  position: relative;
+  cursor: pointer;
+  color: rgba(27, 28, 26, 0.6);
+  display: flex;
+  align-items: center;
+  transition: color 0.2s ease;
+}
+
+.notificationWrapper:hover {
+  color: var(--primary-container);
+}
+
+.notificationWrapper .material-symbols-outlined {
+  font-size: 20px;
+}
+
+.notificationDot {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 8px;
+  height: 8px;
+  background-color: var(--primary-container);
+  border-radius: 50%;
+  border: 2px solid white;
+}
+
+.profileWrapper {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 1px solid rgba(208, 197, 178, 0.3);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.profileWrapper img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* ── Tablet ── */
+@media (max-width: 1024px) {
+  .navbar {
+    padding: 0 20px;
+  }
+
+  .hamburger {
+    display: flex;
+    align-items: center;
+  }
+
+  .leftSection {
+    gap: 1rem;
+  }
+}
+
+/* ── Mobile ── */
+@media (max-width: 640px) {
+  .navbar {
+    padding: 0 16px;
+  }
+
+  .brandTitle {
+    font-size: 1rem;
+  }
+
+  .actionItems {
+    gap: 16px;
+  }
+}

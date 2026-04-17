@@ -1,0 +1,474 @@
+.container {
+  padding: 1.5rem 2rem 0.5rem;
+  background-color: var(--surface);
+  min-height: calc(100vh - 80px);
+}
+
+.serifDisplay {
+  font-family: var(--font-serif);
+  color: var(--on-surface);
+}
+
+.heroSection {
+  margin-bottom: 0.75rem;
+}
+
+.orderId {
+  font-family: var(--font-sans);
+  font-size: 1.25rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  margin-bottom: 0.1rem;
+  color: var(--on-surface);
+}
+
+.statusRow {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.badgeInStock {
+  padding: 0.25rem 0.75rem;
+  border-radius: 9999px;
+  background-color: var(--secondary-container);
+  color: var(--on-secondary-container);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+}
+
+.orderDate {
+  font-size: 0.75rem;
+  color: var(--on-surface-variant);
+  opacity: 0.6;
+}
+
+/* Header Actions */
+.headerActions {
+  display: flex;
+  gap: 0.75rem;
+  margin-left: auto;
+}
+
+.btnConfirm {
+  background-color: var(--primary);
+  color: white;
+  padding: 0.5rem 1.5rem;
+  border: none;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  transition: var(--transition-smooth);
+}
+
+.btnConfirm:hover {
+  filter: brightness(1.1);
+  box-shadow: 0 4px 12px rgba(117, 91, 0, 0.2);
+}
+
+.btnShipped {
+  background-color: transparent;
+  color: var(--on-surface);
+  padding: 0.5rem 1.5rem;
+  border: 2px solid var(--on-surface);
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  transition: var(--transition-smooth);
+}
+
+.btnShipped:hover {
+  background-color: var(--surface-container-highest);
+}
+
+/* Bento Cards */
+.bentoCard {
+  background-color: var(--surface-container-lowest);
+  padding: 0.75rem 1rem;
+  border-radius: 0.75rem;
+  border: 1px solid rgba(208, 197, 178, 0.2);
+  box-shadow: 0px 4px 12px rgba(28, 28, 30, 0.03);
+  height: 100%;
+  position: relative;
+  transition: box-shadow 0.3s ease;
+}
+
+.bentoCard:hover {
+  box-shadow: 0px 12px 32px rgba(28, 28, 30, 0.06);
+}
+
+.cardHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.25rem;
+}
+
+.cardTitle {
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.cardIcon {
+  color: var(--primary);
+  opacity: 0.4;
+}
+
+.infoGroup {
+  margin-bottom: 0.25rem;
+}
+
+.label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  color: var(--on-surface-variant);
+  opacity: 0.6;
+  margin-bottom: 0.25rem;
+}
+
+.value {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--on-surface);
+}
+
+.specialInstructions {
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid rgba(208, 197, 178, 0.15);
+}
+
+.italicText {
+  font-style: italic;
+  font-size: 0.875rem;
+  color: var(--on-surface-variant);
+}
+
+/* Items Table */
+.itemsTableWrapper {
+  background-color: var(--surface-container-lowest);
+  border-radius: 0.75rem;
+  border: 1px solid rgba(208, 197, 178, 0.2);
+  overflow: hidden;
+}
+
+.itemsTable {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.itemsTable thead {
+  background-color: var(--surface-container-low);
+}
+
+.itemsTable th {
+  padding: 1rem 1.5rem;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  color: var(--on-surface-variant);
+  opacity: 0.7;
+}
+
+.itemsTable td {
+  padding: 0.25rem 1rem;
+  border-bottom: 1px solid rgba(208, 197, 178, 0.1);
+}
+
+.productCell {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.thumbnail {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 0.25rem;
+  object-fit: cover;
+  background-color: var(--surface-container);
+}
+
+.sku {
+  font-size: 0.75rem;
+  color: var(--on-surface-variant);
+  opacity: 0.6;
+}
+
+.priceTotal {
+  font-weight: 700;
+  color: var(--primary);
+}
+
+/* Summary Block */
+.summaryRow {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+  font-size: 0.875rem;
+  color: var(--on-surface-variant);
+}
+
+.totalRow {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid rgba(208, 197, 178, 0.2);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.totalLabel {
+  font-size: 1.125rem;
+  font-weight: 700;
+}
+
+.totalValue {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--primary);
+}
+
+/* Payment Info */
+.visaBadge {
+  width: 2.5rem;
+  height: 1.5rem;
+  background-color: var(--surface-container);
+  border: 1px solid rgba(208, 197, 178, 0.2);
+  border-radius: 0.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 8px;
+  font-weight: 700;
+}
+
+.paymentStatus {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 1rem 0;
+}
+
+.statusDot {
+  width: 0.75rem;
+  height: 0.75rem;
+  border-radius: 50%;
+  background-color: var(--secondary);
+}
+
+.paymentStatusText {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  color: var(--secondary);
+}
+
+/* Timeline */
+.timeline {
+  position: relative;
+  padding-left: 2rem;
+}
+
+.timeline::before {
+  content: '';
+  position: absolute;
+  left: 0.625rem;
+  top: 0.5rem;
+  bottom: 0;
+  width: 1px;
+  background-color: rgba(208, 197, 178, 0.3);
+}
+
+.timelineItem {
+  position: relative;
+  margin-bottom: 0.5rem;
+}
+
+.timelineMarker {
+  position: absolute;
+  left: -2rem;
+  top: 0.125rem;
+  width: 1.25rem;
+  height: 1.25rem;
+  border-radius: 50%;
+  background-color: var(--surface-container-lowest);
+  border: 2px solid var(--primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+}
+
+.timelineMarkerFuture {
+  border-color: rgba(208, 197, 178, 0.3);
+}
+
+.markerPulse {
+  width: 0.5rem;
+  height: 0.5rem;
+  background-color: rgba(208, 197, 178, 0.6);
+  border-radius: 50%;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(208, 197, 178, 0.7); }
+  70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(208, 197, 178, 0); }
+  100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(208, 197, 178, 0); }
+}
+
+.timelineTitle {
+  font-size: 0.875rem;
+  font-weight: 700;
+  margin-bottom: 0.25rem;
+}
+
+.timelineDate {
+  font-size: 0.75rem;
+  color: var(--on-surface-variant);
+  opacity: 0.6;
+}
+
+/* Footer Section */
+.footer {
+  margin-top: 0.5rem;
+  padding: 0.25rem 0;
+  border-top: 1px solid rgba(208, 197, 178, 0.1);
+  text-align: center;
+}
+
+.footerNote {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  color: rgba(77, 70, 55, 0.4);
+}
+
+/* --- Responsive Layout --- */
+
+/* Tablet & Large Mobile (up to 1024px) */
+@media (max-width: 1024px) {
+  .container {
+    padding: 1.5rem 1.5rem 1rem;
+  }
+
+  .itemsTableWrapper {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .itemsTable {
+    min-width: 650px;
+  }
+
+  .itemsTable th:first-child, .itemsTable td:first-child {
+    min-width: 280px;
+  }
+}
+
+/* Mobile Portrait & Small Tablets (up to 768px) */
+@media (max-width: 768px) {
+  .container {
+    padding: 1rem 1rem 2rem;
+    min-height: auto;
+  }
+
+  .heroSection {
+    margin-bottom: 2rem;
+  }
+
+  .heroTitleArea {
+    flex-direction: column;
+    align-items: flex-start !important;
+    gap: 1.25rem;
+  }
+
+  .orderId {
+    font-size: 1.5rem;
+  }
+
+  .headerActions {
+    width: 100%;
+    margin-left: 0;
+    gap: 0.5rem;
+  }
+
+  .btnConfirm, .btnShipped {
+    flex: 1;
+    padding: 0.75rem 1rem;
+    font-size: 0.75rem;
+    justify-content: center;
+    white-space: nowrap;
+  }
+
+  .statusRow {
+    flex-wrap: wrap;
+    gap: 0.75rem;
+  }
+
+  .bentoCard {
+    padding: 1.25rem;
+  }
+
+  .cardTitle {
+    font-size: 1.125rem;
+  }
+
+  .itemsTable td {
+    padding: 0.75rem 1rem;
+  }
+
+  .totalValue {
+    font-size: 1.25rem;
+  }
+
+  .timeline {
+    padding-left: 1.75rem;
+  }
+
+  .timelineMarker {
+    left: -1.75rem;
+  }
+}
+
+/* Very Small Mobile (up to 480px) */
+@media (max-width: 480px) {
+  .headerActions {
+    flex-direction: column;
+  }
+
+  .btnConfirm, .btnShipped {
+    width: 100%;
+  }
+
+  .orderId {
+    font-size: 1.25rem;
+  }
+
+  .badgeInStock {
+    font-size: 8px;
+    padding: 0.2rem 0.6rem;
+  }
+
+  .orderDate {
+    font-size: 0.7rem;
+  }
+
+  .bentoCard {
+    padding: 1rem;
+  }
+
+  .productCell p {
+    font-size: 0.8125rem;
+  }
+}

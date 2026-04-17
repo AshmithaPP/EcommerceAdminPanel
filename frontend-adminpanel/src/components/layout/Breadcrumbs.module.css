@@ -1,0 +1,36 @@
+.breadcrumbContainer {
+  width: 100%;
+  padding: 0.75rem 40px; /* Reduced vertical padding */
+  background-color: var(--surface);
+  border-bottom: 1px solid rgba(208, 197, 178, 0.03);
+}
+
+.breadcrumb {
+  display: flex;
+  align-items: center;
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  color: rgba(28, 28, 30, 0.4);
+  text-transform: uppercase;
+}
+
+.breadcrumbParent {
+  transition: var(--transition-smooth);
+}
+
+.breadcrumbParent:hover {
+  color: var(--primary-container);
+  cursor: pointer;
+}
+
+.breadcrumbSeparator {
+  margin: 0 12px;
+  color: rgba(201, 168, 76, 0.2);
+  font-weight: 400;
+}
+
+.breadcrumbCurrent {
+  color: rgba(28, 28, 30, 0.8);
+}
