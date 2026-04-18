@@ -1,7 +1,9 @@
 const categoryService = require('../services/categoryService');
 const { 
     categorySchema, 
+    updateCategorySchema,
     subCategorySchema,
+    updateSubCategorySchema,
     assignAttributesSchema, 
     uuidSchema 
 } = require('../validators/categoryValidator');
@@ -117,7 +119,7 @@ const categoryController = {
     updateSubCategory: async (req, res, next) => {
         try {
             const { sub_category_id } = req.params;
-            const { error } = subCategorySchema.validate(req.body);
+            const { error } = updateSubCategorySchema.validate(req.body);
             if (error) {
                 const err = new Error(error.details[0].message);
                 err.statusCode = 400;
@@ -235,7 +237,7 @@ const categoryController = {
             const { error: idError } = uuidSchema.validate(category_id);
             if (idError) throw new Error('Invalid category ID format');
 
-            const { error } = categorySchema.validate(req.body);
+            const { error } = updateCategorySchema.validate(req.body);
             if (error) {
                 const err = new Error(error.details[0].message);
                 err.statusCode = 400;

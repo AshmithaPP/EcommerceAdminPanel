@@ -3,45 +3,64 @@
 @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=DM+Sans:wght@400;500;700&family=Inter:wght@400;500;600;700&family=Noto+Serif:wght@400;600;700&family=JetBrains+Mono:wght@400;500&family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap');
 
 :root {
-  /* Color Palette - Luxury Theme */
-  --primary: #755b00;
-  --primary-container: #c9a84c;
-  --on-primary-container: #503d00;
-  --primary-fixed: #ffe08f;
-  --on-primary-fixed-variant: #584400;
+  /* Color Palette - Modern Admin Theme */
+  --primary: #4f7cff;
+  --primary-hover: #3b66d9;
+  --on-primary: #FFFFFF;
   
-  --surface: #fbf9f6;
-  --on-surface: #1b1c1a;
-  --on-surface-variant: #4d4637;
+  --sidebar-bg: #0D1B3E;
+  --sidebar-text: #7A89B0;
+  --sidebar-active: #4361EE;
+  --sidebar-active-text: #FFFFFF;
   
-  --sidebar-bg: #1C1C1E;
-  --sidebar-text: rgba(208, 197, 178, 0.6);
-  --sidebar-active: #C9A84C;
-  --sidebar-tagline: rgba(208, 197, 178, 0.4);
+  --navbar-bg: #E8ECF8;
+  --surface: #fcfcfc;
+  --card-bg: #FFFFFF;
+  --input-bg: #EEF0F8;
   
-  --secondary: #51634d;
-  --secondary-container: #d3e9cd;
-  --on-secondary-container: #576953;
+  --heading-text: #0D1B3E;
+  --body-text: #1A202C;
+  --on-surface: #1A202C;
+  --muted-text: #7A89B0;
+  --on-surface-variant: #7A89B0;
   
-  --tertiary: #5f5e60;
-  
-  --error: #ba1a1a;
-  --error-container: #ffdad6;
-  --on-error-container: #93000a;
-  
-  --outline-variant: #d0c5b2;
-  --outline: #7e7665;
-  --inverse-surface: #30312f;
-  
-  --surface-container-low: #f5f3f0;
-  --surface-container-high: #eae8e5;
-  --surface-container-highest: #e4e2df;
-  --surface-container-lowest: #ffffff;
+  --border-default: #D8DCF0;
+  --outline: #D8DCF0;
+  --outline-variant: #D8DCF0;
   
   /* Status Colors */
-  --status-in-stock: #8A9E85;
-  --status-low-stock: #E8A020;
-  --status-out-of-stock: #C0392B;
+  --status-success: #0ECC9A;
+  --status-success-bg: #E1F5EE;
+  --status-warning: #F59E0B;
+  --status-warning-bg: #FFFBEB;
+  --status-danger: #E24B4A;
+  --status-danger-bg: #FCEBEB;
+  --status-info: #3B82F6;
+  --status-info-bg: #E6F1FB;
+  
+  --table-stripe: #F8FAFC;
+  --table-border: #D8DCF0;
+  --table-header-bg: #E8ECF8;
+  
+  --accent: #0ECC9A;
+
+  /* Tag & Label System */
+  --tag-primary: #4361EE;
+  --tag-primary-bg: #EEF0F8;
+  --tag-primary-soft: rgba(67, 97, 238, 0.1);
+  
+  --tag-success: #0ECC9A;
+  --tag-success-bg: #E1F5EE;
+  
+  --tag-warning: #F59E0B;
+  --tag-warning-bg: #FFFBEB;
+  
+  --tag-danger: #E24B4A;
+  --tag-danger-bg: #FCEBEB;
+
+  /* Legacy Compat (mapped to new system) */
+  --primary-container: var(--primary);
+  --surface-container-lowest: var(--card-bg);
   
   /* Fonts */
   --font-serif: 'Cormorant Garamond', serif;
@@ -50,10 +69,9 @@
   --font-inter: 'Inter', sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
 
-  
   --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  --shadow-ambient: 0px 12px 32px rgba(28, 28, 30, 0.04);
-  --shadow-premium: 0px 12px 32px rgba(28, 28, 30, 0.04);
+  --shadow-ambient: 0px 4px 12px rgba(13, 27, 62, 0.05);
+  --shadow-premium: 0px 8px 24px rgba(13, 27, 62, 0.08);
 }
 
 * {
@@ -108,7 +126,7 @@ h1, h2, h3, h4, h5, h6, .font-serif {
   text-transform: uppercase;
   letter-spacing: 0.15em;
   font-weight: 700;
-  color: var(--on-surface-variant);
+  color: var(--muted-text);
 }
 
 .tracking-premium {
@@ -149,3 +167,20 @@ h1, h2, h3, h4, h5, h6, .font-serif {
 .btn-luxury:active {
   transform: scale(0.98);
 }
+
+/* Status Badges */
+.status-badge {
+  display: inline-block;
+  padding: 0.25rem 0.65rem;
+  border-radius: 999px;
+  font-size: 8px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+}
+
+.status-delivered { background-color: var(--status-success-bg); color: var(--status-success); }
+.status-processing { background-color: var(--status-info-bg); color: var(--status-info); }
+.status-cancelled { background-color: var(--status-danger-bg); color: var(--status-danger); }
+.status-warning { background-color: var(--status-warning-bg); color: var(--status-warning); }

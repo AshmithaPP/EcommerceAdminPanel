@@ -19,14 +19,21 @@ const routeMap = {
 const Breadcrumbs = () => {
   const location = useLocation();
   
-  // Custom logic for dynamic order IDs
+  // Enhanced logic for dynamic routes
   let pathData;
-  if (location.pathname.startsWith('/orders/') && location.pathname !== '/orders') {
+  const path = location.pathname;
+
+  if (path.startsWith('/products/edit/')) {
+    pathData = { parent: 'INVENTORY', current: 'EDIT PRODUCT' };
+  } else if (path.startsWith('/products/add')) {
+    pathData = { parent: 'INVENTORY', current: 'ADD PRODUCT' };
+  } else if (path.startsWith('/orders/') && path !== '/orders') {
     pathData = { parent: 'INVENTORY', current: 'ORDER DETAILS' };
-  } else if (location.pathname.startsWith('/customers/') && location.pathname !== '/customers') {
+  } else if (path.startsWith('/customers/') && path !== '/customers') {
     pathData = { parent: 'CUSTOMERS', current: 'PROFILE' };
   } else {
-    pathData = routeMap[location.pathname] || { parent: 'ADMIN', current: 'PANEL' };
+    // Exact match from map or default
+    pathData = routeMap[path] || { parent: 'ADMIN', current: 'PANEL' };
   }
 
   return (

@@ -1,0 +1,242 @@
+.chartContainer {
+  background-color: var(--card-bg, #fff);
+  border-radius: 8.92px;
+  overflow: hidden;
+  border: 1px solid var(--border-default, #D8DCF0);
+  box-shadow: 0px 1.46px 4.88px 0px #00000040;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.chartContainer:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-premium);
+}
+
+.chartContainer :focus {
+  outline: none !important;
+}
+
+.chartContainer * {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* StatCard Style Header */
+.header {
+  background-color: var(--navbar-bg, #E8ECF8);
+  padding: 3px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--border-default, #D8DCF0);
+}
+
+.label {
+  font-family: var(--font-inter, sans-serif);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--primary, #4361EE);
+}
+
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.timeframeSelector {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--primary);
+  text-transform: uppercase;
+  cursor: pointer;
+  opacity: 0.8;
+  transition: opacity 0.2s ease;
+}
+
+.timeframeSelector:hover {
+  opacity: 1;
+}
+
+.liveIndicator {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-right: 0.5rem;
+}
+
+.pulseDot {
+  width: 6px;
+  height: 6px;
+  background-color: var(--primary, #4361EE);
+  border-radius: 50%;
+  position: relative;
+}
+
+.pulseDot::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: var(--primary, #4361EE);
+  border-radius: 50%;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0% { transform: scale(1); opacity: 0.8; }
+  100% { transform: scale(3.5); opacity: 0; }
+}
+
+.liveText {
+  font-size: 9.5px;
+  font-weight: 600;
+  color: var(--heading-text, #0D1B3E);
+}
+
+.iconWrapper {
+  color: var(--primary);
+  display: flex;
+  align-items: center;
+  opacity: 0.8;
+}
+
+/* Content Body */
+.body {
+  padding: 1.25rem 1.5rem;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.summaryInfo {
+  margin-bottom: 1.5rem;
+}
+
+.subtitle {
+  font-size: 0.8125rem;
+  color: var(--muted-text, #7A89B0);
+  margin: 0 0 0.5rem;
+  font-weight: 500;
+}
+
+.valueRow {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+.mainValue {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--heading-text, #0D1B3E);
+  line-height: 1;
+}
+
+.currencyCode {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--muted-text);
+  text-transform: uppercase;
+}
+
+.growthBadge {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.25rem 0.5rem;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  margin-left: 0.25rem;
+}
+
+.positive {
+  background-color: var(--status-success-bg, #E1F5EE);
+  color: var(--status-success, #0ECC9A);
+}
+
+.negative {
+  background-color: var(--status-danger-bg, #FCEBEB);
+  color: var(--status-danger, #E24B4A);
+}
+
+.chartArea {
+  flex: 1;
+  min-height: 180px;
+}
+
+@media (max-width: 768px) {
+  .body {
+    padding: 1rem;
+  }
+
+  .mainValue {
+    font-size: 1.5rem;
+  }
+
+  .chartArea {
+    min-height: 160px;
+  }
+}
+
+/* Custom Tooltip Styling */
+.customTooltip {
+  background-color: #FFFFFF;
+  border-radius: 12px;
+  box-shadow: 0px 8px 24px rgba(13, 27, 62, 0.12);
+  border: 1px solid var(--border-default, #D8DCF0);
+  overflow: hidden;
+  min-width: 120px;
+}
+
+.tooltipHeader {
+  background-color: #E8ECF8;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--border-default);
+}
+
+.tooltipLabel {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--heading-text, #0D1B3E);
+  margin: 0;
+}
+
+.tooltipBody {
+  padding: 0.6rem 0.75rem;
+}
+
+.tooltipItem {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.tooltipDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+
+.tooltipName {
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--muted-text, #7A89B0);
+  flex: 1;
+}
+
+.tooltipValue {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--heading-text, #0D1B3E);
+}

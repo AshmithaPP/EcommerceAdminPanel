@@ -9,7 +9,7 @@ const { v4: uuidv4 } = require('uuid');
 
 const productService = {
     createProduct: async (productData) => {
-        const { name, sub_category_id, brand, base_price, variants } = productData;
+        const { name, sub_category_id, brand, variants, gstPercent } = productData;
 
         // 1. Validation: Sub-Category
         const subCategory = await SubCategory.findById(sub_category_id);
@@ -52,10 +52,27 @@ const productService = {
             }
             skus.add(variant.sku);
 
-            // Check SKU uniqueness in DB
+            // Validate SKU uniqueness in DB
             const existingSku = await Product.findVariantBySku(variant.sku);
             if (existingSku) {
                 const error = new Error(`SKU already exists: ${variant.sku}`);
+                error.statusCode = 400;
+                throw error;
+            }
+
+            // Validate Pricing
+            if (!variant.mrp || variant.mrp <= 0) {
+                const error = new Error(`MRP must be greater than 0 for SKU: ${variant.sku}`);
+                error.statusCode = 400;
+                throw error;
+            }
+            if (!variant.sellingPrice || variant.sellingPrice <= 0) {
+                const error = new Error(`Selling Price must be greater than 0 for SKU: ${variant.sku}`);
+                error.statusCode = 400;
+                throw error;
+            }
+            if (parseFloat(variant.sellingPrice) > parseFloat(variant.mrp)) {
+                const error = new Error(`Selling Price cannot be greater than MRP for SKU: ${variant.sku}`);
                 error.statusCode = 400;
                 throw error;
             }
@@ -101,8 +118,8 @@ const productService = {
                 description: productData.description || '',
                 sub_category_id,
                 brand,
-                base_price: base_price || 0,
-                video_url: productData.video_url || null
+                video_url: productData.video_url || null,
+                gstPercent: gstPercent || 0
             }, connection);
 
             // 2. Insert Variants
@@ -112,7 +129,9 @@ const productService = {
                     variant_id: variantId,
                     product_id: productId,
                     sku: variantData.sku,
-                    price: variantData.price
+                    price: variantData.sellingPrice, // Use sellingPrice for legacy price field
+                    mrp: variantData.mrp,
+                    sellingPrice: variantData.sellingPrice
                 }, connection);
 
                 // Initialize Inventory for the new variant
@@ -166,7 +185,7 @@ const productService = {
             throw error;
         }
 
-        const { name, sub_category_id, brand, base_price, status, video_url } = productData;
+        const { name, sub_category_id, brand, status, video_url, gstPercent } = productData;
 
         // Validation: Sub-Category
         const targetSubCategoryId = sub_category_id || existing.sub_category_id;
@@ -200,9 +219,9 @@ const productService = {
                 description: productData.description !== undefined ? productData.description : existing.description,
                 sub_category_id: targetSubCategoryId,
                 brand: brand || existing.brand,
-                base_price: base_price !== undefined ? base_price : existing.base_price,
                 status: status !== undefined ? status : existing.status,
-                video_url: video_url !== undefined ? video_url : existing.video_url
+                video_url: video_url !== undefined ? video_url : existing.video_url,
+                gstPercent: gstPercent !== undefined ? gstPercent : existing.gstPercent
             }, connection);
 
             // 2. Sync Variants (if provided)
@@ -224,7 +243,9 @@ const productService = {
                         // Update existing variant
                         await Product.updateVariant(vData.variant_id, {
                             sku: vData.sku,
-                            price: vData.price,
+                            price: vData.sellingPrice,
+                            mrp: vData.mrp,
+                            sellingPrice: vData.sellingPrice,
                             status: vData.status !== undefined ? vData.status : 1
                         }, connection);
 
@@ -251,7 +272,9 @@ const productService = {
                             variant_id: newVid,
                             product_id: productId,
                             sku: vData.sku,
-                            price: vData.price
+                            price: vData.sellingPrice,
+                            mrp: vData.mrp,
+                            sellingPrice: vData.sellingPrice
                         }, connection);
 
                         // Initialize Inventory for the new variant
@@ -357,7 +380,9 @@ const productService = {
                 variant_id: variantId,
                 product_id: productId,
                 sku: variantData.sku,
-                price: variantData.price
+                price: variantData.sellingPrice,
+                mrp: variantData.mrp,
+                sellingPrice: variantData.sellingPrice
             }, connection);
 
             // Initialize Inventory for the new variant
@@ -408,7 +433,9 @@ const productService = {
             // 1. Update Core Fields
             await Product.updateVariant(variantId, {
                 sku: variantData.sku || existing.sku,
-                price: variantData.price !== undefined ? variantData.price : existing.price,
+                price: variantData.sellingPrice !== undefined ? variantData.sellingPrice : existing.price,
+                mrp: variantData.mrp !== undefined ? variantData.mrp : existing.mrp,
+                sellingPrice: variantData.sellingPrice !== undefined ? variantData.sellingPrice : existing.sellingPrice,
                 status: variantData.status !== undefined ? variantData.status : existing.status
             }, connection);
 

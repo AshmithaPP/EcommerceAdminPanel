@@ -8,7 +8,7 @@ const fs = require('fs').promises;
 const imageService = {
   /**
    * Processes a single image file into three WebP versions:
-   * 1. Main: 800x1000 (aspect ratio preserved or square if requested)
+   * 1. Main: 1000x1000 (square crop as requested)
    * 2. Thumbnail: 300x300 (square crop)
    * 3. Mini Thumbnail: 150x150 (square crop)
    */
@@ -19,10 +19,10 @@ const imageService = {
     const versions = [
       { 
         name: 'main', 
-        suffix: '', 
-        width: 800, 
+        suffix: '_main', 
+        width: 1000, 
         height: 1000, 
-        fit: 'inside', // preserve aspect ratio but fit within these bounds
+        fit: 'cover', // square crop to fit 1000x1000
         quality: 80 
       },
       { 
@@ -49,7 +49,7 @@ const imageService = {
       const outputFilename = `${filename}${v.suffix}.webp`;
       const outputPath = path.join(uploadDir, outputFilename);
 
-      await sharp(file.path)
+      const info = await sharp(file.path)
         .resize({
           width: v.width,
           height: v.height,
@@ -60,11 +60,23 @@ const imageService = {
         .toFile(outputPath);
 
       results[`${v.name}_url`] = `/uploads/${outputFilename}`;
+      
+      // Store metadata for the main image
+      if (v.name === 'main') {
+        results.width = info.width;
+        results.height = info.height;
+        results.file_size = info.size;
+        results.format = info.format;
+      }
     }
 
     // Optional: Delete the original uploaded file to save space
     // Since we only want optimized WebP files.
-    // await fs.unlink(file.path);
+    try {
+      await fs.unlink(file.path);
+    } catch (err) {
+      console.warn(`Failed to delete original file: ${file.path}`, err);
+    }
 
     return results;
   }

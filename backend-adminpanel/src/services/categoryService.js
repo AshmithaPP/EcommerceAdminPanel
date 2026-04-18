@@ -120,7 +120,9 @@ const categoryService = {
             const result = await SubCategory.update(subCategoryId, { 
                 ...subCategoryData, 
                 name: trimmedName || subCategory.name,
-                category_id: subCategoryData.category_id || subCategory.category_id
+                category_id: subCategoryData.category_id || subCategory.category_id,
+                display_order: subCategoryData.display_order !== undefined ? subCategoryData.display_order : subCategory.display_order,
+                slug: subCategoryData.slug !== undefined ? subCategoryData.slug : subCategory.slug
             }, updatedBy);
             await connection.commit();
             return result;
@@ -254,7 +256,11 @@ const categoryService = {
         const connection = await db.getConnection();
         try {
             await connection.beginTransaction();
-            const result = await Category.update(categoryId, { ...categoryData, name: trimmedName || category.name }, updatedBy, connection);
+            const result = await Category.update(categoryId, { 
+                ...categoryData, 
+                name: trimmedName || category.name,
+                display_order: categoryData.display_order !== undefined ? categoryData.display_order : category.display_order
+            }, updatedBy, connection);
             await connection.commit();
             return result;
         } catch (error) {

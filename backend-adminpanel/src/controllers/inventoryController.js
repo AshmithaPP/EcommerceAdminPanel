@@ -41,24 +41,24 @@ const inventoryController = {
         }
     },
 
-    // === Manual Stock Adjustment ===
+    // === Admin Operations ===
 
-    manualStockAdjustment: async (req, res, next) => {
+    restock: async (req, res, next) => {
         try {
             const { variantId } = req.params;
-            const { quantityDelta, reason } = req.body;
+            const { quantity, reason } = req.body;
             const adminId = req.user.user_id;
 
-            const result = await inventoryService.manualStockAdjustment(
+            const result = await inventoryService.restockStock(
                 variantId,
-                quantityDelta,
-                reason,
+                quantity,
+                reason || 'Admin restock',
                 adminId
             );
 
             res.status(200).json({
                 success: true,
-                message: 'Stock adjusted successfully',
+                message: 'Stock restocked successfully',
                 data: result
             });
         } catch (error) {
@@ -66,22 +66,22 @@ const inventoryController = {
         }
     },
 
-    // === Bulk Stock Update ===
-
-    bulkStockUpdate: async (req, res, next) => {
+    setStockLevel: async (req, res, next) => {
         try {
-            const { updates, reason } = req.body;
+            const { variantId } = req.params;
+            const { stock, reason } = req.body;
             const adminId = req.user.user_id;
 
-            const result = await inventoryService.bulkStockUpdate(
-                updates,
-                adminId,
-                reason || 'Bulk inventory update'
+            const result = await inventoryService.setStockLevel(
+                variantId,
+                stock,
+                reason || 'Admin correction',
+                adminId
             );
 
             res.status(200).json({
                 success: true,
-                message: 'Bulk stock update completed',
+                message: 'Stock level set successfully',
                 data: result
             });
         } catch (error) {
@@ -131,24 +131,20 @@ const inventoryController = {
         }
     },
 
-    // === Inventory Logs ===
+    // === History Retrieval ===
 
-    getAllInventoryLogs: async (req, res, next) => {
+    getStockHistory: async (req, res, next) => {
         try {
+            const { variantId } = req.params;
             const page = parseInt(req.query.page) || 1;
-            const limit = parseInt(req.query.limit) || 100;
+            const limit = parseInt(req.query.limit) || 50;
 
-            const filters = {};
-            if (req.query.action) filters.action = req.query.action;
-            if (req.query.startDate) filters.startDate = req.query.startDate;
-            if (req.query.endDate) filters.endDate = req.query.endDate;
-
-            const result = await inventoryService.getAllInventoryLogs(page, limit, filters);
+            const result = await inventoryService.getStockHistory(variantId, page, limit);
 
             res.status(200).json({
                 success: true,
-                message: 'All inventory logs retrieved successfully',
-                data: result.logs,
+                message: 'Stock history retrieved successfully',
+                data: result.history,
                 pagination: {
                     total: result.total,
                     page: result.page,

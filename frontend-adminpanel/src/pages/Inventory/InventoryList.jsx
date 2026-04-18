@@ -5,22 +5,20 @@ import inventoryService from '../../services/inventoryService';
 
 const InventoryList = () => {
   const [inventory, setInventory] = useState([]);
-  const [logs, setLogs] = useState([]);
+  const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [historyLoading, setHistoryLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [editingItem, setEditingItem] = useState(null);
-  const [newStock, setNewStock] = useState('');
-  const [reason, setReason] = useState('Manual Correction');
+  const [selectedVariant, setSelectedVariant] = useState(null);
+  const [actionType, setActionType] = useState(null); // 'ADD', 'SET', or 'HISTORY'
+  const [inputValue, setInputValue] = useState('');
+  const [reason, setReason] = useState('');
 
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
-      const [invData, logData] = await Promise.all([
-        inventoryService.getFullInventory(1, 100),
-        inventoryService.getInventoryLogs(1, 20)
-      ]);
+      const invData = await inventoryService.getFullInventory(1, 100);
       setInventory(invData.data);
-      setLogs(logData.data);
       setError(null);
     } catch (err) {
       console.error('Error fetching inventory:', err);
@@ -34,81 +32,78 @@ const InventoryList = () => {
     fetchData();
   }, [fetchData]);
 
-  const handleEditClick = (item) => {
-    setEditingItem(item);
-    setNewStock(item.quantity);
-    setReason('Manual Stock Correction');
+  const fetchHistory = async (variantId) => {
+    try {
+      setHistoryLoading(true);
+      const histData = await inventoryService.getStockHistory(variantId);
+      setHistory(histData.data);
+    } catch (err) {
+      console.error('Error fetching history:', err);
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
+  const handleActionClick = (item, type) => {
+    setSelectedVariant(item);
+    setActionType(type);
+    setInputValue(type === 'SET' ? item.quantity : '');
+    setReason(type === 'SET' ? 'Inventory correction' : 'New purchase');
+    fetchHistory(item.variant_id);
   };
 
   const handleSave = async () => {
-    if (!editingItem) return;
+    if (!selectedVariant || !actionType) return;
     
     try {
-      const quantityDelta = parseInt(newStock) - editingItem.quantity;
-      
-      if (quantityDelta === 0) {
-        setEditingItem(null);
-        return;
+      if (actionType === 'ADD') {
+        await inventoryService.restock(selectedVariant.variant_id, {
+          quantity: parseInt(inputValue),
+          reason
+        });
+      } else {
+        await inventoryService.setStock(selectedVariant.variant_id, {
+          stock: parseInt(inputValue),
+          reason
+        });
       }
-
-      await inventoryService.manualStockAdjustment(editingItem.variant_id, {
-        quantityDelta,
-        reason
-      });
       
-      // Refresh data
       fetchData();
-      setEditingItem(null);
+      setSelectedVariant(null);
     } catch (err) {
       console.error('Error updating stock:', err);
-      alert('Failed to update stock. Please try again.');
+      alert(err.response?.data?.message || 'Failed to update stock');
     }
+  };
+
+  const closeModals = () => {
+    setSelectedVariant(null);
+    setActionType(null);
+    setHistory([]);
   };
 
   if (loading && inventory.length === 0) {
     return <div className={styles.inventoryContainer}><div className={styles.loading}>Loading inventory...</div></div>;
   }
 
-  if (error) {
-    return <div className={styles.inventoryContainer}><div className={styles.error}>{error}</div></div>;
-  }
-
   return (
     <div className={styles.inventoryContainer}>
-      {/* Filters & Search */}
-      <SearchFilter 
-        placeholder="Search by product name..."
-      >
-        <div className={styles.filterWrapper}>
-          <span className={styles.filterLabel}>Filter By Status</span>
-          <div className={styles.filterButtonsGroup}>
-            <button className={styles.filterButton}>
-              <span className={`material-symbols-outlined ${styles.lowStockIcon}`}>emergency_home</span>
-              Low Stock
-            </button>
-            <button className={styles.filterButton}>
-              <span className={`material-symbols-outlined ${styles.outOfStockIcon}`}>cancel</span>
-              Out of Stock
-            </button>
-          </div>
-        </div>
-      </SearchFilter>
+      <SearchFilter placeholder="Search by product name..." />
 
-      {/* Main Inventory Table */}
       <section className={styles.sectionCard}>
         <div className={styles.cardHeader}>
-          <h2 className={`${styles.serif} ${styles.cardTitle}`}>Inventory Overview</h2>
-          <span className={styles.skuCount}>Showing {inventory.length} Skus</span>
+          <h2 className={`${styles.serif} ${styles.cardTitle}`}>Stock Management</h2>
+          <span className={styles.skuCount}>{inventory.length} Variants tracked</span>
         </div>
         <div className={styles.tableWrapper}>
           <table className={styles.customTable}>
             <thead>
               <tr className={styles.serif}>
-                <th style={{ minWidth: '220px' }}>Product Name</th>
-                <th style={{ minWidth: '180px' }}>Variant (SKU)</th>
-                <th style={{ minWidth: '140px', textAlign: 'center' }}>Available Stock</th>
-                <th style={{ minWidth: '140px' }}>Last Updated</th>
-                <th style={{ minWidth: '80px', textAlign: 'right' }}>Actions</th>
+                <th>Product & SKU</th>
+                <th style={{ textAlign: 'center' }}>Current Stock</th>
+                <th>Last Updated</th>
+                <th style={{ textAlign: 'center' }}>History</th>
+                <th style={{ textAlign: 'right' }}>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -119,27 +114,48 @@ const InventoryList = () => {
 
                 return (
                   <tr key={item.variant_id}>
-                    <td className={styles.productName}>{item.product_name}</td>
-                    <td className={styles.variantInfo}>{item.sku}</td>
-                    <td className="text-center">
+                    <td>
+                      <div className={styles.productName}>{item.product_name}</div>
+                      <div className={styles.variantInfo}>{item.sku}</div>
+                    </td>
+                    <td style={{ textAlign: 'center' }}>
                       <span className={`${styles.stockBadge} ${
                         status === 'In Stock' ? styles.inStock : 
                         status === 'Low Stock' ? styles.lowStock : 
                         styles.outOfStock
                       }`}>
-                        {status} ({item.quantity >= 10 ? item.quantity : `0${item.quantity}`})
+                        {item.quantity} {status === 'In Stock' ? '' : `(${status})`}
                       </span>
                     </td>
                     <td className={styles.variantInfo}>
                       {item.updated_at ? new Date(item.updated_at).toLocaleString() : 'N/A'}
                     </td>
-                    <td className="text-right">
+                    <td style={{ textAlign: 'center' }}>
                       <button 
-                        className={styles.editBtn}
-                        onClick={() => handleEditClick(item)}
+                        className={styles.infoBtn}
+                        onClick={() => handleActionClick(item, 'HISTORY')}
+                        title="View Full History"
                       >
-                        <span className="material-symbols-outlined">edit</span>
+                        <span className="material-symbols-outlined">info</span>
                       </button>
+                    </td>
+                    <td style={{ textAlign: 'right' }}>
+                      <div className={styles.actionGroup}>
+                        <button 
+                          className={styles.addBtn}
+                          onClick={() => handleActionClick(item, 'ADD')}
+                          title="Add Stock (Restock)"
+                        >
+                          <span className="material-symbols-outlined">add_circle</span>
+                        </button>
+                        <button 
+                          className={styles.setBtn}
+                          onClick={() => handleActionClick(item, 'SET')}
+                          title="Set Absolute Stock"
+                        >
+                          <span className="material-symbols-outlined">edit_square</span>
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 );
@@ -149,97 +165,92 @@ const InventoryList = () => {
         </div>
       </section>
 
-      {/* Activity Logs */}
-      <section className={styles.sectionCard}>
-        <div className={styles.cardHeader}>
-          <h2 className={`${styles.serif} ${styles.cardTitle}`}>Activity Logs</h2>
-        </div>
-        <div className={styles.tableWrapper}>
-          <table className={`${styles.customTable} ${styles.logTable}`}>
-            <thead>
-              <tr>
-                <th style={{ minWidth: '180px' }}>Product / SKU</th>
-                <th style={{ minWidth: '150px' }}>Change Type</th>
-                <th style={{ minWidth: '100px', textAlign: 'center' }}>Quantity</th>
-                <th style={{ minWidth: '100px' }}>Stock Flow</th>
-                <th style={{ minWidth: '100px' }}>Admin / System</th>
-                <th style={{ minWidth: '140px' }}>Timestamp</th>
-              </tr>
-            </thead>
-            <tbody>
-              {logs.map(log => (
-                <tr key={log.log_id}>
-                  <td className="fw-medium">
-                    <div>{log.product_name}</div>
-                    <div className={styles.readonlySubValue}>{log.sku}</div>
-                  </td>
-                  <td>{log.action.replace('_', ' ').toUpperCase()}</td>
-                  <td className={`text-center ${log.quantity_delta >= 0 ? styles.qtyPos : styles.qtyNeg}`}>
-                    {log.quantity_delta >= 0 ? `+${log.quantity_delta}` : log.quantity_delta}
-                  </td>
-                  <td className={styles.variantInfo}>{log.quantity_before} → {log.quantity_after}</td>
-                  <td>{log.admin_name || 'System'}</td>
-                  <td className={styles.timestamp}>
-                    {new Date(log.created_at).toLocaleString()}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      {/* Edit Inventory Modal */}
-      {editingItem && (
+      {/* Unified Action & History Modal */}
+      {selectedVariant && (
         <div className={styles.modalOverlay}>
-          <div className={styles.modalContent}>
+          <div className={`${styles.modalContent} ${styles.wideModal}`}>
             <div className={styles.modalHeader}>
-              <h3 className={`${styles.serif} ${styles.modalTitle}`}>Update Inventory</h3>
-              <button className={styles.closeBtn} onClick={() => setEditingItem(null)}>
+              <div>
+                <h3 className={`${styles.serif} ${styles.modalTitle}`}>
+                  {actionType === 'ADD' ? 'Add Inventory' : 
+                   actionType === 'SET' ? 'Total Stock Correction' : 'Stock Audit History'}
+                </h3>
+                <p className={styles.modalSubtitle}>{selectedVariant.product_name} ({selectedVariant.sku})</p>
+              </div>
+              <button className={styles.closeBtn} onClick={closeModals}>
                 <span className="material-symbols-outlined">close</span>
               </button>
             </div>
             
-            <div className={styles.modalBody}>
-              <div className={styles.inputGroup}>
-                <label className={styles.inputLabel}>Product</label>
-                <div className={styles.readonlyValue}>{editingItem.product_name}</div>
-                <div className={styles.readonlySubValue}>{editingItem.sku}</div>
-              </div>
+            <div className={actionType === 'HISTORY' ? styles.fullHistoryLayout : styles.modalGrid}>
+              {/* Form Side - Only show if not just viewing history */}
+              {actionType !== 'HISTORY' && (
+                <div className={styles.modalForm}>
+                  <div className={styles.inputGroup}>
+                    <label className={styles.inputLabel}>
+                      {actionType === 'ADD' ? 'Quantity to Add' : 'New Absolute Stock'}
+                    </label>
+                    <input 
+                      type="number" 
+                      className={styles.modalInput}
+                      value={inputValue}
+                      onChange={(e) => setInputValue(e.target.value)}
+                      placeholder={actionType === 'ADD' ? "e.g. 50" : "e.g. 100"}
+                      autoFocus
+                    />
+                  </div>
 
-              <div className={styles.inputGroup}>
-                <label className={styles.inputLabel} htmlFor="stockInput">New Stock Count</label>
-                <input 
-                  id="stockInput"
-                  type="number" 
-                  className={styles.modalInput}
-                  value={newStock}
-                  onChange={(e) => setNewStock(e.target.value)}
-                  autoFocus
-                />
-              </div>
+                  <div className={styles.inputGroup}>
+                    <label className={styles.inputLabel}>Reason / Remark</label>
+                    <input 
+                      type="text" 
+                      className={styles.modalInput}
+                      value={reason}
+                      onChange={(e) => setReason(e.target.value)}
+                      placeholder="Reference number or note"
+                    />
+                  </div>
 
-              <div className={styles.inputGroup}>
-                <label className={styles.inputLabel} htmlFor="reasonInput">Reason for Adjustment</label>
-                <input 
-                  id="reasonInput"
-                  type="text" 
-                  className={styles.modalInput}
-                  value={reason}
-                  onChange={(e) => setReason(e.target.value)}
-                  placeholder="e.g., Stock count correction, Damaged items"
-                />
-              </div>
+                  <button className={`${styles.saveBtn} ${styles.fullWidth}`} onClick={handleSave}>
+                    {actionType === 'ADD' ? 'Confirm Addition' : 'Set Final Stock'}
+                  </button>
+                </div>
+              )}
 
-              <div className={styles.adjustmentNote}>
-                <span className="material-symbols-outlined">info</span>
-                This adjustment will be logged under your admin profile.
+              {/* History Side */}
+              <div className={actionType === 'HISTORY' ? styles.fullHistoryBody : styles.modalHistory}>
+                <h4 className={styles.historyTitle}>
+                  {actionType === 'HISTORY' ? 'Complete Transaction Log' : 'Recent Stock Changes'}
+                </h4>
+                {historyLoading ? (
+                  <div className={styles.miniLoading}>Loading history...</div>
+                ) : (
+                  <div className={actionType === 'HISTORY' ? styles.scrollableHistory : styles.historyList}>
+                    {history.length === 0 ? (
+                      <div className={styles.noHistory}>No history records found.</div>
+                    ) : (
+                      history.map(item => (
+                        <div key={item.id} className={styles.historyItem}>
+                          <div className={styles.historyHeader}>
+                            <span className={`${styles.historyAction} ${styles[item.action.toLowerCase()]}`}>
+                              {item.action.replace('_', ' ')}
+                            </span>
+                            <span className={styles.historyDate}>{new Date(item.created_at).toLocaleDateString()}</span>
+                          </div>
+                          <div className={styles.historyDetails}>
+                            <span className={item.quantity >= 0 ? styles.pos : styles.neg}>
+                              {item.quantity >= 0 ? `+${item.quantity}` : item.quantity}
+                            </span>
+                            <span className={styles.historyFlow}>{item.previous_stock} → {item.new_stock}</span>
+                          </div>
+                          {item.reason && <div className={styles.historyReason}>{item.reason}</div>}
+                          {item.reference_id && <div className={styles.historyRef}>Ref: {item.reference_id}</div>}
+                        </div>
+                      ))
+                    )}
+                  </div>
+                )}
               </div>
-            </div>
-
-            <div className={styles.modalFooter}>
-              <button className={styles.cancelBtn} onClick={() => setEditingItem(null)}>Cancel</button>
-              <button className={styles.saveBtn} onClick={handleSave}>Update Stock</button>
             </div>
           </div>
         </div>

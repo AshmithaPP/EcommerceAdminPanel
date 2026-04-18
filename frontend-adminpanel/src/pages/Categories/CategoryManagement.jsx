@@ -16,6 +16,7 @@ const CategoryManagement = () => {
   const [deleteId, setDeleteId] = useState(null);
   const [editingCategory, setEditingCategory] = useState(null);
   const [editName, setEditName] = useState('');
+  const [editOrder, setEditOrder] = useState(0);
 
   const [viewMode, setViewMode] = useState('hierarchy');
   const [page, setPage] = useState(1);
@@ -102,34 +103,6 @@ const CategoryManagement = () => {
     }
   };
 
-  const moveCategory = async (node, direction) => {
-    const parentId = node.parent_category_id || null;
-    let siblings;
-    if (viewMode === 'hierarchy') {
-      const findSiblings = (items, pid) => {
-        if (pid === null) return items;
-        for (let item of items) {
-          if (item.category_id === pid) return item.children;
-          if (item.children) {
-            const found = findSiblings(item.children, pid);
-            if (found) return found;
-          }
-        }
-        return [];
-      };
-      siblings = findSiblings(categories, parentId);
-    } else {
-      siblings = categories.filter(c => (c.parent_category_id || null) === parentId);
-    }
-    const currentIndex = siblings.findIndex(c => c.category_id === node.category_id);
-    if ((direction === 'up' && currentIndex === 0) || (direction === 'down' && currentIndex === siblings.length - 1)) return;
-    const swapIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
-    const currentOrder = node.display_order;
-    const swapOrder = siblings[swapIndex].display_order;
-
-    await updateCategory(node, { display_order: swapOrder });
-    await updateCategory(siblings[swapIndex], { display_order: currentOrder });
-  };
 
   // ---------- Effects ----------
   useEffect(() => {
@@ -180,14 +153,19 @@ const CategoryManagement = () => {
     e.stopPropagation();
     setEditingCategory(node);
     setEditName(node.name);
+    setEditOrder(node.display_order || 0);
   };
 
   const submitEditCategory = () => {
     if (editName.trim() && editingCategory) {
-      updateCategory(editingCategory, { name: editName.trim() });
+      updateCategory(editingCategory, { 
+        name: editName.trim(),
+        display_order: parseInt(editOrder) || 0
+      });
     }
     setEditingCategory(null);
     setEditName('');
+    setEditOrder(0);
   };
 
   const handleDelete = (e, node) => {
@@ -240,26 +218,37 @@ const CategoryManagement = () => {
                 {hasChildren ? (isExpanded ? 'keyboard_arrow_down' : 'keyboard_arrow_right') : 'circle'}
               </span>
               {isEditing ? (
-                <input
-                  value={editName}
-                  onChange={(e) => setEditName(e.target.value)}
-                  onBlur={submitEditCategory}
-                  onKeyDown={(e) => e.key === 'Enter' && submitEditCategory()}
-                  autoFocus
-                  className={styles.editInput}
-                />
+                <div className={styles.editInputGroup}>
+                  <input
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && submitEditCategory()}
+                    autoFocus
+                    placeholder="Category Name"
+                    className={styles.editInput}
+                  />
+                  <input
+                    type="number"
+                    value={editOrder}
+                    onChange={(e) => setEditOrder(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && submitEditCategory()}
+                    placeholder="Order"
+                    className={styles.editOrderInput}
+                    title="Display Order"
+                  />
+                  <button className={styles.iconBtnSmall} onClick={submitEditCategory} title="Save Changes">
+                    <span className="material-symbols-outlined">done</span>
+                  </button>
+                  <button className={styles.iconBtnSmall} onClick={() => setEditingCategory(null)} title="Cancel">
+                    <span className="material-symbols-outlined">close</span>
+                  </button>
+                </div>
               ) : (
                 <span className={styles.nodeName}>{node.name}</span>
               )}
             </div>
             
             <div className={styles.itemActions}>
-              <button className={styles.actionBtn} onClick={(e) => { e.stopPropagation(); moveCategory(node, 'up'); }} title="Move Up">
-                <span className="material-symbols-outlined">expand_less</span>
-              </button>
-              <button className={styles.actionBtn} onClick={(e) => { e.stopPropagation(); moveCategory(node, 'down'); }} title="Move Down">
-                <span className="material-symbols-outlined">expand_more</span>
-              </button>
               <button className={styles.actionBtn} onClick={(e) => handleEditCategory(e, node)} title="Edit">
                 <span className="material-symbols-outlined">edit</span>
               </button>
@@ -357,14 +346,23 @@ const CategoryManagement = () => {
                       <tr key={cat.category_id} className={selectedCategory?.category_id === cat.category_id ? styles.tableRowActive : ''} onClick={() => setSelectedCategory(cat)}>
                         <td>
                           {isEditing ? (
-                            <input
-                              value={editName}
-                              onChange={(e) => setEditName(e.target.value)}
-                              onBlur={submitEditCategory}
-                              onKeyDown={(e) => e.key === 'Enter' && submitEditCategory()}
-                              autoFocus
-                              className={styles.tableEditInput}
-                            />
+                            <div className={styles.tableEditGroup}>
+                                <input
+                                value={editName}
+                                onChange={(e) => setEditName(e.target.value)}
+                                onKeyDown={(e) => e.key === 'Enter' && submitEditCategory()}
+                                autoFocus
+                                className={styles.tableEditInput}
+                                />
+                                <input
+                                type="number"
+                                value={editOrder}
+                                onChange={(e) => setEditOrder(e.target.value)}
+                                onKeyDown={(e) => e.key === 'Enter' && submitEditCategory()}
+                                className={styles.tableOrderInput}
+                                />
+                                <button className={styles.iconBtnSmall} onClick={submitEditCategory}><span className="material-symbols-outlined">done</span></button>
+                            </div>
                           ) : (
                             <span className={styles.tableName}>{cat.name}</span>
                           )}

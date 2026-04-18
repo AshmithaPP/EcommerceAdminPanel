@@ -126,24 +126,26 @@ const Order = {
         return result.affectedRows > 0;
     },
 
-    updateStatus: async (orderId, status, comment) => {
-        const connection = await db.getConnection();
+    updateStatus: async (orderId, status, comment, connection = null) => {
+        const executor = connection || await db.getConnection();
+        const shouldManageTransaction = !connection;
+
         try {
-            await connection.beginTransaction();
+            if (shouldManageTransaction) await executor.beginTransaction();
             
             const query = `UPDATE orders SET status = ? WHERE order_id = ?`;
-            await connection.query(query, [status, orderId]);
+            await executor.query(query, [status, orderId]);
 
             const historyId = uuidv4();
-            await Order.addHistory({ history_id: historyId, order_id: orderId, status, comment }, connection);
+            await Order.addHistory({ history_id: historyId, order_id: orderId, status, comment }, executor);
 
-            await connection.commit();
+            if (shouldManageTransaction) await executor.commit();
             return true;
         } catch (error) {
-            await connection.rollback();
+            if (shouldManageTransaction) await executor.rollback();
             throw error;
         } finally {
-            connection.release();
+            if (shouldManageTransaction) executor.release();
         }
     },
 

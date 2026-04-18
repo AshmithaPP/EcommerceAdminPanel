@@ -32,13 +32,45 @@ const orderService = {
 
     updateStatus: async (orderId, statusData) => {
         const { status, comment } = statusData;
-        const result = await Order.updateStatus(orderId, status, comment);
-        if (!result) {
-            const error = new Error('Failed to update order status');
-            error.statusCode = 400;
+
+        // Centralized logic for stock restoration on cancellation
+        const order = await Order.findById(orderId);
+        if (!order) {
+            const error = new Error('Order not found');
+            error.statusCode = 404;
             throw error;
         }
-        return { success: true, message: `Status updated to ${status}` };
+
+        const connection = await db.getConnection();
+        try {
+            await connection.beginTransaction();
+
+            // 1. Update Order Status in Model
+            const result = await Order.updateStatus(orderId, status, comment, connection);
+            if (!result) {
+                throw new Error('Failed to update order status');
+            }
+
+            // 2. Cross-Model Logic: Restore stock if cancelled
+            // Assuming status string for cancelled is "Cancelled" or "CANCELLED"
+            const isCancelling = (status.toUpperCase() === 'CANCELLED' && order.status.toUpperCase() !== 'CANCELLED');
+            
+            if (isCancelling) {
+                const items = order.items.map(item => ({
+                    variant_id: item.variant_id,
+                    quantity: item.quantity
+                }));
+                await inventoryService.restoreStockForOrder(items, orderId, connection);
+            }
+
+            await connection.commit();
+            return { success: true, message: `Status updated to ${status}` };
+        } catch (error) {
+            await connection.rollback();
+            throw error;
+        } finally {
+            connection.release();
+        }
     },
 
     updatePaymentStatus: async (orderId, paymentData) => {
@@ -112,11 +144,11 @@ const orderService = {
                 }, connection);
             }
 
-            // Reserve Stock for the order
-            await inventoryService.reserveStockForOrder(items.map(item => ({
+            // Reduce Stock immediately for the order (Option A)
+            await inventoryService.reduceStockForOrder(items.map(item => ({
                 variant_id: item.variant_id,
                 quantity: item.quantity
-            })), orderId, null, connection);
+            })), orderId, connection);
 
             if (couponId && discountAmount > 0) {
                 await require('./couponService').recordCouponUsage(couponId, orderData.user_id, orderId, discountAmount, connection);

@@ -17,7 +17,7 @@ const menuItems = [
 ];
 
 const Sidebar = ({ isCollapsed, isMobileOpen, setIsMobileOpen }) => {
-  const { logout } = useContext(AuthContext);
+  const { logout, user } = useContext(AuthContext);
   const [isLoggingOut, setIsLoggingOut] = React.useState(false);
   const closeMobile = () => setIsMobileOpen(false);
 
@@ -57,7 +57,6 @@ const Sidebar = ({ isCollapsed, isMobileOpen, setIsMobileOpen }) => {
           ) : (
             <>
               <h1 className={styles.brandTitle}>Silk Curator</h1>
-              <p className={styles.tagline}>Luxury Admin</p>
             </>
           )}
         </div>
@@ -86,6 +85,21 @@ const Sidebar = ({ isCollapsed, isMobileOpen, setIsMobileOpen }) => {
 
         {/* Bottom */}
         <div className={styles.bottomActions}>
+          <div className={styles.profileSection}>
+            <div className={styles.avatarWrapper}>
+              <img 
+                src={user?.profile_image || "https://lh3.googleusercontent.com/aida-public/AB6AXuBf0USon3Os1b4D2Zqmsiz4iPwuxWl6zCgsnsFDMpDKDNg5JYUZlFnsx176RghHg5LcQJGeMbqcjJA0x82TBMXdUC2uxl-sJeJ3JIK3gMZ9KVUe_GCRuOybzSMdOSPbib2Add7udK6wwK4H7-s97Liadn-YE_EYiSze05uG-r0VVpff4u-mioVgeOimZ6R3RlChKwOELtq_2v90einIhx7r2sQFCMmOPZXSh5b1KUvB23Ka4xhIT_YJgzjhrLQloh053y2enP-q3uI"} 
+                alt={user?.name || "User"} 
+              />
+            </div>
+            {(!isCollapsed || isMobileOpen) && (
+              <div className={styles.userInfo}>
+                <span className={styles.userName}>{user?.name || "Admin Curator"}</span>
+                <span className={styles.userRole}>{user?.role || "Administrator"}</span>
+              </div>
+            )}
+          </div>
+
           <NavLink
             to="/settings"
             className={styles.bottomLink}

@@ -5,9 +5,21 @@ const categorySchema = Joi.object({
     display_order: Joi.number().integer().min(0).optional()
 });
 
+const updateCategorySchema = Joi.object({
+    name: Joi.string().min(2).max(255).optional(),
+    display_order: Joi.number().integer().min(0).optional()
+});
+
 const subCategorySchema = Joi.object({
     name: Joi.string().min(2).max(255).required(),
     category_id: Joi.string().guid({ version: 'uuidv4' }).required(),
+    display_order: Joi.number().integer().min(0).optional(),
+    slug: Joi.string().max(255).optional()
+});
+
+const updateSubCategorySchema = Joi.object({
+    name: Joi.string().min(2).max(255).optional(),
+    category_id: Joi.string().guid({ version: 'uuidv4' }).optional(),
     display_order: Joi.number().integer().min(0).optional(),
     slug: Joi.string().max(255).optional()
 });
@@ -20,7 +32,10 @@ const uuidSchema = Joi.string().guid({ version: 'uuidv4' }).required();
 
 module.exports = {
     categorySchema,
+    updateCategorySchema,
     subCategorySchema,
+    updateSubCategorySchema,
     assignAttributesSchema,
     uuidSchema
 };
+

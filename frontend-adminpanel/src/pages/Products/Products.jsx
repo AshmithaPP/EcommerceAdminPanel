@@ -1,8 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Edit2, Trash2, ChevronDown, ChevronLeft, ChevronRight, Plus } from 'lucide-react';
+import { Edit2, Trash2, ChevronLeft, ChevronRight } from 'lucide-react';
 import Badge from '../../components/ui/Badge';
 import Toggle from '../../components/ui/Toggle';
+import Button from '../../components/ui/Button';
+import DataTable from '../../components/ui/DataTable';
+import Pagination from '../../components/ui/Pagination';
 import { productService } from '../../services/productService';
 import styles from './Products.module.css';
 
@@ -16,71 +19,8 @@ const getImageUrl = (url) => {
 };
 
 /* ─────────────────────────────────────────
-   Pagination Component
-───────────────────────────────────────── */
-const Pagination = ({ totalItems, itemsPerPage, currentPage, onPageChange }) => {
-  const totalPages = Math.ceil(totalItems / itemsPerPage);
-  const start = (currentPage - 1) * itemsPerPage + 1;
-  const end = Math.min(currentPage * itemsPerPage, totalItems);
-
-  const getPages = () => {
-    if (totalPages <= 5) return Array.from({ length: totalPages }, (_, i) => i + 1);
-    const pages = new Set([1, 2, 3, totalPages]);
-    pages.add(currentPage);
-    if (currentPage > 1) pages.add(currentPage - 1);
-    if (currentPage < totalPages) pages.add(currentPage + 1);
-    const sorted = [...pages].sort((a, b) => a - b);
-    const result = [];
-    sorted.forEach((p, i) => {
-      if (i > 0 && p - sorted[i - 1] > 1) result.push('…');
-      result.push(p);
-    });
-    return result;
-  };
-
-  return (
-    <div className={styles.pagination}>
-      <span className={styles.paginationInfo}>
-        Showing {start} to {end} of {totalItems} entries
-      </span>
-      <div className={styles.paginationControls}>
-        <button
-          className={`${styles.pageBtn} ${currentPage === 1 ? styles.pageBtnDisabled : ''}`}
-          onClick={() => currentPage > 1 && onPageChange(currentPage - 1)}
-          disabled={currentPage === 1}
-        >
-          <ChevronLeft size={14} />
-        </button>
-
-        {getPages().map((p, i) =>
-          p === '…' ? (
-            <span key={`el-${i}`} className={styles.pageEllipsis}>…</span>
-          ) : (
-            <button
-              key={p}
-              className={`${styles.pageBtn} ${p === currentPage ? styles.pageBtnActive : ''}`}
-              onClick={() => onPageChange(p)}
-            >
-              {p}
-            </button>
-          )
-        )}
-
-        <button
-          className={`${styles.pageBtn} ${currentPage === totalPages ? styles.pageBtnDisabled : ''}`}
-          onClick={() => currentPage < totalPages && onPageChange(currentPage + 1)}
-          disabled={currentPage === totalPages}
-        >
-          <ChevronRight size={14} />
-        </button>
-      </div>
-    </div>
-  );
-};
-
-/* ─────────────────────────────────────────
    Products Page
-───────────────────────────────────────── */
+   ───────────────────────────────────────── */
 const Products = () => {
   const navigate = useNavigate();
   const [currentPage, setCurrentPage] = useState(1);
@@ -88,11 +28,11 @@ const Products = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [totalProducts, setTotalProducts] = useState(0);
-  const itemsPerPage = 4;
+  const [itemsPerPage, setItemsPerPage] = useState(4);
 
   useEffect(() => {
     fetchProducts(currentPage, itemsPerPage);
-  }, [currentPage]);
+  }, [currentPage, itemsPerPage]);
 
   const fetchProducts = async (page, limit) => {
     setLoading(true);
@@ -100,6 +40,7 @@ const Products = () => {
       const result = await productService.getProducts(page, limit);
       setProducts(result.data);
       setTotalProducts(result.total);
+      if (result.limit) setItemsPerPage(result.limit);
       setError(null);
     } catch (err) {
       setError('Failed to fetch products');
@@ -131,11 +72,6 @@ const Products = () => {
     }
   };
 
-  const toggleAvailability = (id) => {
-    setProducts(prev =>
-      prev.map(p => p.product_id === id ? { ...p, availability: !p.availability } : p)
-    );
-  };
 
   const getStockStatus = (totalStock) => {
     const stockCount = parseInt(totalStock || 0);
@@ -154,120 +90,104 @@ const Products = () => {
   return (
     <div className={styles.pageContainer}>
 
-      {/* ── Page Header ── */}
-      <div className={styles.pageHeader}>
-        <div className={styles.pageHeaderRight}>
-          <span className={styles.statsText}>
-            Displaying {((currentPage - 1) * itemsPerPage) + 1}–{Math.min(currentPage * itemsPerPage, totalProducts)} of {totalProducts} Hand-Woven Masterpieces
-          </span>
-        </div>
-      </div>
-
       {loading && <div>Loading products...</div>}
       {error && <div>Error: {error}</div>}
 
-      {/* ── Toolbar ── */}
-      <div className={styles.toolbar}>
-        <div className={styles.filters}>
-          <div className={styles.dropdown}>
-            All Categories <ChevronDown size={14} />
-          </div>
-          <div className={styles.dropdown}>
-            Stock Status <ChevronDown size={14} />
-          </div>
-        </div>
-        <button className={styles.addBtn} onClick={() => navigate('/products/add')}>
-          <Plus size={16} />
-          <span>Add Product</span>
-        </button>
-      </div>
-
-      {/* ── Desktop Table ── */}
       <div className={styles.tableCard}>
-        <table className={styles.table}>
-          <thead>
-            <tr>
-              <th className={styles.thThumbnail}>Thumbnail</th>
-              <th className={styles.thDetails}>Product Details</th>
-              <th>Price</th>
-              <th>Category</th>
-              <th>Stock</th>
-              <th>Status</th>
-              <th>Availability</th>
-              <th className={styles.thActions}>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {products.map((product) => (
-              <tr key={product.product_id} className={styles.tableRow}>
-                <td>
-                  <div className={styles.imageContainer}>
-                    <img 
-                      src={getImageUrl(product.thumbnail || product.image)} 
-                      alt={product.name} 
-                      className={styles.productImg} 
-                    />
-                  </div>
-                </td>
-                <td>
-                  <div className={styles.productInfo}>
-                    <span className={styles.productName}>{product.name}</span>
-                    <span className={styles.sku}>SKU: {product.product_id}</span>
-                  </div>
-                </td>
-                <td className={styles.priceCell}>${product.base_price}</td>
-                <td className={styles.categoryCell}>
-                  <div className={styles.categoryBreadcrumb}>
-                    <span className={styles.parentName}>{product.category_name}</span>
-                    <span className={styles.categorySeparator}>&gt;</span>
-                    <span className={styles.subName}>{product.sub_category_name}</span>
-                  </div>
-                </td>
-                <td className={styles.stockCell}>
-                  <span className={styles.stockCount}>{product.total_stock || 0}</span>
-                </td>
-                <td>
-                  <Badge variant={getStatusVariant(product.total_stock)}>
-                    {getStockStatus(product.total_stock)}
-                  </Badge>
-                </td>
-                <td>
-                  <Toggle
-                    checked={product.availability !== undefined ? product.availability : true}
-                    onChange={() => toggleAvailability(product.product_id)}
+        <DataTable
+          title="Product Inventory"
+          onAdd={() => navigate('/products/add')}
+          data={products}
+          columns={[
+            {
+              label: 'Thumbnail',
+              key: 'thumbnail',
+              render: (row) => (
+                <div className={styles.imageContainer}>
+                  <img 
+                    src={getImageUrl(row.thumbnail || row.image)} 
+                    alt={row.name} 
+                    className={styles.productImg} 
                   />
-                </td>
-                <td>
-                  <div className={styles.actions}>
-                    <button
-                      className={styles.actionBtn}
-                      onClick={() => navigate(`/products/edit/${product.product_id}`)}
-                      title="Edit"
-                    >
-                      <Edit2 size={16} />
-                    </button>
-                    <button 
-                      className={styles.actionBtn} 
-                      onClick={() => handleDeleteProduct(product.product_id, product.name)}
-                      title="Delete"
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-
-        {/* Table Pagination */}
-        <Pagination
-          totalItems={totalProducts}
-          itemsPerPage={itemsPerPage}
-          currentPage={currentPage}
-          onPageChange={setCurrentPage}
+                </div>
+              )
+            },
+            {
+              label: 'Product Details',
+              key: 'name',
+              render: (row) => (
+                <div className={styles.productInfo}>
+                  <span className={styles.productName}>{row.name}</span>
+                  <span className={styles.sku}>SKU: {row.product_id}</span>
+                </div>
+              )
+            },
+            {
+              label: 'Price',
+              key: 'starting_price',
+              render: (row) => (
+                <span className={styles.priceCell}>
+                  {row.starting_price ? `₹ ${row.starting_price}` : 'No Variants'}
+                </span>
+              )
+            },
+            {
+              label: 'Category',
+              key: 'category_name',
+              render: (row) => (
+                <div className={styles.categoryBreadcrumb}>
+                  <span className={styles.parentName}>{row.category_name}</span>
+                  <span className={styles.categorySeparator}>&gt;</span>
+                  <span className={styles.subName}>{row.sub_category_name}</span>
+                </div>
+              )
+            },
+            {
+              label: 'Stock',
+              key: 'total_stock',
+              render: (row) => (
+                <div className={styles.stockCell}>
+                  <Badge variant={getStatusVariant(row.total_stock)}>
+                    {row.total_stock || 0} ({getStockStatus(row.total_stock)})
+                  </Badge>
+                </div>
+              )
+            },
+            {
+              label: 'Actions',
+              key: 'actions',
+              align: 'right',
+              render: (row) => (
+                <div className={styles.actions}>
+                  <button
+                    className={styles.actionBtn}
+                    onClick={() => navigate(`/products/edit/${row.product_id}`)}
+                    title="Edit"
+                  >
+                    <Edit2 size={16} />
+                  </button>
+                  <button 
+                    className={styles.actionBtn} 
+                    onClick={() => handleDeleteProduct(row.product_id, row.name)}
+                    title="Delete"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                </div>
+              )
+            }
+          ]}
         />
+
       </div>
+
+      {/* Table Pagination */}
+      <Pagination
+        totalItems={totalProducts}
+        itemsPerPage={itemsPerPage}
+        currentPage={currentPage}
+        onPageChange={setCurrentPage}
+      />
 
       {/* ── Mobile Card List ── */}
       <div className={styles.mobileList}>
@@ -300,7 +220,9 @@ const Products = () => {
             </div>
             <div className={styles.mobileCardBottom}>
               <div className={styles.mobilePriceStock}>
-                <span className={styles.mobilePrice}>${product.base_price}</span>
+                <span className={styles.mobilePrice}>
+                  {product.starting_price ? `From ₹${product.starting_price}` : 'N/A'}
+                </span>
                 <span className={styles.mobileStock}>Stock: {product.total_stock || 0}</span>
               </div>
               <Badge variant={getStatusVariant(product.total_stock)}>
@@ -317,19 +239,9 @@ const Products = () => {
           </div>
         ))}
 
-        <Pagination
-          totalItems={totalProducts}
-          itemsPerPage={itemsPerPage}
-          currentPage={currentPage}
-          onPageChange={setCurrentPage}
-        />
       </div>
 
-      {/* ── Footer Actions ── */}
-      <div className={styles.footerActions}>
-        <button className={styles.saveDraftBtn}>Save Draft</button>
-        <button className={styles.publishBtn}>Publish Changes</button>
-      </div>
+      
 
     </div>
   );

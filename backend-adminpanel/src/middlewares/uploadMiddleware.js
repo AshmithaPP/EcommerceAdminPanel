@@ -16,21 +16,35 @@ const storage = multer.diskStorage({
 
 // File filter (images and videos)
 const fileFilter = (req, file, cb) => {
-    const allowedImageTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg'];
+    const allowedImageTypes = ['image/jpeg', 'image/webp', 'image/jpg'];
     const allowedVideoTypes = ['video/mp4', 'video/webm', 'video/quicktime'];
-    const allAllowedTypes = [...allowedImageTypes, ...allowedVideoTypes];
 
-    if (allAllowedTypes.includes(file.mimetype)) {
-        cb(null, true);
+    if (file.mimetype.startsWith('image/')) {
+        if (allowedImageTypes.includes(file.mimetype)) {
+            cb(null, true);
+        } else {
+            cb(new Error('Only WebP and JPEG/JPG images are allowed!'), false);
+        }
+    } else if (file.mimetype.startsWith('video/')) {
+        if (allowedVideoTypes.includes(file.mimetype)) {
+            cb(null, true);
+        } else {
+            cb(new Error('Only MP4, WebM, and MOV videos are allowed!'), false);
+        }
     } else {
-        cb(new Error('Only images (JPEG, PNG, WebP) and videos (MP4, WebM, MOV) are allowed!'), false);
+        cb(new Error('Invalid file type!'), false);
     }
 };
 
 const upload = multer({
     storage: storage,
     limits: {
-        fileSize: 50 * 1024 * 1024 // 50MB limit for the entire request
+        fileSize: (req, file, cb) => {
+            // This is actually handled better by checking file.size in the filter or controller
+            // but multer's limits.fileSize is a global threshold.
+            // We'll set a high threshold here and handle specifics in the controller or a custom check.
+            return 50 * 1024 * 1024; 
+        }
     },
     fileFilter: fileFilter
 });

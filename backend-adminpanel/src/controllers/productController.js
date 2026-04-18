@@ -6,13 +6,19 @@ const imageService = require('../services/imageService');
  * based on the fieldname (e.g., "product_img_0" or "variant_0_img_2").
  */
 const injectFileUrl = (data, fieldname, urls) => {
-    // urls can be a string (single url) or an object (multiple sizes)
-    const image_url = typeof urls === 'string' ? urls : urls.main_url;
-    const thumbnail_url = urls.thumbnail_url || urls.thumb_url || null;
-    const mini_thumbnail_url = urls.mini_thumbnail_url || urls.mini_url || null;
+    // urls is an object from imageService containing URLs and metadata
+    const image_url = urls.main_url;
+    const thumbnail_url = urls.thumb_url || null;
+    const mini_thumbnail_url = urls.mini_url || null;
+    
+    // Metadata
+    const width = urls.width || null;
+    const height = urls.height || null;
+    const file_size = urls.file_size || null;
+    const format = urls.format || null;
 
     if (fieldname === 'product_video') {
-        data.video_url = image_url;
+        data.video_url = typeof urls === 'string' ? urls : urls.main_url;
         return;
     }
 
@@ -24,6 +30,10 @@ const injectFileUrl = (data, fieldname, urls) => {
         data.images[index].image_url = image_url;
         data.images[index].thumbnail_url = thumbnail_url;
         data.images[index].mini_thumbnail_url = mini_thumbnail_url;
+        data.images[index].width = width;
+        data.images[index].height = height;
+        data.images[index].file_size = file_size;
+        data.images[index].format = format;
     } else if (fieldname.startsWith('variant_')) {
         const parts = fieldname.split('_');
         const vIndex = parseInt(parts[1]);
@@ -35,6 +45,10 @@ const injectFileUrl = (data, fieldname, urls) => {
         data.variants[vIndex].images[imgIndex].image_url = image_url;
         data.variants[vIndex].images[imgIndex].thumbnail_url = thumbnail_url;
         data.variants[vIndex].images[imgIndex].mini_thumbnail_url = mini_thumbnail_url;
+        data.variants[vIndex].images[imgIndex].width = width;
+        data.variants[vIndex].images[imgIndex].height = height;
+        data.variants[vIndex].images[imgIndex].file_size = file_size;
+        data.variants[vIndex].images[imgIndex].format = format;
     }
 };
 
@@ -54,9 +68,14 @@ const productController = {
                     const fieldname = file.fieldname;
                     
                     if (file.mimetype.startsWith('image/')) {
-                        // Process images into multiple sizes
-                        const processedUrls = await imageService.processProductImage(file);
-                        injectFileUrl(productData, fieldname, processedUrls);
+                        // Strict validation for size (500KB)
+                        if (file.size > 500 * 1024) {
+                            throw new Error(`File ${file.originalname} exceeds 500KB limit`);
+                        }
+
+                        // Process images into multiple sizes and get metadata
+                        const processedData = await imageService.processProductImage(file);
+                        injectFileUrl(productData, fieldname, processedData);
                     } else if (file.mimetype.startsWith('video/')) {
                         // Video files go direct
                         injectFileUrl(productData, fieldname, `/uploads/${file.filename}`);
@@ -130,9 +149,14 @@ const productController = {
                     const fieldname = file.fieldname;
                     
                     if (file.mimetype.startsWith('image/')) {
-                        // Process images into multiple sizes
-                        const processedUrls = await imageService.processProductImage(file);
-                        injectFileUrl(productData, fieldname, processedUrls);
+                        // Strict validation for size (500KB)
+                        if (file.size > 500 * 1024) {
+                            throw new Error(`File ${file.originalname} exceeds 500KB limit`);
+                        }
+
+                        // Process images into multiple sizes and get metadata
+                        const processedData = await imageService.processProductImage(file);
+                        injectFileUrl(productData, fieldname, processedData);
                     } else if (file.mimetype.startsWith('video/')) {
                         // Video files go direct
                         injectFileUrl(productData, fieldname, `/uploads/${file.filename}`);

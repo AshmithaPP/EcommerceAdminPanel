@@ -19,6 +19,10 @@ import {
 } from 'recharts';
 import styles from './Dashboard.module.css';
 import dashboardService from '../../services/dashboardService';
+import StatCard from '../../components/ui/StatCard';
+import TrendChart from '../../components/ui/TrendChart';
+import DataTable from '../../components/ui/DataTable';
+import InfoCard from '../../components/ui/InfoCard';
 
 const Dashboard = () => {
   const [activeToggle, setActiveToggle] = useState('daily');
@@ -115,7 +119,7 @@ const Dashboard = () => {
   if (error) {
     return (
       <div className={styles.errorContainer}>
-        <AlertTriangle size={48} color="#ba1a1a" />
+        <AlertTriangle size={48} color="#E24B4A" />
         <h3>Error Loading Dashboard</h3>
         <p>{error}</p>
         <button onClick={() => window.location.reload()} className={styles.retryBtn}>Retry</button>
@@ -123,11 +127,58 @@ const Dashboard = () => {
     );
   }
 
-  // Map backend trend labels for Recharts
-  const chartData = salesTrend.trend.map(item => ({
-    name: formatDate(item.date),
-    revenue: item.revenue
-  }));
+  // Generate 30 days of data ending today
+  const chartData = [];
+  const today = new Date();
+  
+  for (let i = 29; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(today.getDate() - i);
+    const dateStr = d.toISOString().split('T')[0];
+    const name = formatDate(dateStr);
+    
+    const existingData = salesTrend.trend.find(item => item.date === dateStr);
+    chartData.push({
+      name,
+      revenue: existingData ? existingData.revenue : 0
+    });
+  }
+
+  const orderColumns = [
+    { 
+      label: 'Order #', 
+      key: 'orderNumber',
+      render: (row) => <span className={styles.monoCell}>{row.orderNumber}</span>
+    },
+    { 
+      label: 'Customer', 
+      key: 'customerName',
+      render: (row) => <p className={styles.customerName}>{row.customerName}</p>
+    },
+    { 
+      label: 'Amount', 
+      key: 'amount',
+      render: (row) => <span className={styles.amountCell}>{formatCurrency(row.amount)}</span>
+    },
+    { 
+      label: 'Status', 
+      key: 'status',
+      render: (row) => (
+        <span className={`status-badge ${
+          row.status === 'Delivered' ? 'status-delivered' : 
+          row.status === 'Cancelled' ? 'status-cancelled' : 
+          'status-processing'
+        }`}>
+          {row.status}
+        </span>
+      )
+    },
+    { 
+      label: 'Date', 
+      key: 'createdAt',
+      render: (row) => <span className={styles.dateCell}>{formatDate(row.createdAt)}</span>
+    }
+  ];
 
   return (
     <div className={styles.dashboardContainer}>
@@ -139,106 +190,39 @@ const Dashboard = () => {
         <div className={styles.kpiCardWrapper}>
           <div className={styles.kpiGrid}>
 
-            <div className={styles.kpiCard}>
-              <div className={styles.kpiHeader}>
-                <span className={styles.kpiLabel}>Total Revenue</span>
-                <span className={`${styles.badge} ${salesTrend.comparison.revenueGrowth >= 0 ? styles.badgeUp : styles.badgeDown}`}>
-                  {salesTrend.comparison.revenueGrowth >= 0 ? <TrendingUp size={9} style={{ marginRight: 3 }} /> : <TrendingDown size={9} style={{ marginRight: 3 }} />}
-                  {Math.abs(salesTrend.comparison.revenueGrowth)}%
-                </span>
-              </div>
-              <div className={styles.kpiValue}>{formatShortCurrency(summary.totalRevenue)}</div>
-            </div>
+            <StatCard 
+              label="Total Revenue"
+              value={formatShortCurrency(summary.totalRevenue)}
+            />
 
-            <div className={styles.kpiCard}>
-              <div className={styles.kpiHeader}>
-                <span className={styles.kpiLabel}>Total Orders</span>
-                <span className={`${styles.badge} ${styles.badgeNeutral}`}>
-                  {summary.todayOrders} New Today
-                </span>
-              </div>
-              <div className={styles.kpiValue}>{summary.totalOrders.toLocaleString()}</div>
-            </div>
+            <StatCard 
+              label="Total Orders"
+              value={summary.totalOrders.toLocaleString()}
+            />
 
-            <div className={styles.kpiCard}>
-              <div className={styles.kpiHeader}>
-                <span className={styles.kpiLabel}>Total Customers</span>
-              </div>
-              <div className={styles.kpiValue}>{summary.totalCustomers.toLocaleString()}</div>
-            </div>
+            <StatCard 
+              label="Total Customers"
+              value={summary.totalCustomers.toLocaleString()}
+            />
 
-            <div className={styles.kpiCard}>
-              <div className={styles.kpiHeader}>
-                <span className={styles.kpiLabel}>Active Products</span>
-                <span className={`${styles.badge} ${styles.badgeNeutral}`}>Stable</span>
-              </div>
-              <div className={styles.kpiValue}>{summary.totalActiveProducts}</div>
-            </div>
+            <StatCard 
+              label="Active Products"
+              value={summary.totalActiveProducts}
+            />
 
           </div>
         </div>
 
         {/* Chart */}
         <div className={styles.chartCardWrapper}>
-          <div className={styles.contentCard}>
-            <div className={styles.chartHeader}>
-              <h4 className={styles.cardTitle}>Revenue Trend (Last 30 Days)</h4>
-              <div className={styles.toggleGroup}>
-                <button
-                  className={`${styles.toggleBtn} ${activeToggle === 'daily' ? styles.toggleBtnActive : ''}`}
-                  onClick={() => setActiveToggle('daily')}
-                >Daily</button>
-                <button
-                  className={`${styles.toggleBtn} ${activeToggle === 'monthly' ? styles.toggleBtnActive : ''}`}
-                  disabled
-                >Monthly</button>
-              </div>
-            </div>
-            <div className={styles.chartArea}>
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%"  stopColor="#C9A84C" stopOpacity={0.12} />
-                      <stop offset="95%" stopColor="#C9A84C" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid vertical={false} stroke="rgba(208,197,178,0.15)" strokeDasharray="0" />
-                  <XAxis
-                    dataKey="name"
-                    axisLine={false}
-                    tickLine={false}
-                    tick={{ fontSize: 9, fontWeight: 700, fill: '#9a917e', letterSpacing: '0.08em' }}
-                    dy={10}
-                    interval={Math.floor(chartData.length / 6)}
-                  />
-                  <YAxis hide />
-                  <Tooltip
-                    contentStyle={{
-                      fontSize: '11px',
-                      borderRadius: '8px',
-                      border: '1px solid rgba(208,197,178,0.25)',
-                      backgroundColor: 'rgba(255,255,255,0.95)',
-                      boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
-                    }}
-                    itemStyle={{ color: '#C9A84C', fontWeight: 700 }}
-                    labelStyle={{ color: '#4d4637', fontWeight: 700, fontSize: 10 }}
-                    formatter={(value) => formatCurrency(value)}
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="revenue"
-                    stroke="#C9A84C"
-                    strokeWidth={2}
-                    fillOpacity={1}
-                    fill="url(#colorRevenue)"
-                    strokeLinecap="round"
-                    animationDuration={1200}
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
+          <TrendChart 
+            title="Revenue Trend"
+            subtitle="Daily revenue performance for the current period"
+            mainValue={formatCurrency(salesTrend.comparison.currentRevenue)}
+            growth={salesTrend.comparison.revenueGrowth}
+            data={chartData}
+            timeframe="Last 30 Days"
+          />
         </div>
 
       </div>
@@ -248,10 +232,7 @@ const Dashboard = () => {
 
         {/* Top Products */}
         <div className={styles.productCardWrapper}>
-          <div className={styles.contentCard}>
-            <div className={styles.cardTitleRow}>
-              <h4 className={styles.cardTitle}>Top Products</h4>
-            </div>
+          <InfoCard title="Top Products">
             <div className={styles.productList}>
               {topProducts.length > 0 ? (
                 topProducts.map((product, index) => (
@@ -266,74 +247,39 @@ const Dashboard = () => {
                     <div className={styles.productRevenue}>
                       {formatCurrency(product.revenue)}
                     </div>
-                    <span className={styles.rank}>#{index + 1}</span>
                   </div>
                 ))
               ) : (
                 <p className={styles.emptyState}>No sales data available</p>
               )}
             </div>
-          </div>
+          </InfoCard>
         </div>
 
         {/* Recent Orders */}
         <div className={styles.orderCardWrapper}>
-          <div className={styles.contentCard}>
-            <div className={styles.cardTitleRow}>
-              <h4 className={styles.cardTitle}>Recent Orders</h4>
-              <button className={styles.viewAllBtn} onClick={() => window.location.href='/orders'}>View All</button>
-            </div>
-            <div className={styles.tableWrapper}>
-              <table className={styles.table}>
-                <thead>
-                  <tr>
-                    <th>Order #</th>
-                    <th>Customer</th>
-                    <th>Amount</th>
-                    <th className={styles.thCenter}>Status</th>
-                    <th className={styles.thRight}>Date</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {recentOrders.length > 0 ? (
-                    recentOrders.map((order) => (
-                      <tr key={order.orderId}>
-                        <td className={styles.monoCell}>{order.orderNumber}</td>
-                        <td>
-                          <p className={styles.customerName}>{order.customerName}</p>
-                        </td>
-                        <td className={styles.amountCell}>{formatCurrency(order.amount)}</td>
-                        <td className={styles.statusCell}>
-                          <span className={`${styles.statusBadge} ${
-                            order.status === 'Delivered' ? styles.statusDelivered : 
-                            order.status === 'Cancelled' ? styles.statusCancelled : 
-                            styles.statusProcessing
-                          }`}>
-                            {order.status}
-                          </span>
-                        </td>
-                        <td className={styles.dateCell}>{formatDate(order.createdAt)}</td>
-                      </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan="5" className={styles.emptyTable}>No recent orders</td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
+          <DataTable 
+            title="Recent Orders"
+            columns={orderColumns}
+            data={recentOrders}
+            emptyMessage="No recent orders found"
+            actions={
+              <button 
+                className={styles.viewAllBtn} 
+                onClick={() => window.location.href='/orders'}
+              >
+                View All
+              </button>
+            }
+          />
         </div>
 
       </div>
 
       {/* Row 3: Operational Alerts */}
-      <section className={styles.alertsSection}>
-        <div className={styles.alertsSectionHeader}>
-          <AlertTriangle size={16} className={styles.alertsIcon} />
-          <h4 className={styles.alertsSectionTitle}>Operational Alerts</h4>
-        </div>
+      <InfoCard 
+        title="Operational Alerts" 
+      >
         <div className={styles.alertsGrid}>
 
           <div className={`${styles.alertCard} ${styles.alertWarn}`}>
@@ -341,7 +287,7 @@ const Dashboard = () => {
               <p className={styles.alertLabel}>Low Stock</p>
               <p className={`${styles.alertValue} ${styles.alertValueWarn}`}>{alerts.counts.lowStock || 0}</p>
             </div>
-            <AlertTriangle size={18} style={{ color: '#C9A84C', flexShrink: 0 }} />
+            <AlertTriangle size={18} className={styles.alertIcon} />
           </div>
 
           <div className={`${styles.alertCard} ${styles.alertDanger}`}>
@@ -349,27 +295,27 @@ const Dashboard = () => {
               <p className={styles.alertLabel}>Out of Stock</p>
               <p className={`${styles.alertValue} ${styles.alertValueDanger}`}>{alerts.counts.outOfStock || 0}</p>
             </div>
-            <AlertOctagon size={18} style={{ color: '#ba1a1a', flexShrink: 0 }} />
+            <AlertOctagon size={18} className={styles.alertIcon} />
           </div>
 
-          <div className={`${styles.alertCard} ${styles.alertNeutral}`}>
+          <div className={`${styles.alertCard} ${styles.alertInfo}`}>
             <div>
               <p className={styles.alertLabel}>Pending Orders</p>
-              <p className={`${styles.alertValue} ${styles.alertValueNeutral}`}>{alerts.counts.pendingOrders || 0}</p>
+              <p className={`${styles.alertValue} ${styles.alertValueInfo}`}>{alerts.counts.pendingOrders || 0}</p>
             </div>
-            <Clock size={18} style={{ color: 'var(--on-surface-variant)', flexShrink: 0 }} />
+            <Clock size={18} className={styles.alertIcon} />
           </div>
 
-          <div className={`${styles.alertCard} ${styles.alertSoftDanger}`}>
+          <div className={`${styles.alertCard} ${styles.alertDanger}`}>
             <div>
               <p className={styles.alertLabel}>Failed Payments</p>
               <p className={`${styles.alertValue} ${styles.alertValueDanger}`}>{alerts.counts.failedPayments || 0}</p>
             </div>
-            <CreditCard size={18} style={{ color: 'rgba(186,26,26,0.4)', flexShrink: 0 }} />
+            <CreditCard size={18} className={styles.alertIcon} />
           </div>
 
         </div>
-      </section>
+      </InfoCard>
 
     </div>
   );

@@ -51,7 +51,6 @@ const EditProduct = () => {
     category_id: '', // Parent Category
     sub_category_id: '', // Link ONLY to sub_categories
     brand: '',
-    base_price: '',
     meta_title: '',
     meta_description: '',
     slug: ''
@@ -63,7 +62,8 @@ const EditProduct = () => {
   const [currentVariant, setCurrentVariant] = useState({
     variant_id: null,
     sku: '',
-    price: '',
+    mrp: '',
+    sellingPrice: '',
     attributeValues: {}, // { [attrId]: { id, name } }
     stock: 0,
     images: []
@@ -138,10 +138,10 @@ const EditProduct = () => {
         category_id: data.category_id || '',
         sub_category_id: data.sub_category_id || '',
         brand: data.brand || '',
-        base_price: data.base_price || '',
         meta_title: data.meta_title || '',
         meta_description: data.meta_description || '',
         slug: data.slug || '',
+        gstPercent: data.gstPercent || 0,
         video_url: data.video_url || null
       });
       
@@ -163,10 +163,12 @@ const EditProduct = () => {
         setVariants(data.variants.map(v => ({
           variant_id: v.variant_id,
           sku: v.sku,
-          price: v.price,
+          mrp: v.mrp || 0,
+          sellingPrice: v.sellingPrice || v.price || 0,
           attributes: v.attributes,
           images: v.images,
-          stock: v.stock || 0
+          stock: v.stock || 0,
+          discountPercentage: v.discountPercentage || 0
         })));
 
         const mainImages = data.variants[0].images || [];
@@ -397,7 +399,8 @@ const EditProduct = () => {
       setCurrentVariant({
         variant_id: v.variant_id || null,
         sku: v.sku,
-        price: v.price,
+        mrp: v.mrp || '',
+        sellingPrice: v.sellingPrice || v.price || '',
         attributeValues: attrVals,
         stock: v.stock || 0,
         images: v.images || []
@@ -407,7 +410,8 @@ const EditProduct = () => {
       setCurrentVariant({
         variant_id: null,
         sku: '',
-        price: '',
+        mrp: '',
+        sellingPrice: '',
         attributeValues: {},
         stock: 0,
         images: []
@@ -418,8 +422,13 @@ const EditProduct = () => {
   };
 
   const addOrUpdateVariant = async () => {
-    if (!currentVariant.sku || !currentVariant.price) {
-      setError('SKU and price are required');
+    if (!currentVariant.sku || !currentVariant.mrp || !currentVariant.sellingPrice) {
+      setError('SKU, MRP and Selling Price are required');
+      return;
+    }
+
+    if (parseFloat(currentVariant.sellingPrice) > parseFloat(currentVariant.mrp)) {
+      setError('Selling price cannot exceed MRP');
       return;
     }
 
@@ -459,7 +468,8 @@ const EditProduct = () => {
 
       const variantPayload = {
         sku: currentVariant.sku,
-        price: parseFloat(currentVariant.price),
+        mrp: parseFloat(currentVariant.mrp),
+        sellingPrice: parseFloat(currentVariant.sellingPrice),
         attributes,
         images: uploadedImages,
         initial_stock: parseInt(currentVariant.stock) || 0
@@ -620,8 +630,8 @@ const EditProduct = () => {
       // We take the current versions of variants and images.
       const metadata = {
         ...productData,
-        base_price: parseFloat(productData.base_price) || 0,
         status: productStatus ? 1 : 0,
+        gstPercent: parseFloat(productData.gstPercent) || 0,
         images: productImages.map((img, idx) => ({
           image_id: img.image_id || null,
           image_url: img.image_url || img.url,
@@ -743,6 +753,16 @@ const EditProduct = () => {
                   className={styles.input}
                 />
               </div>
+              <div className={styles.halfWidth}>
+                <label className={styles.label}>GST (%)</label>
+                <input
+                  type="number"
+                  name="gstPercent"
+                  value={productData.gstPercent}
+                  onChange={handleProductChange}
+                  className={styles.input}
+                />
+              </div>
               <div className={styles.fullWidth}>
                 <label className={styles.label}>Description</label>
                 <textarea
@@ -751,16 +771,6 @@ const EditProduct = () => {
                   onChange={handleProductChange}
                   className={styles.textarea}
                   rows={4}
-                />
-              </div>
-              <div className={styles.halfWidth}>
-                <label className={styles.label}>Base Price (USD)</label>
-                <input
-                  type="number"
-                  name="base_price"
-                  value={productData.base_price}
-                  onChange={handleProductChange}
-                  className={styles.input}
                 />
               </div>
               <div className={styles.statusBox}>
@@ -902,11 +912,6 @@ const EditProduct = () => {
                       <Trash2 size={14} />
                     </button>
                   </div>
-                  {img.is_primary === 1 && (
-                    <div className={styles.imageBadge}>
-                      <Star size={8} fill="currentColor" />
-                    </div>
-                  )}
                 </div>
               ))}
               {productImages.length < 5 && (
@@ -966,56 +971,106 @@ const EditProduct = () => {
                 <table className={styles.table}>
                   <thead>
                     <tr>
+                      <th>Preview</th>
                       <th>SKU</th>
                       {categoryAttributes.map(attr => (
                         <th key={attr.attribute_id}>{attr.name}</th>
                       ))}
                       <th>Stock</th>
-                      <th>Price</th>
-                      <th></th>
+                      <th>Price Details</th>
+                      <th style={{ textAlign: 'right' }}>Actions</th>
                     </tr>
                   </thead>
                   <tbody>
                     {variants.map((variant, idx) => (
                       <tr key={idx}>
-                        <td>{variant.sku}</td>
+                        <td>
+                          <div className={styles.variantThumbContainer}>
+                            {variant.images && variant.images.length > 0 ? (
+                              <img 
+                                src={getImageUrl(variant.images[0])} 
+                                alt="variant preview" 
+                                className={styles.variantThumb} 
+                              />
+                            ) : (
+                              <div className={styles.variantThumbPlaceholder}>
+                                <CloudUpload size={14} />
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                        <td>
+                          <span className={styles.skuText}>{variant.sku}</span>
+                        </td>
                         {categoryAttributes.map(attr => (
                           <td key={attr.attribute_id}>
-                            {variant.attributes?.find(a => a.attribute_id === attr.attribute_id)
-                              ?.attribute_value_name || variant.attributes?.find(a => a.attribute_id === attr.attribute_id)?.attribute_value || '-'}
+                            <span className={styles.attrValueText}>
+                              {variant.attributes?.find(a => a.attribute_id === attr.attribute_id)
+                                ?.attribute_value_name || variant.attributes?.find(a => a.attribute_id === attr.attribute_id)?.attribute_value || '—'}
+                            </span>
                           </td>
                         ))}
                         <td>
-                           <span className={variant.stock > 5 ? styles.badgeGreen : styles.badgeRed}>
-                             {variant.stock} In Stock
+                           <span className={`${styles.stockBadge} ${variant.stock <= 0 ? styles.badgeOut : variant.stock <= 5 ? styles.badgeLow : styles.badgeIn}`}>
+                             {variant.stock <= 0 ? 'Out' : variant.stock <= 5 ? 'Low' : 'In'} ({variant.stock})
                            </span>
                         </td>
-                        <td className={styles.variantPrice}>${variant.price}</td>
+                        <td>
+                          <div className={styles.priceCell}>
+                            <div className={styles.sellingPriceGroup}>
+                              <span className={styles.currency}>₹</span>
+                              <span className={styles.sellingPriceVal}>{variant.sellingPrice}</span>
+                            </div>
+                            <div className={styles.mrpGroup}>
+                              <span className={styles.mrpText}>₹{variant.mrp}</span>
+                              {variant.discountPercentage > 0 && (
+                                <span className={styles.discountTag}>-{variant.discountPercentage}%</span>
+                              )}
+                            </div>
+                          </div>
+                        </td>
                         <td className={styles.variantDel}>
-                          <button className={styles.variantEditBtn} onClick={() => openVariantModal(idx)}>Edit</button>
-                          <button className={styles.deleteBtn} onClick={() => deleteVariant(idx)}><Trash2 size={13} /></button>
+                          <button 
+                            className={styles.variantActionButton} 
+                            onClick={() => openVariantModal(idx)}
+                            title="Edit Variant"
+                          >
+                            <span className="material-symbols-outlined">edit</span>
+                          </button>
+                          <button 
+                            className={styles.variantDeleteButton} 
+                            onClick={() => deleteVariant(idx)}
+                            title="Delete Variant"
+                          >
+                            <Trash2 size={14} />
+                          </button>
                         </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
-              )}
+               )}
             </div>
-            <button 
-              className={styles.addVariant} 
-              onClick={() => openVariantModal()}
-              disabled={!productData.sub_category_id}
-            >
-              <Plus size={13} /> Add Variant
-            </button>
+            <div className={styles.addVariantWrapper}>
+              <Button 
+                variant="outline" 
+                className={styles.fullWidthBtn}
+                onClick={() => openVariantModal()}
+                disabled={!productData.sub_category_id}
+              >
+                <Plus size={14} style={{ marginRight: '6px' }} /> Add Variant
+              </Button>
+            </div>
           </section>
         </div>
       </div>
 
       <div className={styles.actionBar}>
-        <Button variant="primary" className={styles.publishBtn} onClick={handleSubmit} disabled={loading}>
-          {loading ? <Loader size={16} className={styles.spinner} /> : 'Update Product'}
-        </Button>
+        <div className={styles.actionBarRight}>
+          <Button variant="primary" className={styles.publishBtn} onClick={handleSubmit} disabled={loading}>
+            {loading ? <Loader size={16} className={styles.spinner} /> : 'Update Product'}
+          </Button>
+        </div>
       </div>
 
       {/* --- Attribute Modals --- */}
@@ -1109,14 +1164,42 @@ const EditProduct = () => {
                   onChange={e => setCurrentVariant(prev => ({ ...prev, sku: e.target.value }))}
                 />
               </div>
-              <div className={styles.formGroup}>
-                <label>Price *</label>
-                <input
-                  type="number"
-                  value={currentVariant.price}
-                  onChange={e => setCurrentVariant(prev => ({ ...prev, price: e.target.value }))}
-                />
+              <div className={styles.formGrid}>
+                <div className={styles.halfWidth}>
+                  <div className={styles.formGroup}>
+                    <label>MRP *</label>
+                    <input
+                      type="number"
+                      value={currentVariant.mrp}
+                      onChange={e => setCurrentVariant(prev => ({ ...prev, mrp: e.target.value }))}
+                      placeholder="e.g. 799"
+                    />
+                  </div>
+                </div>
+                <div className={styles.halfWidth}>
+                  <div className={styles.formGroup}>
+                    <label>Selling Price *</label>
+                    <input
+                      type="number"
+                      value={currentVariant.sellingPrice}
+                      onChange={e => setCurrentVariant(prev => ({ ...prev, sellingPrice: e.target.value }))}
+                      placeholder="e.g. 356"
+                    />
+                  </div>
+                </div>
               </div>
+
+              {currentVariant.mrp && currentVariant.sellingPrice && (
+                 <div className={styles.pricePreview}>
+                   {parseFloat(currentVariant.sellingPrice) > parseFloat(currentVariant.mrp) ? (
+                     <span className={styles.errorText}>Selling price cannot exceed MRP</span>
+                   ) : (
+                     <span className={styles.pricePreviewText} style={{ color: '#22c55e', fontSize: '0.85rem', fontWeight: '500' }}>
+                       Discount: {Math.round(((parseFloat(currentVariant.mrp) - parseFloat(currentVariant.sellingPrice)) / parseFloat(currentVariant.mrp)) * 100)}% OFF
+                     </span>
+                   )}
+                 </div>
+              )}
               <div className={styles.formGroup}>
                 <label>Stock</label>
                 <input
