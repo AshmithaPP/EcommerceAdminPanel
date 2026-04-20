@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
+import { Plus, Search, Filter, Edit, Ban, CheckCircle } from 'lucide-react';
 import styles from './AdminManagement.module.css';
+import DataTable from '../../components/ui/DataTable';
 import AddAdminModal from '../../components/admins/AddAdminModal';
 import DeactivateModal from '../../components/admins/DeactivateModal';
 
@@ -36,6 +38,7 @@ const adminsData = [
 const AdminManagement = () => {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [deactivateTarget, setDeactivateTarget] = useState(null);
+  const [searchTerm, setSearchTerm] = useState('');
 
   const getRoleClass = (role) => {
     switch (role) {
@@ -46,126 +49,129 @@ const AdminManagement = () => {
     }
   };
 
-  return (
-    <div className={styles.adminContainer}>
-      {/* Header Section */}
-      <div className={styles.headerSection}>
-        <div className={styles.headerTop}>
-          <button className={styles.addBtn} onClick={() => setIsAddModalOpen(true)}>
-            <span className="material-symbols-outlined">person_add</span>
-            Add Sub-Admin
+  const columns = [
+    {
+      label: 'Admin Curator',
+      key: 'admin',
+      width: '35%',
+      render: (row) => (
+        <div className={styles.curatorCell}>
+          <div className={styles.avatar}>
+            <img src={row.avatar} alt={row.name} />
+          </div>
+          <div>
+            <div className={styles.adminName}>{row.name}</div>
+            <div className={styles.adminEmail}>{row.email}</div>
+          </div>
+        </div>
+      )
+    },
+    {
+      label: 'Role',
+      key: 'role',
+      width: '15%',
+      render: (row) => (
+        <span className={`${styles.roleBadge} ${getRoleClass(row.role)}`}>
+          {row.role}
+        </span>
+      )
+    },
+    {
+      label: 'Status',
+      key: 'status',
+      width: '15%',
+      render: (row) => (
+        <div className={`${styles.statusCell} ${row.status === 'Inactive' ? styles.statusInactive : ''}`}>
+          <span className={styles.statusDot}></span>
+          {row.status}
+        </div>
+      )
+    },
+    {
+      label: 'Last Login',
+      key: 'lastLogin',
+      width: '20%',
+      render: (row) => (
+        <span className={styles.lastLoginText}>{row.lastLogin}</span>
+      )
+    },
+    {
+      label: 'Actions',
+      key: 'actions',
+      width: '15%',
+      align: 'right',
+      render: (row) => (
+        <div className={styles.actionCell}>
+          <button className={styles.iconBtn} title="Edit Admin">
+            <Edit size={16} />
           </button>
-        </div>
-
-        {/* Filters Bar */}
-        <div className={styles.filtersBar}>
-          <div className={styles.searchWrapper}>
-            <span className={`material-symbols-outlined ${styles.searchIcon}`}>search</span>
-            <input 
-              type="text" 
-              className={styles.searchInput} 
-              placeholder="Search by name, email or ID..." 
-            />
-          </div>
-          
-          <div className={styles.filterActions}>
-            <select className={styles.selectInput}>
-              <option>All Roles</option>
-              <option>Super Admin</option>
-              <option>Manager</option>
-              <option>Support</option>
-            </select>
-            
-            <select className={styles.selectInput}>
-              <option>All Status</option>
-              <option>Active</option>
-              <option>Inactive</option>
-            </select>
-            
-            <button className={styles.filterBtn}>
-              <span className="material-symbols-outlined">filter_list</span>
+          {row.status === 'Active' ? (
+            <button 
+              className={`${styles.iconBtn} ${styles.blockBtn}`}
+              onClick={() => setDeactivateTarget(row)}
+              title="Deactivate Admin"
+            >
+              <Ban size={16} />
             </button>
-          </div>
+          ) : (
+            <button className={`${styles.iconBtn} ${styles.activateBtn}`} title="Reactivate Admin">
+              <CheckCircle size={16} />
+            </button>
+          )}
         </div>
-      </div>
+      )
+    }
+  ];
 
-      {/* Main Data Table */}
+  const headerActions = (
+    <div className={styles.headerControls}>
+      <div className={styles.searchWrapper}>
+        <Search size={16} className={styles.searchIcon} />
+        <input 
+          type="text" 
+          className={styles.searchInput} 
+          placeholder="Search name, email, or ID..." 
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+        />
+      </div>
+      
+      <select className={styles.selectInput}>
+        <option>All Roles</option>
+        <option>Super Admin</option>
+        <option>Manager</option>
+        <option>Support</option>
+      </select>
+      
+      <select className={styles.selectInput}>
+        <option>All Status</option>
+        <option>Active</option>
+        <option>Inactive</option>
+      </select>
+      
+      <button className={styles.filterBtn} title="More Filters">
+        <Filter size={16} />
+      </button>
+
+      <button className={styles.createBtn} onClick={() => setIsAddModalOpen(true)}>
+        <Plus size={16} strokeWidth={2.5} />
+        ADD CURATOR
+      </button>
+    </div>
+  );
+
+  return (
+    <div className="page-container">
       <div className={styles.tableContainer}>
-        <table className={styles.adminTable}>
-          <thead>
-            <tr>
-              <th>Admin Curator</th>
-              <th>Role</th>
-              <th>Status</th>
-              <th>Last Login</th>
-              <th style={{ textAlign: 'right' }}>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {adminsData.map((admin) => (
-              <tr key={admin.id}>
-                <td>
-                  <div className={styles.curatorCell}>
-                    <div className={styles.avatar}>
-                      <img src={admin.avatar} alt={admin.name} />
-                    </div>
-                    <div>
-                      <div className={styles.adminName}>{admin.name}</div>
-                      <div className={styles.adminEmail}>{admin.email}</div>
-                    </div>
-                  </div>
-                </td>
-                <td>
-                  <span className={`${styles.roleBadge} ${getRoleClass(admin.role)}`}>
-                    {admin.role}
-                  </span>
-                </td>
-                <td>
-                  <div className={`${styles.statusCell} ${admin.status === 'Inactive' ? styles.statusInactive : ''}`}>
-                    <span className={styles.statusDot}></span>
-                    {admin.status}
-                  </div>
-                </td>
-                <td className={styles.lastLogin}>
-                  {admin.lastLogin}
-                </td>
-                <td>
-                  <div className={styles.actionsCell}>
-                    <button className={styles.actionBtn}>
-                      <span className="material-symbols-outlined">edit</span>
-                    </button>
-                    {admin.status === 'Active' ? (
-                      <button 
-                        className={`${styles.actionBtn} ${styles.blockBtn}`}
-                        onClick={() => setDeactivateTarget(admin)}
-                      >
-                        <span className="material-symbols-outlined">block</span>
-                      </button>
-                    ) : (
-                      <button className={styles.actionBtn} style={{ color: 'var(--secondary)' }}>
-                        <span className="material-symbols-outlined">check_circle</span>
-                      </button>
-                    )}
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-
-        {/* Pagination */}
-        <div className={styles.pagination}>
-          <div className={styles.pageInfo}>
-            Showing {adminsData.length} of 12 Curator Admins
-          </div>
-          <div className={styles.pageActions}>
-            <button className={styles.pageBtn}>Previous</button>
-            <button className={`${styles.pageBtn} ${styles.pageBtnActive}`}>Next</button>
-          </div>
-        </div>
+        <DataTable
+          title="Team Management"
+          columns={columns}
+          data={adminsData}
+          actions={headerActions}
+          emptyMessage="No administrators found."
+        />
       </div>
 
-      {/* Modals */}
       <AddAdminModal 
         isOpen={isAddModalOpen} 
         onClose={() => setIsAddModalOpen(false)} 

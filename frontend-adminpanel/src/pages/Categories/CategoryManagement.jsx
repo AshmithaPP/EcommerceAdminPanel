@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { Edit2, Trash2, Plus, ChevronRight, ChevronDown, FolderOpen, Folder } from 'lucide-react';
 import styles from './CategoryManagement.module.css';
 import Modal from '../../components/common/Modal';
 import Button from '../../components/ui/Button';
@@ -17,7 +18,6 @@ const CategoryManagement = () => {
   const [editingCategory, setEditingCategory] = useState(null);
   const [editName, setEditName] = useState('');
   const [editOrder, setEditOrder] = useState(0);
-
   const [viewMode, setViewMode] = useState('hierarchy');
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -55,17 +55,10 @@ const CategoryManagement = () => {
   const createCategory = async (name, parentId = null) => {
     try {
       if (parentId) {
-        await privateApi.post('/categories/sub-category-create', {
-          name,
-          category_id: parentId,
-          display_order: 1,
-        });
+        await privateApi.post('/categories/sub-category-create', { name, category_id: parentId, display_order: 1 });
         toast.success(`Sub-category "${name}" created`);
       } else {
-        await privateApi.post('/categories/category-create', {
-          name,
-          display_order: 1,
-        });
+        await privateApi.post('/categories/category-create', { name, display_order: 1 });
         toast.success(`Category "${name}" created`);
       }
       viewMode === 'hierarchy' ? fetchCategoryTree() : fetchCategoryList(page);
@@ -103,7 +96,6 @@ const CategoryManagement = () => {
     }
   };
 
-
   // ---------- Effects ----------
   useEffect(() => {
     viewMode === 'hierarchy' ? fetchCategoryTree() : fetchCategoryList(1);
@@ -112,22 +104,32 @@ const CategoryManagement = () => {
   // ---------- Search & Stats ----------
   const filteredCategories = useMemo(() => {
     if (!searchQuery.trim()) return categories;
-    
-    const filterTree = (items) => {
-      return items.reduce((acc, item) => {
+    const filterTree = (items) =>
+      items.reduce((acc, item) => {
         const matches = item.name.toLowerCase().includes(searchQuery.toLowerCase());
         const filteredChildren = item.children ? filterTree(item.children) : [];
-        
-        if (matches || filteredChildren.length > 0) {
-          acc.push({ ...item, children: filteredChildren });
-        }
+        if (matches || filteredChildren.length > 0) acc.push({ ...item, children: filteredChildren });
         return acc;
       }, []);
-    };
-
     if (viewMode === 'hierarchy') return filterTree(categories);
     return categories.filter(c => c.name.toLowerCase().includes(searchQuery.toLowerCase()));
   }, [categories, searchQuery, viewMode]);
+
+  const totalCats = useMemo(() => {
+    if (viewMode === 'list') return categories.length;
+    let count = 0;
+    const count_r = (items) => items.forEach(i => { count++; if (i.children) count_r(i.children); });
+    count_r(categories);
+    return count;
+  }, [categories, viewMode]);
+
+  const totalSubCats = useMemo(() => {
+    if (viewMode !== 'hierarchy') return 0;
+    let count = 0;
+    const count_r = (items) => items.forEach(i => { if (i.children?.length) { count += i.children.length; count_r(i.children); } });
+    count_r(categories);
+    return count;
+  }, [categories, viewMode]);
 
   // ---------- UI Helpers ----------
   const toggle = (id) => setExpanded(prev => ({ ...prev, [id]: !prev[id] }));
@@ -136,14 +138,11 @@ const CategoryManagement = () => {
     e.stopPropagation();
     setAddingTo(parentId);
     setNewCategoryName('');
-    if (parentId) setExpanded(prev => ({ ...prev, [parentId]: true }));
+    if (parentId && parentId !== 'root') setExpanded(prev => ({ ...prev, [parentId]: true }));
   };
 
   const submitAdd = () => {
-    if (!newCategoryName.trim()) {
-      setAddingTo(null);
-      return;
-    }
+    if (!newCategoryName.trim()) { setAddingTo(null); return; }
     createCategory(newCategoryName.trim(), addingTo === 'root' ? null : addingTo);
     setAddingTo(null);
     setNewCategoryName('');
@@ -158,33 +157,26 @@ const CategoryManagement = () => {
 
   const submitEditCategory = () => {
     if (editName.trim() && editingCategory) {
-      updateCategory(editingCategory, { 
-        name: editName.trim(),
-        display_order: parseInt(editOrder) || 0
-      });
+      updateCategory(editingCategory, { name: editName.trim(), display_order: parseInt(editOrder) || 0 });
     }
     setEditingCategory(null);
     setEditName('');
     setEditOrder(0);
   };
 
-  const handleDelete = (e, node) => {
-    e.stopPropagation();
-    setDeleteId(node);
-  };
+  const handleDelete = (e, node) => { e.stopPropagation(); setDeleteId(node); };
+  const confirmDelete = () => { deleteCategory(deleteId); setDeleteId(null); };
 
-  const confirmDelete = () => {
-    deleteCategory(deleteId);
-    setDeleteId(null);
-  };
-
-  // ---------- Render Helpers ----------
+  // ---------- Inline Add Input ----------
   const renderAddInput = () => (
-    <div className={styles.addInputWrapper}>
+    <div className={styles.addInputRow}>
+      <span className={styles.addInputIcon}>
+        <Folder size={14} />
+      </span>
       <input
         autoFocus
         className={styles.addInput}
-        placeholder="New group name..."
+        placeholder="New category name..."
         value={newCategoryName}
         onChange={(e) => setNewCategoryName(e.target.value)}
         onKeyDown={(e) => {
@@ -192,13 +184,16 @@ const CategoryManagement = () => {
           if (e.key === 'Escape') setAddingTo(null);
         }}
       />
-      <div className={styles.addInputActions}>
-        <button className={styles.iconBtnSmall} onClick={submitAdd}><span className="material-symbols-outlined">done</span></button>
-        <button className={styles.iconBtnSmall} onClick={() => setAddingTo(null)}><span className="material-symbols-outlined">close</span></button>
-      </div>
+      <button className={styles.confirmBtn} onClick={submitAdd} title="Save">
+        <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>done</span>
+      </button>
+      <button className={styles.cancelBtn} onClick={() => setAddingTo(null)} title="Cancel">
+        <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>close</span>
+      </button>
     </div>
   );
 
+  // ---------- Tree Renderer ----------
   const renderTree = (items, level = 1) => {
     if (!items?.length) return null;
     return items.map(node => {
@@ -208,60 +203,84 @@ const CategoryManagement = () => {
       const isEditing = editingCategory?.category_id === node.category_id;
 
       return (
-        <div key={node.category_id} className={`${styles.treeItem} ${level === 1 ? styles.rootNode : styles.childNode}`}>
-          <div className={`${styles.treeHeader} ${isSelected ? styles.headerActive : ''}`} onClick={() => setSelectedCategory(node)}>
-            <div className={styles.headerLeft}>
-              <span
-                className={`material-symbols-outlined ${styles.expandIcon}`}
-                onClick={(e) => { e.stopPropagation(); toggle(node.category_id); }}
-              >
-                {hasChildren ? (isExpanded ? 'keyboard_arrow_down' : 'keyboard_arrow_right') : 'circle'}
+        <div key={node.category_id} className={`${styles.treeRow} ${level === 1 ? styles.rootRow : styles.childRow}`}>
+          <div
+            className={`${styles.treeRowInner} ${isSelected ? styles.rowSelected : ''}`}
+            style={{ paddingLeft: `${(level - 1) * 24 + 12}px` }}
+            onClick={() => setSelectedCategory(node)}
+          >
+            {/* Expand / leaf icon */}
+            <span
+              className={styles.expandBtn}
+              onClick={(e) => { e.stopPropagation(); if (hasChildren) toggle(node.category_id); }}
+            >
+              {hasChildren
+                ? (isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />)
+                : <span className={styles.leafDot} />
+              }
+            </span>
+
+            {/* Folder icon */}
+            <span className={`${styles.folderIcon} ${hasChildren ? styles.folderParent : styles.folderLeaf}`}>
+              {hasChildren && isExpanded ? <FolderOpen size={14} /> : <Folder size={14} />}
+            </span>
+
+            {/* Name / Edit inline */}
+            {isEditing ? (
+              <div className={styles.inlineEditGroup} onClick={e => e.stopPropagation()}>
+                <input
+                  autoFocus
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && submitEditCategory()}
+                  className={styles.inlineEditInput}
+                  placeholder="Category name"
+                />
+                <input
+                  type="number"
+                  value={editOrder}
+                  onChange={(e) => setEditOrder(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && submitEditCategory()}
+                  className={styles.inlineOrderInput}
+                  placeholder="Order"
+                  title="Display Order"
+                />
+                <button className={styles.confirmBtn} onClick={submitEditCategory} title="Save">
+                  <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>done</span>
+                </button>
+                <button className={styles.cancelBtn} onClick={() => setEditingCategory(null)} title="Cancel">
+                  <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>close</span>
+                </button>
+              </div>
+            ) : (
+              <span className={`${styles.nodeName} ${level === 1 ? styles.rootName : styles.childName}`}>
+                {node.name}
               </span>
-              {isEditing ? (
-                <div className={styles.editInputGroup}>
-                  <input
-                    value={editName}
-                    onChange={(e) => setEditName(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && submitEditCategory()}
-                    autoFocus
-                    placeholder="Category Name"
-                    className={styles.editInput}
-                  />
-                  <input
-                    type="number"
-                    value={editOrder}
-                    onChange={(e) => setEditOrder(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && submitEditCategory()}
-                    placeholder="Order"
-                    className={styles.editOrderInput}
-                    title="Display Order"
-                  />
-                  <button className={styles.iconBtnSmall} onClick={submitEditCategory} title="Save Changes">
-                    <span className="material-symbols-outlined">done</span>
-                  </button>
-                  <button className={styles.iconBtnSmall} onClick={() => setEditingCategory(null)} title="Cancel">
-                    <span className="material-symbols-outlined">close</span>
-                  </button>
-                </div>
-              ) : (
-                <span className={styles.nodeName}>{node.name}</span>
-              )}
-            </div>
-            
-            <div className={styles.itemActions}>
-              <button className={styles.actionBtn} onClick={(e) => handleEditCategory(e, node)} title="Edit">
-                <span className="material-symbols-outlined">edit</span>
-              </button>
-              <button className={styles.actionBtn} onClick={(e) => handleAddClick(e, node.category_id)} title="Add Sub">
-                <span className="material-symbols-outlined">add</span>
-              </button>
-              <button className={`${styles.actionBtn} ${styles.deleteBtn}`} onClick={(e) => handleDelete(e, node)} title="Delete">
-                <span className="material-symbols-outlined">delete</span>
-              </button>
-            </div>
+            )}
+
+            {/* Badge: child count */}
+            {hasChildren && !isEditing && (
+              <span className={styles.childCount}>{node.children.length}</span>
+            )}
+            {/* Actions */}
+            {!isEditing && (
+              <div className={styles.rowActions}>
+                <button className={styles.rowActionBtn} onClick={(e) => handleEditCategory(e, node)} title="Edit">
+                  <Edit2 size={13} />
+                </button>
+                <button className={styles.rowActionBtn} onClick={(e) => handleAddClick(e, node.category_id)} title="Add Sub-category">
+                  <Plus size={13} />
+                </button>
+                <button className={`${styles.rowActionBtn} ${styles.deleteActionBtn}`} onClick={(e) => handleDelete(e, node)} title="Delete">
+                  <Trash2 size={13} />
+                </button>
+              </div>
+            )}
           </div>
+
+          {/* Children */}
           {(isExpanded || addingTo === node.category_id) && (
-            <div className={styles.subTree}>
+            <div className={styles.children}>
               {renderTree(node.children, level + 1)}
               {addingTo === node.category_id && renderAddInput()}
             </div>
@@ -271,149 +290,212 @@ const CategoryManagement = () => {
     });
   };
 
+  // ---------- List view columns ----------
+  const renderListView = () => (
+    <>
+      <div className={styles.tableWrapper}>
+        <table className={styles.table}>
+          <colgroup>
+            <col style={{ width: 'auto', minWidth: '200px' }} />
+            <col style={{ width: '130px' }} />
+            <col style={{ width: '160px' }} />
+            <col style={{ width: '110px' }} />
+          </colgroup>
+          <thead>
+            <tr>
+              <th>Category Name</th>
+              <th className={styles.thCenter}>Display Order</th>
+              <th className={styles.thCenter}>Identifier</th>
+              <th className={styles.thRight}>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filteredCategories.length === 0 ? (
+              <tr>
+                <td colSpan={4} className={styles.emptyCell}>No categories found.</td>
+              </tr>
+            ) : (
+              filteredCategories.map((cat, idx) => {
+                const isEditing = editingCategory?.category_id === cat.category_id;
+                return (
+                  <tr
+                    key={cat.category_id}
+                    className={`${idx % 2 === 1 ? styles.stripedRow : ''} ${selectedCategory?.category_id === cat.category_id ? styles.activeRow : ''}`}
+                    onClick={() => setSelectedCategory(cat)}
+                  >
+                    <td>
+                      {isEditing ? (
+                        <div className={styles.tableEditGroup}>
+                          <input value={editName} onChange={(e) => setEditName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && submitEditCategory()} autoFocus className={styles.tableEditInput} />
+                          <input type="number" value={editOrder} onChange={(e) => setEditOrder(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && submitEditCategory()} className={styles.tableOrderInput} />
+                          <button className={styles.confirmBtn} onClick={submitEditCategory}><span className="material-symbols-outlined" style={{ fontSize: '16px' }}>done</span></button>
+                        </div>
+                      ) : (
+                        <span className={styles.catName}>{cat.name}</span>
+                      )}
+                    </td>
+                    <td className={styles.tdCenter}>
+                      <span className={styles.orderPill}>{cat.display_order ?? 0}</span>
+                    </td>
+                    <td className={styles.tdCenter}>
+                      <code className={styles.idCode}>#CAT-{cat.category_id}</code>
+                    </td>
+                    <td className={styles.tdRight}>
+                      <div className={styles.tableActions}>
+                        <button className={styles.tableActionBtn} onClick={(e) => { e.stopPropagation(); handleEditCategory(e, cat); }} title="Edit">
+                          <Edit2 size={14} />
+                        </button>
+                        <button className={`${styles.tableActionBtn} ${styles.deleteTblBtn}`} onClick={(e) => { e.stopPropagation(); handleDelete(e, cat); }} title="Delete">
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {totalPages > 1 && !searchQuery && (
+        <div className={styles.pagination}>
+          <button className={styles.pageBtn} disabled={page === 1} onClick={() => { const p = page - 1; setPage(p); fetchCategoryList(p); }}>
+            <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>chevron_left</span>
+          </button>
+          {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
+            <button
+              key={p}
+              className={`${styles.pageBtn} ${p === page ? styles.activePage : ''}`}
+              onClick={() => { setPage(p); fetchCategoryList(p); }}
+            >{p}</button>
+          ))}
+          <button className={styles.pageBtn} disabled={page === totalPages} onClick={() => { const p = page + 1; setPage(p); fetchCategoryList(p); }}>
+            <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>chevron_right</span>
+          </button>
+        </div>
+      )}
+    </>
+  );
+
   // ---------- JSX ----------
   return (
-    <div className={styles.pageContainer}>
-      <header className={styles.luxuryHeader}>
-        <div className={styles.headerTitleSection}>
-          <h1 className={styles.pageTitle}>Category Management</h1>
-        </div>
+    <div className="page-container">
 
-        <div className={styles.controlsRow}>
-          <div className={styles.searchWrapper}>
-            <span className={`material-symbols-outlined ${styles.searchIcon}`}>search</span>
-            <input 
-              type="text" 
-              placeholder="Search category structures..." 
-              className={styles.premiumSearch}
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
+      {/* ── Stats Row ── */}
+      <div className={styles.statsRow}>
+        <div className={styles.statCard}>
+          <span className={styles.statLabel}>Total Categories</span>
+          <span className={styles.statValue}>{categories.length}</span>
+        </div>
+        {viewMode === 'hierarchy' && (
+          <div className={styles.statCard}>
+            <span className={styles.statLabel}>Sub-categories</span>
+            <span className={styles.statValue}>{totalSubCats}</span>
           </div>
-          
-          <div className={styles.actionGroup}>
+        )}
+
+      </div>
+
+      {/* ── Main Card ── */}
+      <div className={styles.tableCard}>
+
+        {/* Card Header — matches DataTable header pattern */}
+        <div className={styles.cardHeader}>
+          <span className={styles.cardTitle}>CATEGORY MANAGEMENT</span>
+          <div className={styles.headerRight}>
+
+            {/* Search */}
+            <div className={styles.searchWrapper}>
+              <span className={styles.searchIcon}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
+                </svg>
+              </span>
+              <input
+                type="text"
+                className={styles.searchInput}
+                placeholder="Search categories..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
+
+            {/* View Toggle */}
             <div className={styles.viewToggle}>
-              <button className={`${styles.toggleBtn} ${viewMode === 'hierarchy' ? styles.activeToggle : ''}`} onClick={() => setViewMode('hierarchy')}>
-                <span className="material-symbols-outlined">account_tree</span>
+              <button
+                className={`${styles.toggleBtn} ${viewMode === 'hierarchy' ? styles.activeToggle : ''}`}
+                onClick={() => setViewMode('hierarchy')}
+                title="Hierarchy View"
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>account_tree</span>
                 Hierarchy
               </button>
-              <button className={`${styles.toggleBtn} ${viewMode === 'list' ? styles.activeToggle : ''}`} onClick={() => setViewMode('list')}>
-                <span className="material-symbols-outlined">list</span>
+              <button
+                className={`${styles.toggleBtn} ${viewMode === 'list' ? styles.activeToggle : ''}`}
+                onClick={() => setViewMode('list')}
+                title="List View"
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>list</span>
                 List
               </button>
             </div>
-            
-            <button className={styles.luxuryAddBtn} onClick={(e) => handleAddClick(e, 'root')}>
-              <span className="material-symbols-outlined">add_circle</span>
-              New Root Category
+
+            {/* Add Root Category */}
+            <button className={styles.addRootBtn} onClick={(e) => handleAddClick(e, 'root')}>
+              <Plus size={14} strokeWidth={3} />
             </button>
           </div>
         </div>
-      </header>
 
-      <main className={styles.glassContent}>
-        <div className={styles.scrollArea}>
+        {/* Card Body */}
+        <div className={styles.cardBody}>
           {isLoading ? (
             <div className={styles.loaderContainer}>
-              <div className={styles.premiumLoader}></div>
-              <span>Fetching Curated Collections...</span>
+              <div className={styles.spinner} />
+              <span className={styles.loaderText}>Loading categories...</span>
             </div>
           ) : viewMode === 'hierarchy' ? (
             <div className={styles.treeContainer}>
               {filteredCategories.length === 0 ? (
                 <div className={styles.emptyState}>
-                  <span className="material-symbols-outlined">category</span>
-                  <p>No categories match your search criteria.</p>
+                  <span className="material-symbols-outlined" style={{ fontSize: '40px', opacity: 0.2 }}>category</span>
+                  <p>No categories found. Start by adding a root category.</p>
                 </div>
               ) : renderTree(filteredCategories)}
               {addingTo === 'root' && renderAddInput()}
             </div>
           ) : (
-            <div className={styles.tableView}>
-              <table className={styles.premiumTable}>
-                <thead>
-                  <tr>
-                    <th>Collection Name</th>
-                    <th>Display Order</th>
-                    <th>Identifier</th>
-                    <th className={styles.textRight}>Management</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredCategories.map(cat => {
-                    const isEditing = editingCategory?.category_id === cat.category_id;
-                    return (
-                      <tr key={cat.category_id} className={selectedCategory?.category_id === cat.category_id ? styles.tableRowActive : ''} onClick={() => setSelectedCategory(cat)}>
-                        <td>
-                          {isEditing ? (
-                            <div className={styles.tableEditGroup}>
-                                <input
-                                value={editName}
-                                onChange={(e) => setEditName(e.target.value)}
-                                onKeyDown={(e) => e.key === 'Enter' && submitEditCategory()}
-                                autoFocus
-                                className={styles.tableEditInput}
-                                />
-                                <input
-                                type="number"
-                                value={editOrder}
-                                onChange={(e) => setEditOrder(e.target.value)}
-                                onKeyDown={(e) => e.key === 'Enter' && submitEditCategory()}
-                                className={styles.tableOrderInput}
-                                />
-                                <button className={styles.iconBtnSmall} onClick={submitEditCategory}><span className="material-symbols-outlined">done</span></button>
-                            </div>
-                          ) : (
-                            <span className={styles.tableName}>{cat.name}</span>
-                          )}
-                        </td>
-                        <td>
-                          <span className={styles.orderBadge}>{cat.display_order}</span>
-                        </td>
-                        <td>
-                          <code className={styles.idCode}>#CAT-{cat.category_id}</code>
-                        </td>
-                        <td className={styles.textRight}>
-                          <div className={styles.tableActions}>
-                            <button className={styles.tableBtn} onClick={(e) => { e.stopPropagation(); handleEditCategory(e, cat); }}>
-                              <span className="material-symbols-outlined">edit_note</span>
-                            </button>
-                            <button className={`${styles.tableBtn} ${styles.deleteBtn}`} onClick={(e) => { e.stopPropagation(); handleDelete(e, cat); }}>
-                              <span className="material-symbols-outlined">delete_sweep</span>
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-              
-              {totalPages > 1 && !searchQuery && (
-                <div className={styles.paginationLuxury}>
-                  <button disabled={page === 1} onClick={() => { setPage(p => p-1); fetchCategoryList(page-1); }}>
-                    <span className="material-symbols-outlined">chevron_left</span>
-                  </button>
-                  <div className={styles.pageIndicator}>
-                    <span className={styles.currentPage}>{page}</span>
-                    <span className={styles.pageDivider}>/</span>
-                    <span className={styles.totalPages}>{totalPages}</span>
-                  </div>
-                  <button disabled={page === totalPages} onClick={() => { setPage(p => p+1); fetchCategoryList(page+1); }}>
-                    <span className="material-symbols-outlined">chevron_right</span>
-                  </button>
-                </div>
-              )}
-            </div>
+            renderListView()
           )}
         </div>
-      </main>
 
-      <Modal isOpen={!!deleteId} onClose={() => setDeleteId(null)} title="Revoke Collection"
-        footer={<><Button variant="ghost" onClick={() => setDeleteId(null)}>Hold Request</Button><Button variant="danger" onClick={confirmDelete}>Confirm Permanent Deletion</Button></>}>
-        <div className={styles.deleteConfirmBody}>
-          <span className="material-symbols-outlined">warning</span>
-          <p>Are you certain you wish to remove <strong>{deleteId?.name}</strong>? All associated architectural bounds will be detached.</p>
+        {/* Showing entries footer */}
+        {!isLoading && filteredCategories.length > 0 && (
+          <div className={styles.cardFooter}>
+            Showing {filteredCategories.length} {filteredCategories.length === 1 ? 'category' : 'categories'}
+            {searchQuery && <> matching "<strong>{searchQuery}</strong>"</>}
+          </div>
+        )}
+      </div>
+
+      {/* ── Delete Confirm Modal ── */}
+      <Modal
+        isOpen={!!deleteId}
+        onClose={() => setDeleteId(null)}
+        title="Delete Category"
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setDeleteId(null)}>Cancel</Button>
+            <Button variant="danger" onClick={confirmDelete}>Delete</Button>
+          </>
+        }
+      >
+        <div className={styles.deleteBody}>
+          <span className={styles.deleteIcon}>
+            <span className="material-symbols-outlined">warning</span>
+          </span>
+          <p>Are you sure you want to delete <strong>{deleteId?.name}</strong>? This action cannot be undone.</p>
         </div>
       </Modal>
     </div>

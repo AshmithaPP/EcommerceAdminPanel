@@ -7,9 +7,26 @@ const db = require('../config/database');
 const slugify = require('../utils/slugify');
 const { v4: uuidv4 } = require('uuid');
 
+function calculateGSTFields(sellingPrice, gstPercent, priceIncludesGST) {
+    const sp = parseFloat(sellingPrice) || 0;
+    const gst = parseFloat(gstPercent) || 0;
+    // Default to true if not strictly false or 0
+    const includesGST = priceIncludesGST === false || priceIncludesGST === 0 || priceIncludesGST === '0' || priceIncludesGST === 'false' ? false : true;
+
+    if (includesGST) {
+        const basePrice = parseFloat((sp / (1 + gst / 100)).toFixed(2));
+        const gstAmount = parseFloat((sp - basePrice).toFixed(2));
+        return { basePrice, gstAmount, finalPrice: sp };
+    } else {
+        const gstAmount = parseFloat((sp * (gst / 100)).toFixed(2));
+        const finalPrice = parseFloat((sp + gstAmount).toFixed(2));
+        return { basePrice: sp, gstAmount, finalPrice };
+    }
+}
+
 const productService = {
     createProduct: async (productData) => {
-        const { name, sub_category_id, brand, variants, gstPercent } = productData;
+        const { name, sub_category_id, brand, variants, gstPercent, priceIncludesGST } = productData;
 
         // 1. Validation: Sub-Category
         const subCategory = await SubCategory.findById(sub_category_id);
@@ -119,23 +136,26 @@ const productService = {
                 sub_category_id,
                 brand,
                 video_url: productData.video_url || null,
-                gstPercent: gstPercent || 0
+                gstPercent: gstPercent || 0,
+                priceIncludesGST: priceIncludesGST !== undefined ? priceIncludesGST : 1
             }, connection);
 
             // 2. Insert Variants
             for (const variantData of variants) {
                 const variantId = uuidv4();
+                const gstFields = calculateGSTFields(variantData.sellingPrice, gstPercent, priceIncludesGST);
                 await Product.addVariant({
                     variant_id: variantId,
                     product_id: productId,
                     sku: variantData.sku,
                     price: variantData.sellingPrice, // Use sellingPrice for legacy price field
                     mrp: variantData.mrp,
-                    sellingPrice: variantData.sellingPrice
+                    sellingPrice: variantData.sellingPrice,
+                    ...gstFields
                 }, connection);
 
                 // Initialize Inventory for the new variant
-                await inventoryService.initializeInventory(variantId, variantData.initial_stock || 0, 10, connection);
+                await inventoryService.initializeInventory(variantId, variantData.initial_stock || 0, variantData.low_stock_threshold || 5, connection);
 
                 // Insert Variant Attributes
                 if (variantData.attributes && variantData.attributes.length > 0) {
@@ -185,7 +205,7 @@ const productService = {
             throw error;
         }
 
-        const { name, sub_category_id, brand, status, video_url, gstPercent } = productData;
+        const { name, sub_category_id, brand, status, video_url, gstPercent, priceIncludesGST } = productData;
 
         // Validation: Sub-Category
         const targetSubCategoryId = sub_category_id || existing.sub_category_id;
@@ -221,10 +241,13 @@ const productService = {
                 brand: brand || existing.brand,
                 status: status !== undefined ? status : existing.status,
                 video_url: video_url !== undefined ? video_url : existing.video_url,
-                gstPercent: gstPercent !== undefined ? gstPercent : existing.gstPercent
+                gstPercent: gstPercent !== undefined ? gstPercent : existing.gstPercent,
+                priceIncludesGST: priceIncludesGST !== undefined ? priceIncludesGST : existing.priceIncludesGST
             }, connection);
 
             // 2. Sync Variants (if provided)
+            const resolvedGstPercent = gstPercent !== undefined ? gstPercent : existing.gstPercent;
+            const resolvedIncludesGST = priceIncludesGST !== undefined ? priceIncludesGST : existing.priceIncludesGST;
             if (productData.variants && Array.isArray(productData.variants)) {
                 const incomingVariants = productData.variants;
                 const existingVariants = await Product.getVariants(productId);
@@ -241,11 +264,14 @@ const productService = {
                 for (const vData of incomingVariants) {
                     if (vData.variant_id && existingVariantIds.includes(vData.variant_id)) {
                         // Update existing variant
+                        const variantSellingPrice = vData.sellingPrice !== undefined ? vData.sellingPrice : 0;
+                        const gstFields = calculateGSTFields(variantSellingPrice, resolvedGstPercent, resolvedIncludesGST);
                         await Product.updateVariant(vData.variant_id, {
                             sku: vData.sku,
-                            price: vData.sellingPrice,
+                            price: variantSellingPrice,
                             mrp: vData.mrp,
-                            sellingPrice: vData.sellingPrice,
+                            sellingPrice: variantSellingPrice,
+                            ...gstFields,
                             status: vData.status !== undefined ? vData.status : 1
                         }, connection);
 
@@ -268,17 +294,19 @@ const productService = {
                     } else {
                         // Add new variant
                         const newVid = uuidv4();
+                        const gstFields = calculateGSTFields(vData.sellingPrice, resolvedGstPercent, resolvedIncludesGST);
                         await Product.addVariant({
                             variant_id: newVid,
                             product_id: productId,
                             sku: vData.sku,
                             price: vData.sellingPrice,
                             mrp: vData.mrp,
-                            sellingPrice: vData.sellingPrice
+                            sellingPrice: vData.sellingPrice,
+                            ...gstFields
                         }, connection);
 
                         // Initialize Inventory for the new variant
-                        await inventoryService.initializeInventory(newVid, vData.initial_stock || 0, 10, connection);
+                        await inventoryService.initializeInventory(newVid, vData.initial_stock || 0, vData.low_stock_threshold || 5, connection);
 
                         if (vData.attributes && vData.attributes.length > 0) {
                             await Product.addVariantAttributes(newVid, vData.attributes, connection);
@@ -376,17 +404,19 @@ const productService = {
         try {
             await connection.beginTransaction();
             const variantId = uuidv4();
+            const gstFields = calculateGSTFields(variantData.sellingPrice, product.gstPercent, product.priceIncludesGST);
             await Product.addVariant({
                 variant_id: variantId,
                 product_id: productId,
                 sku: variantData.sku,
                 price: variantData.sellingPrice,
                 mrp: variantData.mrp,
-                sellingPrice: variantData.sellingPrice
+                sellingPrice: variantData.sellingPrice,
+                ...gstFields
             }, connection);
 
             // Initialize Inventory for the new variant
-            await inventoryService.initializeInventory(variantId, variantData.initial_stock || 0, 10, connection);
+            await inventoryService.initializeInventory(variantId, variantData.initial_stock || 0, variantData.low_stock_threshold || 5, connection);
 
             if (variantData.attributes) {
                 await Product.addVariantAttributes(variantId, variantData.attributes, connection);
@@ -426,6 +456,13 @@ const productService = {
             }
         }
 
+        const product = await Product.findById(existing.product_id);
+        const gstFields = calculateGSTFields(
+            variantData.sellingPrice !== undefined ? variantData.sellingPrice : existing.sellingPrice, 
+            product.gstPercent, 
+            product.priceIncludesGST
+        );
+
         const connection = await db.getConnection();
         try {
             await connection.beginTransaction();
@@ -436,6 +473,7 @@ const productService = {
                 price: variantData.sellingPrice !== undefined ? variantData.sellingPrice : existing.price,
                 mrp: variantData.mrp !== undefined ? variantData.mrp : existing.mrp,
                 sellingPrice: variantData.sellingPrice !== undefined ? variantData.sellingPrice : existing.sellingPrice,
+                ...gstFields,
                 status: variantData.status !== undefined ? variantData.status : existing.status
             }, connection);
 
@@ -463,10 +501,10 @@ const productService = {
                 
                 if (existingInventory) {
                     // Update existing
-                    await inventoryService.setStockLevel(variantId, variantData.initial_stock, 'Updated via variant edit', null, connection);
+                    await inventoryService.setStockLevel(variantId, variantData.initial_stock, 'Updated via variant edit', null, variantData.low_stock_threshold, connection);
                 } else {
                     // Initialize if missing (legacy data)
-                    await inventoryService.initializeInventory(variantId, variantData.initial_stock, 10, connection);
+                    await inventoryService.initializeInventory(variantId, variantData.initial_stock, variantData.low_stock_threshold || 5, connection);
                 }
             }
 

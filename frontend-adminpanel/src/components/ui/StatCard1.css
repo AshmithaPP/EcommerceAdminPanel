@@ -1,0 +1,197 @@
+/* ── StatCard ─────────────────────────────────────────────────────────────── */
+
+@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap');
+
+.sc-card {
+  font-family: 'Nunito', sans-serif;
+  position: relative;
+  border-radius: 18px;
+  overflow: hidden;
+  padding: 16px 18px 14px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  box-sizing: border-box;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.18);
+  cursor: default;
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+
+.sc-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.26);
+}
+
+/* ── Decorative blobs ──────────────────────────────────────────────────────── */
+.sc-blob {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.sc-blob--1 {
+  /* Large circle — top-right corner, top & right edges clipped by overflow:hidden */
+  width: 160px;
+  height: 160px;
+  top: -60px;
+  right: -40px;
+  background: rgba(255, 255, 255, 0.13);
+  z-index: 0;
+}
+
+.sc-blob--2 {
+  /* Smaller circle — overlaps blob-1 inward, fully inside card top-right area */
+  width: 110px;
+  height: 110px;
+  top: 20px;
+  right: 48px;
+  background: rgba(255, 255, 255, 0.10);
+  z-index: 0;
+}
+
+/* ── Top Row ───────────────────────────────────────────────────────────────── */
+.sc-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  position: relative;
+  z-index: 1;
+}
+
+.sc-icon-wrap {
+  width: 36px;
+  height: 36px;
+  background: rgba(255, 255, 255, 0.18);
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  flex-shrink: 0;
+}
+
+.sc-icon-wrap svg,
+.sc-icon-wrap img {
+  width: 18px;
+  height: 18px;
+}
+
+.sc-top-right {
+  display: flex;
+  align-items: center;
+}
+
+/* ── Menu (three dots) ─────────────────────────────────────────────────────── */
+.sc-menu {
+  background: rgba(255, 255, 255, 0.18);
+  border-radius: 8px;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  cursor: pointer;
+}
+
+/* ── Tab Toggle ────────────────────────────────────────────────────────────── */
+.sc-tabs {
+  display: flex;
+  gap: 2px;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+  padding: 3px;
+}
+
+.sc-tab {
+  font-family: 'Nunito', sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  border: none;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.75);
+  padding: 3px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+  white-space: nowrap;
+  line-height: 1.4;
+}
+
+.sc-tab:hover {
+  color: #fff;
+}
+
+.sc-tab--active {
+  color: #fff !important;
+  font-weight: 800;
+}
+
+/* ── Body ──────────────────────────────────────────────────────────────────── */
+.sc-body {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  position: relative;
+  z-index: 1;
+  margin-top: 8px;
+}
+
+.sc-body-left {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.sc-value-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sc-value {
+  font-size: 26px;
+  font-weight: 800;
+  color: #fff;
+  letter-spacing: -0.5px;
+  line-height: 1;
+}
+
+.sc-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.78);
+  letter-spacing: 0.2px;
+}
+
+/* ── Trend Badge ───────────────────────────────────────────────────────────── */
+.sc-trend {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.sc-trend--up {
+  background: rgba(255, 255, 255, 0.22);
+  color: #fff;
+}
+
+.sc-trend--down {
+  background: rgba(255, 100, 100, 0.30);
+  color: #fca5a5;
+}
+
+/* ── Sparkline ─────────────────────────────────────────────────────────────── */
+.sc-chart {
+  flex-shrink: 0;
+  display: flex;
+  align-items: flex-end;
+}
+
+.sc-sparkline {
+  display: block;
+}

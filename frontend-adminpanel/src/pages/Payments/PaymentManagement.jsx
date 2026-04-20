@@ -1,29 +1,63 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { Eye, CreditCard, Wallet, Landmark, Truck, ChevronDown } from 'lucide-react';
 import styles from './PaymentManagement.module.css';
+import DataTable from '../../components/ui/DataTable';
+import Pagination from '../../components/ui/Pagination';
 import paymentService from '../../services/paymentService';
 import { toast } from 'react-hot-toast';
 
+// ── Helpers ──────────────────────────────────────────────────────────
+const formatCurrency = (amount) =>
+  new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(amount || 0);
+
+const formatDate = (dateString) => {
+  if (!dateString) return 'N/A';
+  return new Date(dateString).toLocaleDateString('en-IN', {
+    day: 'numeric', month: 'short', year: 'numeric',
+  });
+};
+
+const getMethodIcon = (method) => {
+  switch (method?.toLowerCase()) {
+    case 'netbanking': return <Landmark size={13} />;
+    case 'upi':       return <Wallet size={13} />;
+    case 'card':      return <CreditCard size={13} />;
+    case 'cod':       return <Truck size={13} />;
+    default:          return <Wallet size={13} />;
+  }
+};
+
+const STATUS_CLS = {
+  success: 'paid',
+  pending: 'pending',
+  failed:  'failed',
+};
+
+const statusLabel = (s) =>
+  s === 'success' ? 'Paid' : s?.charAt(0).toUpperCase() + s?.slice(1);
+
+// ── Component ─────────────────────────────────────────────────────────
 const PaymentManagement = () => {
   const [payments, setPayments] = useState([]);
-  const [selectedTransaction, setSelectedTransaction] = useState(null);
+  const [selectedTx, setSelectedTx] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [total, setTotal] = useState(0);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [limit] = useState(10);
-  const [activeFilter, setActiveFilter] = useState('All');
   const [isJsonOpen, setIsJsonOpen] = useState(false);
+  const [activeFilter, setActiveFilter] = useState('All');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [pagination, setPagination] = useState({ page: 1, limit: 10, total: 0 });
+
+  const filters = ['All', 'Success', 'Pending', 'Failed'];
 
   const fetchPayments = useCallback(async () => {
     try {
       setLoading(true);
-      const offset = (currentPage - 1) * limit;
-      const response = await paymentService.getPayments({ limit, offset });
-      
+      const offset = (pagination.page - 1) * pagination.limit;
+      const response = await paymentService.getPayments({ limit: pagination.limit, offset });
       if (response.success) {
         setPayments(response.data);
-        setTotal(response.total);
-        if (response.data.length > 0 && !selectedTransaction) {
-          setSelectedTransaction(response.data[0]);
+        setPagination(prev => ({ ...prev, total: response.total }));
+        if (response.data.length > 0 && !selectedTx) {
+          setSelectedTx(response.data[0]);
         }
       }
     } catch (error) {
@@ -32,254 +66,192 @@ const PaymentManagement = () => {
     } finally {
       setLoading(false);
     }
-  }, [currentPage, limit, selectedTransaction]);
+  }, [pagination.page, pagination.limit]);
 
-  useEffect(() => {
-    fetchPayments();
-  }, [fetchPayments]);
+  useEffect(() => { fetchPayments(); }, [fetchPayments]);
 
-  const getStatusClass = (status) => {
-    switch (status) {
-      case 'success': return styles.statusPaid;
-      case 'pending': return styles.statusPending;
-      case 'failed': return styles.statusFailed;
-      default: return styles.statusPending;
-    }
-  };
+  // ── Client-side filter on fetched page ──
+  const filteredPayments = activeFilter === 'All'
+    ? payments
+    : payments.filter(p => p.status?.toLowerCase() === activeFilter.toLowerCase());
 
-  const getMethodIcon = (method) => {
-    switch (method?.toLowerCase()) {
-      case 'netbanking': return 'account_balance';
-      case 'upi': return 'payments';
-      case 'card': return 'credit_card';
-      case 'cod': return 'local_shipping';
-      default: return 'payments';
-    }
-  };
+  // ── DataTable column definitions ──
+  const columns = [
+    {
+      label: 'Order',
+      key: 'order_number',
+      width: '180px',
+      render: (row) => (
+        <div>
+          <div className={styles.orderId}>#{row.order_number}</div>
+          <div className={styles.customerMeta}>{row.customer_name} · {formatDate(row.created_at)}</div>
+        </div>
+      ),
+    },
+    {
+      label: 'Amount',
+      key: 'amount',
+      width: '120px',
+      align: 'right',
+      render: (row) => <span className={styles.amount}>{formatCurrency(row.amount)}</span>,
+    },
+    {
+      label: 'Method',
+      key: 'payment_method',
+      width: '130px',
+      render: (row) => (
+        <div className={styles.methodCell}>
+          <div className={styles.methodRow}>
+            <span className={styles.methodIcon}>{getMethodIcon(row.payment_method)}</span>
+            <span className={styles.methodName}>{row.payment_method || 'Online'}</span>
+          </div>
+          <div className={styles.gatewayLabel}>Razorpay</div>
+        </div>
+      ),
+    },
+    {
+      label: 'Status',
+      key: 'status',
+      width: '100px',
+      align: 'center',
+      render: (row) => {
+        const cls = STATUS_CLS[row.status] || 'pending';
+        return (
+          <span className={`${styles.badge} ${styles[`badge_${cls}`]}`}>
+            {statusLabel(row.status)}
+          </span>
+        );
+      },
+    },
+    {
+      label: 'Action',
+      key: 'action',
+      width: '70px',
+      align: 'center',
+      render: (row) => (
+        <button
+          className={`${styles.viewBtn} ${selectedTx?.payment_id === row.payment_id ? styles.viewBtnActive : ''}`}
+          onClick={() => { setSelectedTx(row); setIsJsonOpen(false); }}
+          title="View Details"
+        >
+          <Eye size={13} />
+        </button>
+      ),
+    },
+  ];
 
-  const formatCurrency = (amount) => {
-    return new Intl.NumberFormat('en-IN', {
-      style: 'currency',
-      currency: 'INR',
-    }).format(amount);
-  };
-
-  const formatDate = (dateString) => {
-    if (!dateString) return 'N/A';
-    return new Date(dateString).toLocaleDateString('en-IN', {
-      day: 'numeric',
-      month: 'short',
-    });
-  };
-
-  const filteredPayments = activeFilter === 'All' 
-    ? payments 
-    : payments.filter(p => p.status.toLowerCase() === activeFilter.toLowerCase());
+  // ── Header actions: filter pills + search ──
+  const headerActions = (
+    <div className={styles.headerControls}>
+      <div className={styles.filterGroup}>
+        {filters.map((f) => (
+          <button
+            key={f}
+            className={`${styles.filterBtn} ${activeFilter === f ? styles.activeFilter : ''}`}
+            onClick={() => {
+              setActiveFilter(f);
+              setPagination(prev => ({ ...prev, page: 1 }));
+            }}
+          >
+            {f}
+          </button>
+        ))}
+      </div>
+      <div className={styles.searchWrapper}>
+        <svg className={styles.searchIcon} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
+        </svg>
+        <input
+          type="text"
+          className={styles.searchInput}
+          placeholder="Search orders..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+        />
+      </div>
+    </div>
+  );
 
   return (
-    <div className={styles.paymentContainer}>
-      {/* Left Panel: Transaction Register */}
-      <section className={styles.leftPanel}>
-        <div className={styles.filterBar}>
-          <div className={styles.filterHeader}>
-            <h2 className={styles.title}>Transaction Register</h2>
-            <div className={styles.statusFilter}>
-              {['All', 'Success', 'Pending', 'Failed'].map((filter) => (
-                <button
-                  key={filter}
-                  className={`${styles.filterBtn} ${activeFilter === filter ? styles.filterBtnActive : ''}`}
-                  onClick={() => setActiveFilter(filter)}
-                >
-                  {filter}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div className={styles.searchBar}>
-            <div className={styles.inputWrapper}>
-              <span className={`material-symbols-outlined ${styles.searchIcon}`}>search</span>
-              <input
-                type="text"
-                className={styles.searchInput}
-                placeholder="Search Order Number or Customer..."
-              />
-            </div>
-          </div>
-        </div>
+    <div className="page-container">
+      {loading && <div className={styles.loadingBar} />}
 
-        <div className={styles.tableContainer}>
-          {loading ? (
-            <div className="d-flex justify-content-center p-5">
-              <div className="spinner-border text-primary" role="status">
-                <span className="visually-hidden">Loading...</span>
-              </div>
-            </div>
-          ) : (
-            <table className={styles.table}>
-              <thead className={styles.tableHead}>
-                <tr>
-                  <th className={styles.tableHeaderCell}>Order Details</th>
-                  <th className={styles.tableHeaderCell}>Amount</th>
-                  <th className={styles.tableHeaderCell}>Method</th>
-                  <th className={styles.tableHeaderCell}>Status</th>
-                  <th className={`${styles.tableHeaderCell} ${styles.tableHeaderCellLast}`}>Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredPayments.map((tx) => (
-                  <tr
-                    key={tx.payment_id}
-                    className={`${styles.tableRow} ${selectedTransaction?.payment_id === tx.payment_id ? styles.tableRowSelected : ''}`}
-                  >
-                    <td className={`${styles.tableCell} ${styles.tableCellFirst} ${selectedTransaction?.payment_id === tx.payment_id ? styles.tableCellSelected : ''}`}>
-                      <div className={styles.orderId}>#{tx.order_number}</div>
-                      <div className={styles.customerInfo}>{tx.customer_name} • {formatDate(tx.created_at)}</div>
-                    </td>
-                    <td className={styles.tableCell}>
-                      <div className={styles.amount}>{formatCurrency(tx.amount)}</div>
-                    </td>
-                    <td className={styles.tableCell}>
-                      <div className={styles.methodWrapper}>
-                        <span className={`material-symbols-outlined ${styles.methodIcon}`}>{getMethodIcon(tx.payment_method)}</span>
-                        <span className={styles.methodName}>{tx.payment_method || 'Online'}</span>
-                      </div>
-                      <div className={styles.gatewayName}>Razorpay</div>
-                    </td>
-                    <td className={styles.tableCell}>
-                      <span className={`${styles.statusBadge} ${getStatusClass(tx.status)}`}>
-                        {tx.status === 'success' ? 'Paid' : tx.status.charAt(0)?.toUpperCase() + tx.status.slice(1)}
-                      </span>
-                    </td>
-                    <td className={`${styles.tableCell} ${styles.tableCellLast}`}>
-                      <button
-                        className={`${styles.actionBtn} ${selectedTransaction?.payment_id === tx.payment_id ? styles.actionBtnActive : ''}`}
-                        onClick={() => setSelectedTransaction(tx)}
-                      >
-                        <span className="material-symbols-outlined">visibility</span>
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-                {filteredPayments.length === 0 && (
-                  <tr>
-                    <td colSpan="5" className="text-center p-5 text-muted">No transactions found.</td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+      <div className={styles.mainGrid}>
+
+        {/* ── LEFT: Transaction Register (DataTable) ── */}
+        <div className={styles.leftCol}>
+          <DataTable
+            title="Transaction Register"
+            columns={columns}
+            data={loading ? [] : filteredPayments}
+            actions={headerActions}
+            emptyMessage={loading ? 'Loading payments...' : 'No transactions found.'}
+          />
+          {!loading && pagination.total > pagination.limit && (
+            <Pagination
+              totalItems={pagination.total}
+              itemsPerPage={pagination.limit}
+              currentPage={pagination.page}
+              onPageChange={(p) => setPagination(prev => ({ ...prev, page: p }))}
+            />
           )}
         </div>
-      </section>
 
-      {/* Right Panel: Details & Actions */}
-      <section className={styles.rightPanel}>
-        {selectedTransaction ? (
-          <>
-            {/* Transaction Details Card */}
-            <div className={styles.detailsCard}>
-              <div className={styles.cardHeaderCentered}>
-                <h3 className={styles.cardTitle}>Transaction Details</h3>
-                <p className={styles.transactionId}>{selectedTransaction.razorpay_payment_id || 'N/A'}</p>
-                {selectedTransaction.status === 'success' && (
-                  <span className={styles.verifiedBadge}>
-                    <span>VERIFIED</span>
-                    <span>PAYMENT</span>
-                  </span>
-                )}
-              </div>
+        {/* ── RIGHT: Detail Panel ── */}
+        <div className={styles.rightCol}>
+          {selectedTx ? (
+            <>
+              {/* Transaction Details Card */}
+              <div className={styles.infoCard}>
+                <div className={styles.infoCardHeader}>
+                  <span className={styles.infoCardTitle}>Transaction Details</span>
+                  <CreditCard size={13} style={{ color: 'var(--primary, #4361EE)', opacity: 0.7 }} />
+                </div>
+                <div className={styles.infoCardBody}>
 
-              <div className={styles.detailsGrid}>
-                <div>
-                  <p className={styles.label}>Customer</p>
-                  <p className={styles.value}>{selectedTransaction.customer_name}</p>
-                  <p className={styles.subValue}>{selectedTransaction.customer_email}</p>
-                </div>
-                <div>
-                  <p className={styles.label}>Amount Settled</p>
-                  <p className={styles.largeAmount}>{formatCurrency(selectedTransaction.amount)}</p>
-                </div>
-                <div>
-                  <p className={styles.label}>Gateway</p>
-                  <p className={styles.value}>Razorpay Business</p>
-                </div>
-                <div>
-                  <p className={styles.label}>Razorpay Order ID</p>
-                  <p className={styles.monoValue}>{selectedTransaction.razorpay_order_id}</p>
-                </div>
-              </div>
-
-              {/* Collapsible JSON Block */}
-              <div className={styles.jsonViewer}>
-                <div
-                  className={styles.jsonSummary}
-                  onClick={() => setIsJsonOpen(!isJsonOpen)}
-                >
-                  <span className={`material-symbols-outlined ${isJsonOpen ? 'rotate-180' : ''}`} style={{ transition: 'transform 0.3s' }}>
-                    expand_more
-                  </span>
-                  View Raw Response JSON
-                </div>
-                {isJsonOpen && (
-                  <div className={styles.jsonContent}>
-                    {JSON.stringify(selectedTransaction, null, 2)}
+                  {/* Key-value pairs */}
+                  <div className={styles.detailItem}>
+                    <span className={styles.detailLabel}>Customer</span>
+                    <div>
+                      <span className={styles.detailValue}>{selectedTx.customer_name}</span>
+                      <p className={styles.detailSub}>{selectedTx.customer_email}</p>
+                    </div>
                   </div>
-                )}
-              </div>
-            </div>
 
-            {/* Refund Management Panel */}
-            <div className={styles.refundCard}>
-              <div className="d-flex align-items-center gap-3 mb-4">
-                <span className="material-symbols-outlined" style={{ color: '#C9A84C' }}>keyboard_return</span>
-                <h3 className={styles.cardTitle} style={{ fontSize: '20px' }}>Initiate Refund</h3>
-              </div>
+                  <div className={styles.detailItem}>
+                    <span className={styles.detailLabel}>Amount</span>
+                    <span className={styles.detailValueLg}>{formatCurrency(selectedTx.amount)}</span>
+                  </div>
 
-              <div className={styles.refundAmountDisplay}>
-                <span className={styles.label} style={{ marginBottom: 0 }}>Settled Amount</span>
-                <span className={styles.value}>{formatCurrency(selectedTransaction.amount)}</span>
-              </div>
+                  <div className={styles.detailItem}>
+                    <span className={styles.detailLabel}>Gateway</span>
+                    <span className={styles.detailValue}>Razorpay</span>
+                  </div>
 
-              <div className={styles.inputGroup}>
-                <label className={styles.label}>Refund Amount</label>
-                <div className="position-relative">
-                  <span className={styles.currencyPrefix}>₹</span>
-                  <input
-                    type="text"
-                    className={styles.refundInput}
-                    defaultValue={selectedTransaction.amount}
-                  />
+                  <div className={styles.detailItem}>
+                    <span className={styles.detailLabel}>Order ID</span>
+                    <code className={styles.txnId}>{selectedTx.razorpay_order_id || 'N/A'}</code>
+                  </div>
+
+                  <div className={styles.detailItem}>
+                    <span className={styles.detailLabel}>Status</span>
+                    <span className={`${styles.badge} ${styles[`badge_${STATUS_CLS[selectedTx.status] || 'pending'}`]}`}>
+                      {statusLabel(selectedTx.status)}
+                    </span>
+                  </div>
+              
                 </div>
               </div>
 
-              <div className={styles.inputGroup}>
-                <label className={styles.label}>Reason for Refund</label>
-                <textarea
-                  className={styles.textarea}
-                  placeholder="State reason for processing (e.g., Fabric Defect, Order Cancellation)..."
-                />
-              </div>
 
-              <button className={styles.secondaryActionBtn} disabled={selectedTransaction.status !== 'success'}>
-                Initiate Refund Process
-              </button>
-
-              {/* Refund History */}
-              <div className={styles.historySection}>
-                <h4 className={styles.historyTitle}>Refund History</h4>
-                <div className={styles.emptyState}>
-                  <p className={styles.emptyText}>No refund history available for this record.</p>
-                </div>
-              </div>
+            </>
+          ) : (
+            <div className={styles.emptyDetail}>
+              <CreditCard size={32} style={{ opacity: 0.15 }} />
+              <p>Select a transaction to view details</p>
             </div>
-          </>
-        ) : (
-          <div className="text-center p-5 text-muted">Select a transaction to view details.</div>
-        )}
-      </section>
-
-      {/* Decorative Blur */}
-      <div className={styles.decorativeBlur}>
-        <div className={styles.blurCircle}></div>
+          )}
+        </div>
       </div>
     </div>
   );

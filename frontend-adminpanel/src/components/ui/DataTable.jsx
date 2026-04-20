@@ -8,7 +8,7 @@ import styles from './DataTable.module.css';
  * A reusable, high-fidelity table component with zebra-striping and header sections.
  * 
  * @param {string} title - Table title for the header
- * @param {Array} columns - Column definitions: { label, key, align, render }
+ * @param {Array} columns - Column definitions: { label, key, align, width, render }
  * @param {Array} data - Data array
  * @param {React.ReactNode} actions - Optional header actions (like "View All" button)
  * @param {Function} onAdd - Optional callback for an "Add" action (shows '+' icon)
@@ -44,6 +44,12 @@ const DataTable = ({
 
       <div className={styles.tableWrapper}>
         <table className={styles.table}>
+          {/* colgroup: enforces explicit column widths so header & body stay in sync */}
+          <colgroup>
+            {columns.map((col, idx) => (
+              <col key={idx} style={col.width ? { width: col.width, minWidth: col.width } : {}} />
+            ))}
+          </colgroup>
           <thead>
             <tr>
               {columns.map((col, idx) => (

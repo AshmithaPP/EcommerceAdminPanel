@@ -10,14 +10,14 @@
   color: #ffffff;
 }
 
-.in-stock {
-  background-color: var(--status-in-stock);
+.inStock {
+  background-color: #16a34a; /* Success Green */
 }
 
-.low-stock {
-  background-color: var(--status-low-stock);
+.lowStock {
+  background-color: #f59e0b; /* Warning Amber */
 }
 
-.out-of-stock {
-  background-color: var(--status-out-of-stock);
+.outOfStock {
+  background-color: #dc2626; /* Danger Red */
 }

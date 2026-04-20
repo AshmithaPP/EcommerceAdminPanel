@@ -4,12 +4,12 @@ const { v4: uuidv4 } = require('uuid');
 const Product = {
     // === Product Core ===
     create: async (productData, connection = db) => {
-        const { product_id, name, slug, description, sub_category_id, brand, video_url, gstPercent } = productData;
+        const { product_id, name, slug, description, sub_category_id, brand, video_url, gstPercent, priceIncludesGST } = productData;
         const sql = `
-            INSERT INTO products (product_id, name, slug, description, sub_category_id, brand, video_url, gstPercent)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO products (product_id, name, slug, description, sub_category_id, brand, video_url, gstPercent, priceIncludesGST)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
-        await connection.query(sql, [product_id, name, slug, description, sub_category_id, brand, video_url || null, gstPercent || 0]);
+        await connection.query(sql, [product_id, name, slug, description, sub_category_id, brand, video_url || null, gstPercent || 0, priceIncludesGST !== undefined ? priceIncludesGST : 1]);
         return product_id;
     },
 
@@ -32,7 +32,20 @@ const Product = {
                     FROM product_variants pv
                     LEFT JOIN inventory_levels inv ON pv.variant_id = inv.variant_id
                     WHERE pv.product_id = p.product_id AND pv.status = 1) as total_stock,
-                   (SELECT MIN(sellingPrice) 
+                   (SELECT COUNT(*)
+                    FROM product_variants pv
+                    JOIN inventory_levels inv ON pv.variant_id = inv.variant_id
+                    WHERE pv.product_id = p.product_id 
+                      AND pv.status = 1 
+                      AND inv.quantity <= inv.low_stock_threshold 
+                      AND inv.quantity > 0) as low_stock_count,
+                   (SELECT COUNT(*)
+                    FROM product_variants pv
+                    JOIN inventory_levels inv ON pv.variant_id = inv.variant_id
+                    WHERE pv.product_id = p.product_id 
+                      AND pv.status = 1 
+                      AND inv.quantity <= 0) as out_of_stock_count,
+                   (SELECT MIN(COALESCE(NULLIF(finalPrice, 0), NULLIF(sellingPrice, 0), price)) 
                     FROM product_variants 
                     WHERE product_id = p.product_id AND status = 1) as starting_price
             FROM products p
@@ -51,7 +64,7 @@ const Product = {
     findById: async (productId) => {
         const sql = `
             SELECT p.*, sc.name as sub_category_name, c.name as category_name,
-                   (SELECT MIN(sellingPrice) 
+                   (SELECT MIN(COALESCE(NULLIF(finalPrice, 0), NULLIF(sellingPrice, 0), price)) 
                     FROM product_variants 
                     WHERE product_id = p.product_id AND status = 1) as starting_price
             FROM products p
@@ -77,15 +90,15 @@ const Product = {
     },
 
     update: async (productId, productData, connection = db) => {
-        const { name, slug, description, sub_category_id, brand, status, video_url, gstPercent } = productData;
+        const { name, slug, description, sub_category_id, brand, status, video_url, gstPercent, priceIncludesGST } = productData;
         const sql = `
             UPDATE products 
-            SET name = ?, slug = ?, description = ?, sub_category_id = ?, brand = ?, status = ?, video_url = ?, gstPercent = ?
+            SET name = ?, slug = ?, description = ?, sub_category_id = ?, brand = ?, status = ?, video_url = ?, gstPercent = ?, priceIncludesGST = ?
             WHERE product_id = ?
         `;
         await connection.query(sql, [
             name, slug, description, sub_category_id, brand, 
-            status !== undefined ? status : 1, video_url || null, gstPercent || 0, productId
+            status !== undefined ? status : 1, video_url || null, gstPercent || 0, priceIncludesGST !== undefined ? priceIncludesGST : 1, productId
         ]);
     },
 
@@ -113,12 +126,12 @@ const Product = {
 
     // === Variants ===
     addVariant: async (variantData, connection = db) => {
-        const { variant_id, product_id, sku, price, mrp, sellingPrice } = variantData;
+        const { variant_id, product_id, sku, price, mrp, sellingPrice, basePrice, gstAmount, finalPrice } = variantData;
         const sql = `
-            INSERT INTO product_variants (variant_id, product_id, sku, price, mrp, sellingPrice)
-            VALUES (?, ?, ?, ?, ?, ?)
+            INSERT INTO product_variants (variant_id, product_id, sku, price, mrp, sellingPrice, basePrice, gstAmount, finalPrice)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
-        await connection.query(sql, [variant_id, product_id, sku, price, mrp || 0, sellingPrice || 0]);
+        await connection.query(sql, [variant_id, product_id, sku, price, mrp || 0, sellingPrice || 0, basePrice || 0, gstAmount || 0, finalPrice || 0]);
         return variant_id;
     },
 
@@ -176,14 +189,14 @@ const Product = {
     },
 
     updateVariant: async (variantId, variantData, connection = db) => {
-        const { sku, price, status, mrp, sellingPrice } = variantData;
+        const { sku, price, status, mrp, sellingPrice, basePrice, gstAmount, finalPrice } = variantData;
         const sql = `
             UPDATE product_variants 
-            SET sku = ?, price = ?, status = ?, mrp = ?, sellingPrice = ?
+            SET sku = ?, price = ?, status = ?, mrp = ?, sellingPrice = ?, basePrice = ?, gstAmount = ?, finalPrice = ?
             WHERE variant_id = ?
         `;
         await connection.query(sql, [
-            sku, price, status !== undefined ? status : 1, mrp || 0, sellingPrice || 0, variantId
+            sku, price, status !== undefined ? status : 1, mrp || 0, sellingPrice || 0, basePrice || 0, gstAmount || 0, finalPrice || 0, variantId
         ]);
     },
 

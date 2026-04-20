@@ -1,8 +1,50 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
+import { ArrowLeft, User, MapPin, CreditCard, Package, CheckCircle, Clock } from 'lucide-react';
 import styles from './OrderDetails.module.css';
 import orderService from '../../services/orderService';
+import DataTable from '../../components/ui/DataTable';
+import StatCard from '../../components/ui/StatCard';
 
+// ── Helpers ──────────────────────────────────────────
+const formatCurrency = (amount) =>
+  new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(amount || 0);
+
+const formatDate = (dateString, withTime = false) => {
+  if (!dateString) return 'N/A';
+  const date = new Date(dateString);
+  return date.toLocaleDateString('en-US', {
+    month: 'short', day: 'numeric', year: 'numeric',
+    ...(withTime && { hour: '2-digit', minute: '2-digit' }),
+  });
+};
+
+const STATUS_MAP = {
+  pending: { label: 'Pending', cls: 'pending' },
+  Pending: { label: 'Pending', cls: 'pending' },
+  confirmed: { label: 'Confirmed', cls: 'confirmed' },
+  Confirmed: { label: 'Confirmed', cls: 'confirmed' },
+  processing: { label: 'Processing', cls: 'confirmed' },
+  Processing: { label: 'Processing', cls: 'confirmed' },
+  shipped: { label: 'Shipped', cls: 'shipped' },
+  Shipped: { label: 'Shipped', cls: 'shipped' },
+  delivered: { label: 'Delivered', cls: 'delivered' },
+  Delivered: { label: 'Delivered', cls: 'delivered' },
+  cancelled: { label: 'Cancelled', cls: 'cancelled' },
+  Cancelled: { label: 'Cancelled', cls: 'cancelled' },
+};
+
+const StatusBadge = ({ status }) => {
+  const s = STATUS_MAP[status] || { label: status, cls: 'pending' };
+  return <span className={`${styles.badge} ${styles[`badge_${s.cls}`]}`}>{s.label}</span>;
+};
+
+const PaymentBadge = ({ status }) => {
+  const cls = status === 'Paid' ? 'paid' : status === 'Pending' ? 'pending' : 'unpaid';
+  return <span className={`${styles.badge} ${styles[`badge_${cls}`]}`}>{status}</span>;
+};
+
+// ── Component ─────────────────────────────────────────
 const OrderDetails = () => {
   const { id } = useParams();
   const [order, setOrder] = useState(null);
@@ -21,18 +63,13 @@ const OrderDetails = () => {
     }
   }, [id]);
 
-  useEffect(() => {
-    fetchOrderDetails();
-  }, [fetchOrderDetails]);
+  useEffect(() => { fetchOrderDetails(); }, [fetchOrderDetails]);
 
   const handleUpdateStatus = async (newStatus, comment) => {
     try {
       setActionLoading(true);
       const result = await orderService.updateOrderStatus(id, { status: newStatus, comment });
-      if (result.success) {
-        // Refresh order details to show updated history and status
-        await fetchOrderDetails();
-      }
+      if (result.success) await fetchOrderDetails();
     } catch (error) {
       console.error(`Error updating status to ${newStatus}:`, error);
       alert(`Failed to update status: ${error.message}`);
@@ -41,13 +78,13 @@ const OrderDetails = () => {
     }
   };
 
+  // ── Loading ──
   if (loading) {
     return (
-      <div className={styles.container}>
-        <div className="d-flex justify-content-center align-items-center" style={{ minHeight: '400px' }}>
-          <div className="spinner-border text-primary" role="status">
-            <span className="visually-hidden">Loading...</span>
-          </div>
+      <div className={styles.pageContainer}>
+        <div className={styles.loaderContainer}>
+          <div className={styles.spinner} />
+          <span className={styles.loaderText}>Loading order details...</span>
         </div>
       </div>
     );
@@ -55,245 +92,306 @@ const OrderDetails = () => {
 
   if (!order) {
     return (
-      <div className={styles.container}>
-        <div className="text-center py-5">
-          <h3>Order not found</h3>
-          <Link to="/orders" className="btn btn-primary mt-3">Back to Orders</Link>
+      <div className={styles.pageContainer}>
+        <div className={styles.emptyState}>
+          <Package size={40} style={{ opacity: 0.2 }} />
+          <p>Order not found.</p>
+          <Link to="/orders" className={styles.backLink}>← Back to Orders</Link>
         </div>
       </div>
     );
   }
 
-  const formatCurrency = (amount) => {
-    return new Intl.NumberFormat('en-IN', {
-      style: 'currency',
-      currency: 'INR',
-    }).format(amount);
-  };
-
-  const formatDate = (dateString, withTime = true) => {
-    if (!dateString) return 'N/A';
-    const date = new Date(dateString);
-    const options = {
-        month: 'short',
-        day: 'numeric',
-        year: 'numeric',
-        ...(withTime && { hour: '2-digit', minute: '2-digit' })
-    };
-    return date.toLocaleDateString('en-US', options);
-  };
-
-  // Helper to determine status badge class
-  const getStatusBadgeClass = (status) => {
-    switch (status) {
-      case 'Pending': return styles.badgePending;
-      case 'Confirmed': return styles.badgeConfirmed;
-      case 'Shipped': return styles.badgeShipped;
-      case 'Delivered': return styles.badgeShipped;
-      case 'Cancelled': return styles.badgeUnpaid;
-      default: return styles.badgeInStock;
-    }
-  };
-
-  return (
-    <div className={styles.container}>
-      {/* Hero Title Area */}
-      <div className={styles.heroSection}>
-        <div className={`${styles.heroTitleArea} d-flex justify-content-between align-items-center mb-2`}>
-          <h2 className={`${styles.orderId} mt-0 mb-0`}>Order #{order.order_number}</h2>
-          <div className={styles.headerActions}>
-            {order.status === 'Pending' && (
-              <button 
-                className={styles.btnConfirm} 
-                onClick={() => handleUpdateStatus('Confirmed', 'Order confirmed by administrator')}
-                disabled={actionLoading}
-              >
-                {actionLoading ? 'Updating...' : 'Confirm Order'}
-              </button>
-            )}
-            {['Confirmed', 'Processing'].includes(order.status) && (
-              <button 
-                className={styles.btnShipped} 
-                onClick={() => handleUpdateStatus('Shipped', 'Order marked as shipped')}
-                disabled={actionLoading}
-              >
-                {actionLoading ? 'Updating...' : 'Ship Order'}
-              </button>
-            )}
-            {order.status !== 'Cancelled' && order.status !== 'Delivered' && (
-              <button 
-                className="btn btn-outline-danger btn-sm ms-2" 
-                onClick={() => handleUpdateStatus('Cancelled', 'Order cancelled by administrator')}
-                disabled={actionLoading}
-              >
-                Cancel
-              </button>
-            )}
+  // ── Items table columns ──
+  const itemColumns = [
+    {
+      label: 'Product',
+      key: 'product_name',
+      width: 'auto',
+      render: (row) => (
+        <div className={styles.productCell}>
+          <div className={styles.productThumb}>
+            <Package size={16} style={{ opacity: 0.3 }} />
+          </div>
+          <div>
+            <div className={styles.productName}>{row.product_name}</div>
+            <div className={styles.productSku}>SKU: {row.variant_sku}</div>
           </div>
         </div>
-        <div className={styles.statusRow}>
-          <span className={getStatusBadgeClass(order.status)}>{order.status}</span>
-          <span className={styles.orderDate}>Placed on {formatDate(order.created_at)}</span>
+      ),
+    },
+    {
+      label: 'Qty',
+      key: 'quantity',
+      width: '70px',
+      align: 'center',
+      render: (row) => <span className={styles.qtyBadge}>{row.quantity}</span>,
+    },
+    {
+      label: 'Unit Price',
+      key: 'price',
+      width: '110px',
+      align: 'center',
+      render: (row) => <span className={styles.priceText}>{formatCurrency(row.price)}</span>,
+    },
+    {
+      label: 'Total',
+      key: 'total_price',
+      width: '110px',
+      align: 'right',
+      render: (row) => (
+        <span className={styles.totalText}>{formatCurrency(row.price * row.quantity)}</span>
+      ),
+    },
+  ];
+
+  return (
+    <div className={styles.pageContainer}>
+
+      {/* ── Top Bar ── */}
+      <div className={styles.topBar}>
+        <div className={styles.topBarLeft}>
+          <span className={styles.orderNum}>#{order.order_number}</span>
+        </div>
+        <div className={styles.topBarRight}>
+          {/* Status action buttons */}
+          {order.status === 'Pending' && (
+            <button className={`${styles.actionBtn} ${styles.confirmBtn}`}
+              onClick={() => handleUpdateStatus('Confirmed', 'Order confirmed by administrator')}
+              disabled={actionLoading}>
+              {actionLoading ? 'Updating…' : 'Confirm Order'}
+            </button>
+          )}
+          {['Confirmed', 'Processing', 'processing', 'confirmed'].includes(order.status) && (
+            <button className={`${styles.actionBtn} ${styles.shipBtn}`}
+              onClick={() => handleUpdateStatus('Shipped', 'Order marked as shipped')}
+              disabled={actionLoading}>
+              {actionLoading ? 'Updating…' : 'Mark Shipped'}
+            </button>
+          )}
+          {!['Cancelled', 'Delivered', 'cancelled', 'delivered'].includes(order.status) && (
+            <button className={`${styles.actionBtn} ${styles.cancelBtn}`}
+              onClick={() => handleUpdateStatus('Cancelled', 'Order cancelled by administrator')}
+              disabled={actionLoading}>
+              Cancel Order
+            </button>
+          )}
         </div>
       </div>
 
-      <div className="row g-2">
-        {/* Left Column */}
-        <div className="col-12 col-lg-8">
-          <div className="row g-2 mb-2">
+      {/* ── Order Meta Row ── */}
+      <div className={styles.metaRow}>
+        <div className={styles.metaLeft}>
+          <StatusBadge status={order.status} />
+          <PaymentBadge status={order.payment_status} />
+          <span className={styles.metaDate}>
+            <Clock size={12} style={{ marginRight: 4 }} />
+            Placed {formatDate(order.created_at)}
+          </span>
+        </div>
+      </div>
+
+      {/* ── Stat Cards ── */}
+      <div className={styles.statsGrid}>
+        <StatCard
+          label="Order Total"
+          value={formatCurrency(order.total_amount)}
+          icon={<CreditCard size={14} />}
+        />
+        <StatCard
+          label="Subtotal"
+          value={formatCurrency(order.subtotal)}
+          icon={<Package size={14} />}
+        />
+        <StatCard
+          label="Shipping"
+          value={formatCurrency(order.shipping_charge)}
+          icon={<MapPin size={14} />}
+        />
+        <StatCard
+          label="Discount"
+          value={`-${formatCurrency(order.discount_amount)}`}
+          icon={<CheckCircle size={14} />}
+        />
+      </div>
+
+      {/* ── Main Grid ── */}
+      <div className={styles.mainGrid}>
+
+        {/* LEFT — Items + Customer + Address */}
+        <div className={styles.leftCol}>
+
+          {/* Ordered Items */}
+          <DataTable
+            title="Ordered Items"
+            columns={itemColumns}
+            data={order.items || []}
+            emptyMessage="No items found."
+          />
+
+          {/* Customer + Address row */}
+          <div className={styles.infoRow}>
+
             {/* Customer Info */}
-            <div className="col-md-6">
-              <div className={styles.bentoCard}>
-                <div className={styles.cardHeader}>
-                  <h3 className={`${styles.serifDisplay} ${styles.cardTitle}`}>Customer Info</h3>
-                  <span className={`material-symbols-outlined ${styles.cardIcon}`}>person</span>
+            <div className={styles.infoCard}>
+              <div className={styles.infoCardHeader}>
+                <span className={styles.infoCardTitle}>CUSTOMER INFO</span>
+                <User size={13} style={{ color: 'var(--primary, #4361EE)', opacity: 0.7 }} />
+              </div>
+              <div className={styles.infoCardBody}>
+                <div className={styles.infoItem}>
+                  <span className={styles.infoLabel}>Name</span>
+                  <span className={styles.infoValue}>{order.customer_name}</span>
                 </div>
-                <div className={styles.infoGroup}>
-                  <p className={styles.label}>Full Name</p>
-                  <p className={styles.value}>{order.customer_name}</p>
+                <div className={styles.infoItem}>
+                  <span className={styles.infoLabel}>Email</span>
+                  <span className={styles.infoValue}>{order.customer_email}</span>
                 </div>
-                <div className={styles.infoGroup}>
-                  <p className={styles.label}>Email Address</p>
-                  <p className={styles.value}>{order.customer_email}</p>
-                </div>
-                <div className={styles.infoGroup}>
-                  <p className={styles.label}>Phone Number</p>
-                  <p className={styles.value}>{order.customer_phone}</p>
+                <div className={styles.infoItem}>
+                  <span className={styles.infoLabel}>Phone</span>
+                  <span className={styles.infoValue}>{order.customer_phone}</span>
                 </div>
               </div>
             </div>
 
             {/* Delivery Address */}
-            <div className="col-md-6">
-              <div className={styles.bentoCard}>
-                <div className={styles.cardHeader}>
-                  <h3 className={`${styles.serifDisplay} ${styles.cardTitle}`}>Delivery Address</h3>
-                  <span className={`material-symbols-outlined ${styles.cardIcon}`}>local_shipping</span>
-                </div>
+            <div className={styles.infoCard}>
+              <div className={styles.infoCardHeader}>
+                <span className={styles.infoCardTitle}>DELIVERY ADDRESS</span>
+                <MapPin size={13} style={{ color: 'var(--primary, #4361EE)', opacity: 0.7 }} />
+              </div>
+              <div className={styles.infoCardBody}>
                 {order.delivery_address ? (
-                    <div className={styles.infoGroup}>
-                        <p className={styles.value}>{order.delivery_address.name}</p>
-                        <p className={styles.value}>{order.delivery_address.address_line1}</p>
-                        {order.delivery_address.address_line2 && (
-                            <p className={styles.value}>{order.delivery_address.address_line2}</p>
-                        )}
-                        <p className={styles.value}>
-                            {order.delivery_address.city}, {order.delivery_address.state} {order.delivery_address.zip_code}
-                        </p>
-                        <p className={styles.value}>{order.delivery_address.country}</p>
-                        <div className="mt-2 text-muted" style={{ fontSize: '0.75rem' }}>
-                            <p className="mb-0">Phone: {order.delivery_address.phone}</p>
-                            <p className="mb-0">Email: {order.delivery_address.email}</p>
-                        </div>
+                  <>
+                    <div className={styles.infoItem}>
+                      <span className={styles.infoLabel}>Recipient</span>
+                      <span className={styles.infoValue}>{order.delivery_address.name}</span>
                     </div>
+                    <div className={styles.infoItem}>
+                      <span className={styles.infoLabel}>Address</span>
+                      <span className={styles.infoValue}>
+                        {order.delivery_address.address_line1}
+                        {order.delivery_address.address_line2 && `, ${order.delivery_address.address_line2}`}
+                      </span>
+                    </div>
+                    <div className={styles.infoItem}>
+                      <span className={styles.infoLabel}>City</span>
+                      <span className={styles.infoValue}>
+                        {order.delivery_address.city}, {order.delivery_address.state} {order.delivery_address.zip_code}
+                      </span>
+                    </div>
+                    <div className={styles.infoItem}>
+                      <span className={styles.infoLabel}>Country</span>
+                      <span className={styles.infoValue}>{order.delivery_address.country}</span>
+                    </div>
+                    <div className={styles.infoItem}>
+                      <span className={styles.infoLabel}>Phone</span>
+                      <span className={styles.infoValue}>{order.delivery_address.phone}</span>
+                    </div>
+                  </>
                 ) : (
-                    <p className="text-muted">No address provided</p>
+                  <p className={styles.noData}>No address provided</p>
                 )}
-                {/* Special Instructions could be added if available in model */}
               </div>
             </div>
-          </div>
-
-          {/* Ordered Items */}
-          <div className={styles.itemsTableWrapper}>
-            <div className="p-2 border-bottom">
-              <h3 className={`${styles.serifDisplay} ${styles.cardTitle} mb-0`}>Ordered Items</h3>
-            </div>
-            <table className={styles.itemsTable}>
-              <thead>
-                <tr>
-                  <th style={{ width: '50%' }}>Product Details</th>
-                  <th className="text-center">Qty</th>
-                  <th className="text-end">Price</th>
-                  <th className="text-end">Total</th>
-                </tr>
-              </thead>
-              <tbody>
-                {order.items.map((item, index) => (
-                  <tr key={item.order_item_id || index}>
-                    <td>
-                      <div className={styles.productCell}>
-                        {/* Mock image for now or use placeholder if not in backend yet */}
-                        <div className={styles.thumbnail} style={{ backgroundColor: 'var(--surface-container-high)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            <span className="material-symbols-outlined opacity-20">image</span>
-                        </div>
-                        <div>
-                          <p className="fw-medium mb-1">{item.product_name}</p>
-                          <p className={styles.sku}>SKU: {item.variant_sku} {item.attributes_json ? `• ${Object.values(item.attributes_json).join(', ')}` : ''}</p>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="text-center fw-medium font-body">{item.quantity}</td>
-                    <td className="text-end fw-medium font-body">{formatCurrency(item.price)}</td>
-                    <td className={`text-end font-body ${styles.priceTotal}`}>{formatCurrency(item.price * item.quantity)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
           </div>
         </div>
 
-        {/* Right Column */}
-        <div className="col-12 col-lg-4">
-          <div className="vstack gap-2">
-            {/* Order Summary */}
-            <div className={styles.bentoCard}>
-              <h3 className={`${styles.serifDisplay} ${styles.cardTitle} mb-2`}>Order Summary</h3>
-              <div className={styles.summaryRow}>
-                <span>Subtotal</span>
-                <span className="fw-medium font-body text-dark">{formatCurrency(order.subtotal)}</span>
+        {/* RIGHT — Payment + Summary + Timeline */}
+        <div className={styles.rightCol}>
+
+          {/* Payment Info */}
+          <div className={styles.infoCard}>
+            <div className={styles.infoCardHeader}>
+              <span className={styles.infoCardTitle}>PAYMENT INFO</span>
+              <CreditCard size={13} style={{ color: 'var(--primary, #4361EE)', opacity: 0.7 }} />
+            </div>
+            <div className={styles.infoCardBody}>
+              <div className={styles.infoItem}>
+                <span className={styles.infoLabel}>Method</span>
+                <span className={styles.infoValue} style={{ textTransform: 'capitalize' }}>
+                  {order.payment_method?.replace('_', ' ') || 'N/A'}
+                </span>
               </div>
-              <div className={styles.summaryRow}>
-                <span>Shipping</span>
-                <span className="fw-medium font-body text-dark">{formatCurrency(order.shipping_charge)}</span>
+              <div className={styles.infoItem}>
+                <span className={styles.infoLabel}>Status</span>
+                <PaymentBadge status={order.payment_status} />
               </div>
-              {order.discount_amount > 0 && (
-                <div className={styles.summaryRow}>
-                    <span>Discount {order.coupon_code ? `(${order.coupon_code})` : ''}</span>
-                    <span className="fw-medium font-body text-danger">-{formatCurrency(order.discount_amount)}</span>
+              <div className={styles.infoItem}>
+                <span className={styles.infoLabel}>Transaction ID</span>
+                <code className={styles.txnId}>{order.transaction_id || 'N/A'}</code>
+              </div>
+              {order.payment_gateway && (
+                <div className={styles.infoItem}>
+                  <span className={styles.infoLabel}>Gateway</span>
+                  <span className={styles.infoValue}>{order.payment_gateway}</span>
                 </div>
               )}
-              <div className={styles.totalRow}>
-                <span className={`${styles.serifDisplay} ${styles.totalLabel}`}>Total</span>
-                <span className={styles.totalValue}>{formatCurrency(order.total_amount)}</span>
-              </div>
             </div>
+          </div>
 
-            {/* Payment Info */}
-            <div className={styles.bentoCard}>
-              <div className="d-flex justify-content-between align-items-center mb-2">
-                <h3 className={`${styles.serifDisplay} ${styles.cardTitle} mb-0`}>Payment Info</h3>
-                <span className="material-symbols-outlined text-primary opacity-20" style={{ fontSize: '32px', fontVariationSettings: "'FILL' 1" }}>payments</span>
-              </div>
-              <div className="d-flex align-items-center gap-3 mb-3">
-                <div className={styles.visaBadge}>{order.payment_method?.toUpperCase()}</div>
-                <p className="mb-0 fw-medium">{order.payment_method || 'N/A'}</p>
-              </div>
-              <div className={styles.paymentStatus}>
-                <div className={`${styles.statusDot} ${order.payment_status === 'Paid' ? 'bg-success' : 'bg-warning'}`}></div>
-                <p className={`mb-0 ${styles.paymentStatusText}`}>Status: {order.payment_status}</p>
-              </div>
-              <p className={styles.sku}>Transaction ID: {order.transaction_id || 'N/A'}</p>
+          {/* Order Summary */}
+          <div className={styles.infoCard}>
+            <div className={styles.infoCardHeader}>
+              <span className={styles.infoCardTitle}>ORDER SUMMARY</span>
+              <Package size={13} style={{ color: 'var(--primary, #4361EE)', opacity: 0.7 }} />
             </div>
-
-            {/* Order History */}
-            <div className={styles.bentoCard}>
-              <h3 className={`${styles.serifDisplay} ${styles.cardTitle} mb-2`}>Order History</h3>
-              <div className={styles.timeline}>
-                {order.status_timeline?.map((step, index) => (
-                  <div key={step.history_id || index} className={styles.timelineItem}>
-                    <div className={`${styles.timelineMarker}`}>
-                        <span className="material-symbols-outlined text-primary" style={{ fontSize: '14px', fontWeight: 'bold' }}>check</span>
-                    </div>
-                    <p className={styles.timelineTitle}>{step.status}</p>
-                    <p className={styles.timelineDate}>{formatDate(step.created_at)}</p>
-                    {step.comment && <p className={`${styles.italicText} mt-1`} style={{ fontSize: '12px' }}>{step.comment}</p>}
-                  </div>
-                ))}
-                {/* Show future steps based on current status if needed */}
+            <div className={styles.infoCardBody}>
+              <div className={styles.summaryRow}>
+                <span className={styles.summaryLabel}>Subtotal</span>
+                <span className={styles.summaryVal}>{formatCurrency(order.subtotal)}</span>
+              </div>
+              <div className={styles.summaryRow}>
+                <span className={styles.summaryLabel}>Shipping</span>
+                <span className={styles.summaryVal}>{formatCurrency(order.shipping_charge)}</span>
+              </div>
+              {parseFloat(order.discount_amount) > 0 && (
+                <div className={styles.summaryRow}>
+                  <span className={styles.summaryLabel}>
+                    Discount {order.coupon_code ? `(${order.coupon_code})` : ''}
+                  </span>
+                  <span className={`${styles.summaryVal} ${styles.discountVal}`}>
+                    −{formatCurrency(order.discount_amount)}
+                  </span>
+                </div>
+              )}
+              <div className={styles.summaryDivider} />
+              <div className={`${styles.summaryRow} ${styles.summaryTotal}`}>
+                <span className={styles.summaryTotalLabel}>Total</span>
+                <span className={styles.summaryTotalVal}>{formatCurrency(order.total_amount)}</span>
               </div>
             </div>
           </div>
+
+          {/* Status Timeline */}
+          <div className={styles.infoCard}>
+            <div className={styles.infoCardHeader}>
+              <span className={styles.infoCardTitle}>ORDER TIMELINE</span>
+              <Clock size={13} style={{ color: 'var(--primary, #4361EE)', opacity: 0.7 }} />
+            </div>
+            <div className={styles.infoCardBody}>
+              <div className={styles.timeline}>
+                {order.status_timeline?.map((step, idx) => (
+                  <div key={step.history_id || idx} className={styles.timelineItem}>
+                    <div className={styles.timelineLeft}>
+                      <div className={`${styles.timelineDot} ${idx === 0 ? styles.dotLatest : ''}`} />
+                      {idx < (order.status_timeline.length - 1) && <div className={styles.timelineLine} />}
+                    </div>
+                    <div className={styles.timelineContent}>
+                      <div className={styles.timelineStatus}>
+                        <StatusBadge status={step.status} />
+                      </div>
+                      <div className={styles.timelineDate}>{formatDate(step.created_at, true)}</div>
+                      {step.comment && (
+                        <div className={styles.timelineComment}>{step.comment}</div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
         </div>
       </div>
     </div>
@@ -301,4 +399,3 @@ const OrderDetails = () => {
 };
 
 export default OrderDetails;
-

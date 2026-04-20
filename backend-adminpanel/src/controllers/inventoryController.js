@@ -53,7 +53,8 @@ const inventoryController = {
                 variantId,
                 quantity,
                 reason || 'Admin restock',
-                adminId
+                adminId,
+                req.body.threshold
             );
 
             res.status(200).json({
@@ -76,7 +77,8 @@ const inventoryController = {
                 variantId,
                 stock,
                 reason || 'Admin correction',
-                adminId
+                adminId,
+                req.body.threshold
             );
 
             res.status(200).json({

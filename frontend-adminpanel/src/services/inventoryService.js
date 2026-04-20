@@ -6,13 +6,13 @@ const inventoryService = {
         return response.data;
     },
 
-    restock: async (variantId, { quantity, reason }) => {
-        const response = await privateApi.post(`/inventory/variants/${variantId}/restock`, { quantity, reason });
+    restock: async (variantId, { quantity, reason, threshold }) => {
+        const response = await privateApi.post(`/inventory/variants/${variantId}/restock`, { quantity, reason, threshold });
         return response.data;
     },
 
-    setStock: async (variantId, { stock, reason }) => {
-        const response = await privateApi.post(`/inventory/variants/${variantId}/set-stock`, { stock, reason });
+    setStock: async (variantId, { stock, reason, threshold }) => {
+        const response = await privateApi.post(`/inventory/variants/${variantId}/set-stock`, { stock, reason, threshold });
         return response.data;
     },
 

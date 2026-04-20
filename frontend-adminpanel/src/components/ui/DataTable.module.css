@@ -17,12 +17,14 @@
   align-items: center;
   justify-content: space-between;
   border-bottom: 1px solid var(--border-default);
+  gap: 0.75rem;
 }
 
 .actions {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
+  flex-shrink: 0;
 }
 
 .addIconBtn {
@@ -58,11 +60,7 @@
   text-transform: uppercase;
   letter-spacing: 0.1em;
   color: var(--primary, #4361EE);
-}
-
-.actions {
-  display: flex;
-  align-items: center;
+  white-space: nowrap;
 }
 
 .tableWrapper {
@@ -83,12 +81,14 @@
   letter-spacing: 0.12em;
   color: var(--muted-text, #7A89B0);
   font-weight: 700;
-  padding: 1rem 1rem;
+  padding: 0.875rem 1rem;
   border-bottom: 1px solid var(--border-default);
   background-color: #fff;
   position: sticky;
   top: 0;
   z-index: 2;
+  vertical-align: middle;
+  white-space: nowrap;
 }
 
 .table td {
@@ -96,6 +96,7 @@
   border-bottom: 1px solid rgba(216, 220, 240, 0.4);
   vertical-align: middle;
   font-size: 11.5px;
+  white-space: nowrap;
 }
 
 /* Zebra Striping */
@@ -103,8 +104,14 @@
   background-color: var(--table-stripe, #F8FAFC);
 }
 
-.thCenter, .tdCenter { text-align: center; }
-.thRight, .tdRight { text-align: right; }
+/* Alignment helpers — !important needed to beat .table th specificity (0,1,1) */
+.thCenter, .tdCenter {
+  text-align: center !important;
+}
+
+.thRight, .tdRight {
+  text-align: right !important;
+}
 
 .emptyTable {
   text-align: center;
@@ -112,11 +119,13 @@
   color: var(--muted-text);
   font-style: italic;
   font-size: 0.875rem;
+  white-space: normal;
 }
 
 @media (max-width: 768px) {
   .header {
     padding: 0.5rem 0.875rem;
+    flex-wrap: wrap;
   }
   .table td, .table th {
     padding: 0.75rem 0.875rem;

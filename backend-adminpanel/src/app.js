@@ -13,7 +13,6 @@ const couponRoutes = require('./routes/couponRoutes');
 const paymentRoutes = require('./routes/paymentRoutes');
 const dashboardRoutes = require('./routes/dashboardRoutes');
 const shipmentRoutes = require('./routes/shipmentRoutes');
-const shippingZoneRoutes = require('./routes/shippingZoneRoutes');
 const uploadRoutes = require('./routes/uploadRoutes');
 const path = require('path');
 const paymentController = require('./controllers/paymentController');
@@ -50,7 +49,6 @@ app.use('/api/coupons', couponRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/admin/dashboard', dashboardRoutes);
 app.use('/api/shipments', shipmentRoutes);
-app.use('/api/shipping-zones', shippingZoneRoutes);
 app.use('/api/upload', uploadRoutes);
 
 // Admin Payments List

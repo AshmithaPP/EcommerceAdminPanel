@@ -1,21 +1,60 @@
-import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useParams, Link, useNavigate } from 'react-router-dom';
+import {
+  ArrowLeft, Mail, Phone, Calendar, ShoppingBag, CreditCard,
+  TrendingUp, Star, MapPin, Eye, UserX, UserCheck,
+} from 'lucide-react';
 import styles from './CustomerDetails.module.css';
+import DataTable from '../../../components/ui/DataTable';
+import StatCard from '../../../components/ui/StatCard';
 import customerService from '../../../services/customerService';
 
+// ── Helpers ──────────────────────────────────────────────────────────
+const formatDate = (dateString) => {
+  if (!dateString) return 'N/A';
+  return new Date(dateString).toLocaleDateString('en-IN', {
+    day: '2-digit', month: 'short', year: 'numeric',
+  });
+};
+
+const formatCurrency = (amount) =>
+  new Intl.NumberFormat('en-IN', {
+    style: 'currency', currency: 'INR', maximumFractionDigits: 0,
+  }).format(parseFloat(amount) || 0);
+
+// ── Order Status Badge ────────────────────────────────────────────────
+const STATUS_MAP = {
+  pending: 'pending', Pending: 'pending',
+  confirmed: 'confirmed', Confirmed: 'confirmed',
+  processing: 'confirmed', Processing: 'confirmed',
+  shipped: 'shipped', Shipped: 'shipped',
+  delivered: 'delivered', Delivered: 'delivered',
+  cancelled: 'cancelled', Cancelled: 'cancelled',
+};
+
+const OrderStatusBadge = ({ status }) => {
+  const cls = STATUS_MAP[status] || 'pending';
+  return (
+    <span className={`${styles.badge} ${styles[`badge_${cls}`]}`}>
+      {status}
+    </span>
+  );
+};
+
+// ── Component ─────────────────────────────────────────────────────────
 const CustomerDetails = () => {
   const { id } = useParams();
+  const navigate = useNavigate();
   const [customer, setCustomer] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  useEffect(() => {
-    fetchCustomerDetails();
-  }, [id]);
-
-  const fetchCustomerDetails = async () => {
+  const fetchCustomerDetails = useCallback(async () => {
     try {
       setLoading(true);
+      setError(null);
+      // Returns response.data.data → the customer object directly
       const data = await customerService.getCustomerById(id);
       setCustomer(data);
     } catch (err) {
@@ -24,225 +63,226 @@ const CustomerDetails = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [id]);
+
+  useEffect(() => { fetchCustomerDetails(); }, [fetchCustomerDetails]);
 
   const handleToggleStatus = async () => {
-    if (!customer) return;
+    if (!customer || actionLoading) return;
     try {
+      setActionLoading(true);
       const newStatus = customer.status === 1 ? 0 : 1;
       await customerService.updateStatus(id, newStatus);
-      setCustomer({ ...customer, status: newStatus });
+      setCustomer(prev => ({ ...prev, status: newStatus }));
     } catch (err) {
       console.error('Error updating customer status:', err);
       alert('Failed to update status');
+    } finally {
+      setActionLoading(false);
     }
   };
 
-  const formatDate = (dateString) => {
-    if (!dateString) return 'N/A';
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
-  };
+  // ── Loading ──
+  if (loading) {
+    return (
+      <div className="page-container">
+        <div className={styles.loaderContainer}>
+          <div className={styles.spinner} />
+          <span className={styles.loaderText}>Loading customer...</span>
+        </div>
+      </div>
+    );
+  }
 
-  const formatCurrency = (amount) => {
-    return new Intl.NumberFormat('en-IN', {
-      style: 'currency',
-      currency: 'INR',
-      maximumFractionDigits: 0
-    }).format(amount);
-  };
+  if (error || !customer) {
+    return (
+      <div className="page-container">
+        <div className={styles.emptyState}>
+          <UserX size={40} style={{ opacity: 0.2 }} />
+          <p>{error || 'Customer not found.'}</p>
+          <Link to="/customers" className={styles.backLink}>← Back to Customers</Link>
+        </div>
+      </div>
+    );
+  }
 
-  if (loading) return <div className="text-center py-5"><div className="spinner-border text-primary"></div></div>;
-  if (error) return <div className="text-center py-5 text-danger">{error}</div>;
-  if (!customer) return <div className="text-center py-5">Customer not found.</div>;
+  // ── Destructure exactly from API ──────────────────────────────────
+  const {
+    name,
+    email,
+    phone,
+    status,
+    created_at,
+    image,
+    addresses = [],
+    stats = {},
+    recent_orders = [],
+  } = customer;
+
+  const isHighValue  = parseFloat(stats.total_spent || 0) > 10000;
+  const isActive     = status === 1;
+
+  // ── Recent Orders DataTable columns ──────────────────────────────
+  const orderColumns = [
+    {
+      label: 'Order',
+      key: 'order_number',
+      width: '160px',
+      render: (row) => (
+        <span className={styles.orderId}>{row.order_number}</span>
+      ),
+    },
+    {
+      label: 'Date',
+      key: 'date',
+      width: '130px',
+      render: (row) => (
+        <span className={styles.dateText}>{formatDate(row.date)}</span>
+      ),
+    },
+    {
+      label: 'Status',
+      key: 'status',
+      width: '120px',
+      align: 'center',
+      render: (row) => <OrderStatusBadge status={row.status} />,
+    },
+    {
+      label: 'Total',
+      key: 'total',
+      width: '120px',
+      align: 'right',
+      render: (row) => (
+        <span className={styles.totalText}>{formatCurrency(row.total)}</span>
+      ),
+    },
+    {
+      label: 'Action',
+      key: 'action',
+      width: '80px',
+      align: 'center',
+      render: (row) => (
+        <button
+          className={styles.viewBtn}
+          onClick={() => navigate(`/orders/${row.order_id}`)}
+          title="View Order"
+        >
+          <Eye size={12} /> View
+        </button>
+      ),
+    },
+  ];
 
   return (
-    <div className={styles.customerDetailsContainer}>
-      {/* Customer Header */}
-      <section className={styles.headerSection}>
-        <div className="flex-grow-1">
-          <div className={styles.badge}>{customer.total_spent > 100000 ? 'High Value Customer' : 'Standard Customer'}</div>
-          <h2 className={styles.customerName}>{customer.name}</h2>
-          <div className={styles.contactInfo}>
-            <div className={styles.infoItem}>
-              <span className={`material-symbols-outlined ${styles.infoIcon}`}>mail</span>
-              {customer.email}
-            </div>
-            <div className={styles.infoItem}>
-              <span className={`material-symbols-outlined ${styles.infoIcon}`}>call</span>
-              {customer.phone}
-            </div>
-            <div className={styles.infoItem}>
-              <span className={`material-symbols-outlined ${styles.infoIcon}`}>calendar_today</span>
-              Joined {formatDate(customer.created_at)}
-            </div>
-          </div>
-        </div>
-        <div className={styles.headerActions}>
-          <button 
-            className={customer.status === 1 ? styles.btnBlock : styles.btnSendMessage} 
+    <div className="page-container">
+
+      {/* ── 1. Top Bar: breadcrumb + status toggle ── */}
+      <div className={styles.topBar}>
+
+        <div className={styles.topBarRight}>
+          <button
+            className={`${styles.actionBtn} ${isActive ? styles.blockBtn : styles.activateBtn}`}
             onClick={handleToggleStatus}
+            disabled={actionLoading}
           >
-            {customer.status === 1 ? 'Block' : 'Activate'}
+            {isActive
+              ? <><UserX size={13} /> {actionLoading ? 'Updating…' : 'Block Customer'}</>
+              : <><UserCheck size={13} /> {actionLoading ? 'Updating…' : 'Activate Customer'}</>
+            }
           </button>
-          <button className={styles.btnSendMessage}>Send Message</button>
         </div>
-      </section>
+      </div>
 
-      {/* Stats Bar */}
-      <section className={styles.statsBar}>
-        <div className={styles.statCard}>
-          <div>
-            <p className={styles.statLabel}>Total Spend</p>
-            <p className={`${styles.statValue} ${styles.statValuePrimary}`}>{formatCurrency(customer.stats?.total_spent || 0)}</p>
+      {/* ── 2. Hero Profile Card ── */}
+      <div className={styles.heroCard}>
+        <img
+          src={image || `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&size=80&background=4361EE&color=fff&bold=true`}
+          alt={name}
+          className={styles.heroAvatar}
+        />
+        <div className={styles.heroInfo}>
+          <p className={styles.heroName}>{name}</p>
+          <div className={styles.heroMeta}>
+            <span className={styles.metaItem}><Mail size={12} />{email}</span>
+            {phone && <span className={styles.metaItem}><Phone size={12} />{phone}</span>}
+            <span className={styles.metaItem}><Calendar size={12} />Joined {formatDate(created_at)}</span>
           </div>
-          <span className={`material-symbols-outlined ${styles.statIcon} ${styles.statIconPrimary}`}>payments</span>
         </div>
-        <div className={styles.statCard}>
-          <div>
-            <p className={styles.statLabel}>Purchases</p>
-            <p className={styles.statValue}>{customer.stats?.purchases_count || 0}</p>
-          </div>
-          <span className={`material-symbols-outlined ${styles.statIcon}`}>shopping_bag</span>
+      </div>
+
+      {/* ── 3. Stat Cards (from stats object) ── */}
+      <div className={styles.statsGrid}>
+        <StatCard
+          label="Lifetime Value"
+          value={formatCurrency(stats.total_spent)}
+          icon={<CreditCard size={14} />}
+        />
+        <StatCard
+          label="Total Orders"
+          value={stats.purchases_count ?? 0}
+          icon={<ShoppingBag size={14} />}
+        />
+        <StatCard
+          label="Return Rate"
+          value={stats.return_rate ?? '—'}
+          icon={<TrendingUp size={14} />}
+        />
+        <StatCard
+          label="Customer Score"
+          value={stats.score ?? '—'}
+          icon={<Star size={14} />}
+        />
+      </div>
+
+      {/* ── 4. Main Grid: Orders (left) | Addresses + Notes (right) ── */}
+      <div className={styles.mainGrid}>
+
+        {/* LEFT — Recent Orders table */}
+        <div className={styles.leftCol}>
+          <DataTable
+            title={`Recent Orders (${recent_orders.length})`}
+            columns={orderColumns}
+            data={recent_orders}
+            emptyMessage="No orders found for this customer."
+          />
         </div>
-        <div className={styles.statCard}>
-          <div>
-            <p className={styles.statLabel}>Return Rate</p>
-            <p className={styles.statValue}>{customer.stats?.return_rate || '0%'}</p>
-          </div>
-          <span className={`material-symbols-outlined ${styles.statIcon}`}>assignment_return</span>
-        </div>
-        <div className={styles.statCard}>
-          <div>
-            <p className={styles.statLabel}>Score</p>
-            <p className={`${styles.statValue} ${styles.statValueSecondary}`}>{customer.stats?.score || 'N/A'}</p>
-          </div>
-          <span className={`material-symbols-outlined ${styles.statIcon} ${styles.statIconSecondary}`}>grade</span>
-        </div>
-      </section>
 
-      {/* Main Content Layout */}
-      <div className={styles.contentGrid}>
-        {/* Left: Orders Table */}
-        <section className={styles.mainCard}>
-          <div className={styles.tabs}>
-            <button className={`${styles.tab} ${styles.activeTab}`}>Orders</button>
-            <button className={styles.tab}>Returns</button>
-            <button className={styles.tab}>Wishlist</button>
-          </div>
-          
-          <div className={styles.tableContainer}>
-            <div className={styles.cardHeader}>
-              <h3 className={styles.cardTitle}>Recent History</h3>
-              <div className={styles.tableActions}>
-                <button className={styles.iconBtn}><span className="material-symbols-outlined" style={{fontSize: '1.1rem'}}>filter_list</span></button>
-                <button className={styles.iconBtn}><span className="material-symbols-outlined" style={{fontSize: '1.1rem'}}>download</span></button>
-              </div>
-            </div>
+        {/* RIGHT — Addresses then Notes */}
+        <div className={styles.rightCol}>
 
-            <div className={styles.scrollArea}>
-              <table className={styles.customTable}>
-                <thead>
-                  <tr className={styles.tableHeadRow}>
-                    <th>ID</th>
-                    <th>Date</th>
-                    <th>Items</th>
-                    <th>Status</th>
-                    <th className="text-end">Total</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(customer.recent_orders || []).map((order, index) => (
-                    <tr key={order.order_id} className={styles.tableRow}>
-                      <td className="fw-medium">#{order.order_number.split('-').pop()}</td>
-                      <td className="text-muted">{formatDate(order.date)}</td>
-                      <td className="text-muted">Multiple Items</td>
-                      <td>
-                        <span className={`${styles.statusBadge} ${
-                          order.status === 'Delivered' 
-                            ? styles.statusDelivered 
-                            : styles.statusReturned
-                        }`}>
-                          {order.status}
-                        </span>
-                      </td>
-                      <td className="text-end fw-bold">{formatCurrency(order.total)}</td>
-                    </tr>
-                  ))}
-                  {(!customer.recent_orders || customer.recent_orders.length === 0) && (
-                    <tr>
-                      <td colSpan="5" className="text-center py-4 text-muted">No recent orders found</td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-
-            <div className={styles.tableFooter}>
-              <p className={styles.footerText}>Showing {customer.recent_orders?.length || 0} recent orders</p>
-              <div className={styles.pagination}>
-                <button className={`${styles.pageBtn} ${styles.prevBtn}`} disabled>Prev</button>
-                <button className={`${styles.pageBtn} ${styles.nextBtn}`}>Next</button>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* Right Column */}
-        <div className={styles.sideColumn}>
           {/* Addresses */}
-          <section className={styles.sideCard}>
-            <div className={styles.sideCardHeader}>
-              <h3 className={styles.cardTitle}>Addresses</h3>
-              <button className={styles.newAddrBtn}>
-                <span className="material-symbols-outlined" style={{fontSize: '1.1rem'}}>add</span> New
-              </button>
+          <div className={styles.infoCard}>
+            <div className={styles.infoCardHeader}>
+              <span className={styles.infoCardTitle}>
+                Addresses ({addresses.length})
+              </span>
+              <MapPin size={13} style={{ color: 'var(--primary, #4361EE)', opacity: 0.7 }} />
             </div>
-            <div className={styles.addressList} style={{ maxHeight: '300px', overflowY: 'auto' }}>
-              {(customer.addresses || []).map((addr, index) => (
-                <div key={addr.address_id || index} className={styles.addressBox} style={{ marginBottom: '1rem' }}>
-                  <div>
-                    <div className={styles.addrTitle}>
-                      {addr.zip_code ? 'Standard Address' : 'Residence (Home)'}
-                      {addr.is_default ? <span className={styles.primaryBadge}>Primary</span> : null}
+            <div className={styles.infoCardBody}>
+              {addresses.length === 0 ? (
+                <p className={styles.noData}>No addresses on file</p>
+              ) : (
+                addresses.map((addr) => (
+                  <div key={addr.address_id} className={styles.addrBox}>
+                    <div className={styles.addrHeader}>
+                      <span className={styles.addrType}>
+                        {addr.address_line2 ? 'Office / Suite' : 'Residence'}
+                      </span>
+                      {addr.is_default === 1 && (
+                        <span className={styles.primaryBadge}>Primary</span>
+                      )}
                     </div>
                     <p className={styles.addrText}>
-                      {addr.address_line1}, {addr.address_line2 ? addr.address_line2 + ', ' : ''} 
-                      {addr.city}, {addr.state} - {addr.zip_code}, {addr.country}
+                      {addr.address_line1}
+                      {addr.address_line2 ? `, ${addr.address_line2}` : ''},{' '}
+                      {addr.city}, {addr.state} – {addr.zip_code}, {addr.country}
                     </p>
                   </div>
-                  <span className="material-symbols-outlined text-muted cursor-pointer" style={{fontSize: '1.1rem'}}>edit</span>
-                </div>
-              ))}
-              {(!customer.addresses || customer.addresses.length === 0) && (
-                <p className="text-muted text-center py-3">No addresses found</p>
+                ))
               )}
             </div>
-          </section>
+          </div>
 
-          {/* Admin Notes */}
-          <section className={`${styles.sideCard} ${styles.notesCard}`}>
-            <h3 className={styles.cardTitle} style={{marginBottom: '1rem'}}>Admin Notes</h3>
-            <div className={styles.notesList}>
-              {/* Note: In a real app, you'd fetch notes from an API. Showing mock for now as requested. */}
-              {[
-                { author: 'Rahul Sharma', time: '2d ago', text: '"Prefers heavy zari work but lightweight fabric. Show silk-organza."', isPrimary: true },
-                { author: 'Ananya K.', time: 'Nov 15', text: '"Discussed bespoke blouse stitching. Vintage patterns."', isPrimary: false }
-              ].map((note, index) => (
-                <div key={index} className={`${styles.noteItem} ${!note.isPrimary ? styles.noteItemAlt : ''}`}>
-                  <div className={styles.noteMeta}>
-                    <span className={`${styles.authorName} ${!note.isPrimary ? styles.authorNameAlt : ''}`}>{note.author}</span>
-                    <span className={styles.noteTime}>{note.time}</span>
-                  </div>
-                  <p className={styles.noteText}>{note.text}</p>
-                </div>
-              ))}
-            </div>
-            <div className={styles.noteInputArea}>
-              <textarea className={styles.textarea} placeholder="Add note..."></textarea>
-              <button className={styles.btnPostNote}>Post Note</button>
-            </div>
-          </section>
         </div>
       </div>
     </div>

@@ -46,7 +46,6 @@ const AddProduct = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  const [activeTab, setActiveTab] = useState('basic');
 
   const [productData, setProductData] = useState({
     name: '',
@@ -57,7 +56,8 @@ const AddProduct = () => {
     meta_title: '',
     meta_description: '',
     slug: '',
-    gstPercent: 5
+    gstPercent: 5,
+    priceIncludesGST: true
   });
 
   const [variants, setVariants] = useState([]);
@@ -149,6 +149,18 @@ const AddProduct = () => {
       fetchSubCategoryAttributes(productData.sub_category_id);
     } catch (error) {
       toast.error('Failed to assign attributes');
+    }
+  };
+
+  const unassignAttributeFromCategory = async (attributeId) => {
+    if (!productData.sub_category_id) return;
+    if (!window.confirm('Unmap this attribute from this category?')) return;
+    try {
+      await privateApi.delete(`/categories/sub-category-attribute-unassign/${productData.sub_category_id}/${attributeId}`);
+      toast.success('Attribute unmapped');
+      fetchSubCategoryAttributes(productData.sub_category_id);
+    } catch (error) {
+      toast.error('Failed to unmap attribute');
     }
   };
 
@@ -250,8 +262,11 @@ const AddProduct = () => {
   };
 
   const handleProductChange = (e) => {
-    const { name, value } = e.target;
-    setProductData(prev => ({ ...prev, [name]: value }));
+    const { name, value, type, checked } = e.target;
+    setProductData(prev => ({
+      ...prev,
+      [name]: type === 'checkbox' ? checked : value
+    }));
     if (name === 'name') {
       const slug = value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
       setProductData(prev => ({ ...prev, slug }));
@@ -339,9 +354,17 @@ const AddProduct = () => {
   const handleSubmit = async () => {
     setLoading(true);
     try {
-      if (!productData.name || !productData.sub_category_id || variants.length === 0) {
-        throw new Error('Name, Sub-Category, and at least one variant are required');
-      }
+      if (!productData.name) throw new Error('Product name is required');
+      if (!productData.category_id) throw new Error('Parent category is required');
+      if (!productData.sub_category_id) throw new Error('Sub-category is required');
+      if (variants.length === 0) throw new Error('At least one variant is required');
+
+      // Variant validation
+      variants.forEach((v, idx) => {
+        if (!v.sku) throw new Error(`SKU is required for Variant #${idx + 1}`);
+        if (!v.mrp || !v.sellingPrice) throw new Error(`Price details are required for Variant #${idx + 1}`);
+        if (v.stock < 0) throw new Error(`Stock cannot be negative for Variant #${idx + 1}`);
+      });
 
       const formData = new FormData();
       const metadata = {
@@ -351,6 +374,7 @@ const AddProduct = () => {
         variants: variants.map((v, vIdx) => ({
           ...v,
           price: v.sellingPrice,
+          initial_stock: v.stock || 0, // Map 'stock' to 'initial_stock' for backend
           attributes: Object.entries(v.attributeValues || {})
             .filter(([_, val]) => val !== null)
             .map(([attrId, val]) => ({
@@ -409,186 +433,163 @@ const AddProduct = () => {
   return (
     <div className={styles.pageContainer}>
       {error && <div className={styles.errorBanner}>{error}</div>}
-      
-      <div className={styles.tabContainer}>
-        {[
-          { id: 'basic', label: 'Basic Details' },
-          { id: 'variants', label: 'Inventory & Variants' }
-        ].map(tab => (
-          <button key={tab.id} className={`${styles.tab} ${activeTab === tab.id ? styles.tabActive : ''}`} onClick={() => setActiveTab(tab.id)}>
-            {tab.label}
-          </button>
-        ))}
-      </div>
 
-      <div className={styles.tabContent}>
-        {activeTab === 'basic' && (
-          <>
-            {/* 1. Identity */}
-            <section className={styles.formSection}>
-              <div className={styles.sectionHeader}>
-                <User size={16} className={styles.sectionIcon} />
-                <h3>Product Identity</h3>
-              </div>
-              <div className={styles.sectionContent}>
-                <div className={styles.formGrid4}>
-                  <InputBox label="Product Name" name="name" value={productData.name} onChange={handleProductChange} required Icon={Package} />
-                  <SelectBox label="Parent Category" name="category_id" value={productData.category_id} onChange={handleProductChange} required Icon={List}>
-                    <option value="">Select category</option>
-                    {categories.map(cat => <option key={cat.category_id} value={cat.category_id}>{cat.name}</option>)}
-                  </SelectBox>
-                  <SelectBox label="Sub-Category" name="sub_category_id" value={productData.sub_category_id} onChange={handleProductChange} disabled={!productData.category_id} required Icon={Layers}>
-                    <option value="">Select sub-category</option>
-                    {subCategories.map(sub => <option key={sub.sub_category_id} value={sub.sub_category_id}>{sub.name}</option>)}
-                  </SelectBox>
-                  <InputBox label="Brand" name="brand" value={productData.brand} onChange={handleProductChange} Icon={Tag} />
-                  <InputBox label="GST (%)" type="number" name="gstPercent" value={productData.gstPercent} onChange={handleProductChange} Icon={Percent} />
-                </div>
-              </div>
-            </section>
 
-            {/* 2. Attributes */}
-            <section className={styles.formSection}>
-              <div className={styles.sectionHeader}>
-                <Settings size={16} className={styles.sectionIcon} />
-                <h3>Attributes & Traits</h3>
-                <div className={styles.sectionHeaderActions}>
-                  <button className={`${styles.headerActionBtn} ${styles.secondary}`} onClick={openGlobalAttrModal}>
-                    <Settings size={14} />
-                    Manage Global
-                  </button>
-                  {productData.sub_category_id && (
-                    <button className={styles.headerActionBtn} onClick={openMappingModal}>
-                      <List size={14} />
-                      Assign to Category
-                    </button>
-                  )}
-                </div>
-              </div>
-              <div className={styles.sectionContent}>
-                {!productData.sub_category_id ? (
-                  <div className={styles.emptyPrompt} style={{ padding: '0.5rem', alignItems: 'flex-start' }}>
-                    <p>Select a <strong>Sub-Category</strong> above to map specific traits, or use <strong>Manage Global</strong> to update the master list.</p>
-                  </div>
-                ) : categoryAttributes.length === 0 ? (
-                  <div className={styles.emptyPrompt} style={{ padding: '0.5rem', alignItems: 'flex-start' }}>
-                    <p>No attributes mapped to this category yet. Click <strong>Assign to Category</strong> to select them.</p>
-                  </div>
-                ) : (
-                  <div className={styles.tagList}>
-                    {categoryAttributes.map(attr => (
-                      <div key={attr.attribute_id} className={styles.attributeTag}>
-                        {attr.name}
-                        <span>({attr.values?.length || 0} values)</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </section>
 
-            {/* 3. Description & SEO */}
-            <div className={styles.formGrid2} style={{ gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-              <section className={styles.formSection} style={{ marginBottom: 0 }}>
-                <div className={styles.sectionHeader}>
-                  <FileText size={16} className={styles.sectionIcon} />
-                  <h3>Description</h3>
-                </div>
-                <div className={styles.sectionContent}>
-                  <div className={styles.labelWrapper}>
-                    <textarea name="description" value={productData.description} onChange={handleProductChange} className={styles.textarea} rows={4} placeholder="Heritage weaves details..." />
-                  </div>
-                </div>
-              </section>
-
-              <section className={styles.formSection} style={{ marginBottom: 0 }}>
-                <div className={styles.sectionHeader}>
-                  <Search size={16} className={styles.sectionIcon} />
-                  <h3>SEO Detail</h3>
-                </div>
-                <div className={styles.sectionContent}>
-                  <div className={styles.formGrid2} style={{ gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '0.75rem' }}>
-                    <InputBox label="Meta Title" name="meta_title" value={productData.meta_title} onChange={handleProductChange} />
-                    <InputBox label="URL Slug" name="slug" value={productData.slug} onChange={handleProductChange} />
-                  </div>
-                  <InputBox label="Meta Description" name="meta_description" value={productData.meta_description} onChange={handleProductChange} />
-                </div>
-              </section>
+      <div className={styles.formFlow}>
+        {/* 1. Identity */}
+        <section className={styles.formSection}>
+          <div className={styles.sectionHeader}>
+            <User size={16} className={styles.sectionIcon} />
+            <h3>Product Identity</h3>
+          </div>
+          <div className={styles.sectionContent}>
+            <div className={styles.formGrid4}>
+              <InputBox label="Product Name" name="name" value={productData.name} onChange={handleProductChange} required Icon={Package} />
+              <SelectBox label="Parent Category" name="category_id" value={productData.category_id} onChange={handleProductChange} required Icon={List}>
+                <option value="">Select category</option>
+                {categories.map(cat => <option key={cat.category_id} value={cat.category_id}>{cat.name}</option>)}
+              </SelectBox>
+              <SelectBox label="Sub-Category" name="sub_category_id" value={productData.sub_category_id} onChange={handleProductChange} disabled={!productData.category_id} required Icon={Layers}>
+                <option value="">Select sub-category</option>
+                {subCategories.map(sub => <option key={sub.sub_category_id} value={sub.sub_category_id}>{sub.name}</option>)}
+              </SelectBox>
+              <InputBox label="Brand" name="brand" value={productData.brand} onChange={handleProductChange} Icon={Tag} />
             </div>
+          </div>
+        </section>
 
-            {/* 4. Visual Assets */}
-            <section className={styles.formSection}>
-              <div className={styles.sectionHeader}>
-                <ImageIcon size={16} className={styles.sectionIcon} />
-                <h3>Visual Assets</h3>
-              </div>
-              <div className={styles.sectionContent}>
-                <div className={styles.imageGrid}>
-                  {productVideo && (
-                    <div className={styles.videoItem}>
-                      <div className={styles.videoBadge}><Video size={10} /></div>
-                      <video src={productVideo.url} muted />
-                      <div className={styles.imageOverlay}>
-                        <button className={styles.overlayBtn} onClick={removeVideo}><Trash2 size={14} /></button>
-                      </div>
-                    </div>
-                  )}
-                  {productImages.map((img, idx) => (
-                    <div key={idx} className={styles.imageItem}>
-                      <img src={getImageUrl(img)} alt="p-img" />
-                      <div className={styles.imageOverlay}>
-                        <button className={styles.overlayBtn} onClick={() => removeProductImage(idx)}><Trash2 size={14} /></button>
-                      </div>
-                    </div>
-                  ))}
-                  {productImages.length < 5 && (
-                    <div className={styles.uploadZone} onClick={() => document.getElementById('p-img-input').click()}>
-                      <CloudUpload size={18} />
-                      <p className={styles.uploadMain}>Add Img</p>
-                      <input id="p-img-input" type="file" multiple accept="image/*" style={{ display: 'none' }} onChange={handleProductImageUpload} />
-                    </div>
-                  )}
-                  {!productVideo && (
-                    <div className={styles.uploadZone} onClick={() => document.getElementById('vid-input').click()}>
-                      <Video size={18} />
-                      <p className={styles.uploadMain}>Add Vid</p>
-                      <input id="vid-input" type="file" accept="video/*" style={{ display: 'none' }} onChange={handleVideoUpload} />
-                    </div>
-                  )}
-                </div>
-              </div>
-            </section>
-          </>
-        )}
-
-        {activeTab === 'variants' && (
-          <section className={styles.formSection}>
-            <div className={styles.sectionHeader}>
-              <LayoutGrid size={16} className={styles.sectionIcon} />
-              <h3>Variants & Inventory</h3>
+        {/* 2. Attributes */}
+        <section className={styles.formSection}>
+          <div className={styles.sectionHeader}>
+            <Settings size={16} className={styles.sectionIcon} />
+            <h3>Attributes & Traits</h3>
+            <div className={styles.sectionHeaderActions}>
+              <button className={`${styles.headerActionBtn} ${styles.secondary}`} onClick={openGlobalAttrModal}>
+                <Settings size={14} />
+                Manage Global
+              </button>
               {productData.sub_category_id && (
-                <div className={styles.sectionHeaderActions}>
-                  <button className={`${styles.headerActionBtn} ${styles.secondary}`} onClick={openGlobalAttrModal}>
-                    <Settings size={14} />
-                    Manage Global
-                  </button>
-                  <button className={styles.headerActionBtn} onClick={openMappingModal}>
-                    <List size={14} />
-                    Assign Attributes
-                  </button>
+                <button className={styles.headerActionBtn} onClick={openMappingModal}>
+                  <List size={14} />
+                  Assign to Category
+                </button>
+              )}
+            </div>
+          </div>
+          <div className={styles.sectionContent}>
+            {!productData.sub_category_id ? (
+              <div className={styles.emptyPrompt} style={{ padding: '0.5rem', alignItems: 'flex-start' }}>
+                <p>Select a <strong>Sub-Category</strong> above to map specific traits, or use <strong>Manage Global</strong> to update the master list.</p>
+              </div>
+            ) : categoryAttributes.length === 0 ? (
+              <div className={styles.emptyPrompt} style={{ padding: '0.5rem', alignItems: 'flex-start' }}>
+                <p>No attributes mapped to this category yet. Click <strong>Assign to Category</strong> to select them.</p>
+              </div>
+            ) : (
+              <div className={styles.tagList}>
+                {categoryAttributes.map(attr => (
+                  <div key={attr.attribute_id} className={styles.attributeTag}>
+                    {attr.name}
+                    <span>({attr.values?.length || 0} values)</span>
+                    <button className={styles.tagRemoveBtn} onClick={() => unassignAttributeFromCategory(attr.attribute_id)}>
+                      <X size={12} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </section>
+
+
+
+        {/* 4. Visual Assets */}
+        <section className={styles.formSection}>
+          <div className={styles.sectionHeader}>
+            <ImageIcon size={16} className={styles.sectionIcon} />
+            <h3>Visual Assets</h3>
+          </div>
+          <div className={styles.sectionContent}>
+            <div className={styles.imageGrid}>
+              {productVideo && (
+                <div className={styles.videoItem}>
+                  <div className={styles.videoBadge}><Video size={10} /></div>
+                  <video src={productVideo.url} muted />
+                  <div className={styles.imageOverlay}>
+                    <button className={styles.overlayBtn} onClick={removeVideo}><Trash2 size={14} /></button>
+                  </div>
+                </div>
+              )}
+              {productImages.map((img, idx) => (
+                <div key={idx} className={styles.imageItem}>
+                  <img src={getImageUrl(img)} alt="p-img" />
+                  <div className={styles.imageOverlay}>
+                    <button className={styles.overlayBtn} onClick={() => removeProductImage(idx)}><Trash2 size={14} /></button>
+                  </div>
+                </div>
+              ))}
+              {productImages.length < 5 && (
+                <div className={styles.uploadZone} onClick={() => document.getElementById('p-img-input').click()}>
+                  <CloudUpload size={18} />
+                  <p className={styles.uploadMain}>Add Img</p>
+                  <input id="p-img-input" type="file" multiple accept="image/*" style={{ display: 'none' }} onChange={handleProductImageUpload} />
+                </div>
+              )}
+              {!productVideo && (
+                <div className={styles.uploadZone} onClick={() => document.getElementById('vid-input').click()}>
+                  <Video size={18} />
+                  <p className={styles.uploadMain}>Add Vid</p>
+                  <input id="vid-input" type="file" accept="video/*" style={{ display: 'none' }} onChange={handleVideoUpload} />
                 </div>
               )}
             </div>
-            <div className={styles.sectionContent}>
-              {!productData.sub_category_id ? (
-                <div className={styles.emptyPrompt}>
-                  <Info size={20} />
-                  <p>Define <strong>Sub-Category</strong> first</p>
-                </div>
-              ) : (
-                <div className={styles.variantsContainer}>
-                  <div className={styles.variantGrid}>
-                    {variants.map((v, vIdx) => (
+          </div>
+        </section>
+
+        <section className={styles.formSection}>
+          <div className={styles.sectionHeader}>
+            <LayoutGrid size={16} className={styles.sectionIcon} />
+            <h3>Variants & Inventory</h3>
+            {productData.sub_category_id && (
+              <div className={styles.sectionHeaderActions}>
+                <button className={`${styles.headerActionBtn} ${styles.secondary}`} onClick={openGlobalAttrModal}>
+                  <Settings size={14} />
+                  Manage Global
+                </button>
+                <button className={styles.headerActionBtn} onClick={openMappingModal}>
+                  <List size={14} />
+                  Assign Attributes
+                </button>
+              </div>
+            )}
+          </div>
+          <div className={styles.sectionContent}>
+            {!productData.sub_category_id ? (
+              <div className={styles.emptyPrompt}>
+                <Info size={20} />
+                <p>Define <strong>Sub-Category</strong> first</p>
+              </div>
+            ) : (
+              <div className={styles.variantsContainer}>
+                <div className={styles.variantGrid}>
+                  {variants.map((v, vIdx) => {
+                    const sp = parseFloat(v.sellingPrice) || 0;
+                    const gst = parseFloat(productData.gstPercent) || 0;
+                    let basePrice = '0.00', gstAmount = '0.00', finalPrice = '0.00';
+                    if (productData.priceIncludesGST) {
+                      const bp = sp / (1 + gst / 100);
+                      basePrice = bp.toFixed(2);
+                      gstAmount = (sp - bp).toFixed(2);
+                      finalPrice = sp.toFixed(2);
+                    } else {
+                      const ga = sp * (gst / 100);
+                      gstAmount = ga.toFixed(2);
+                      finalPrice = (sp + ga).toFixed(2);
+                      basePrice = sp.toFixed(2);
+                    }
+
+                    return (
                       <div key={vIdx} className={styles.variantCard}>
                         <div className={styles.variantCardHeader}>
                           <span className={styles.variantTitle}>Variant #{vIdx + 1}</span>
@@ -596,10 +597,44 @@ const AddProduct = () => {
                         </div>
                         <div className={styles.inlineGridWide}>
                           <InputBox label="SKU" value={v.sku} onChange={e => updateVariant(vIdx, 'sku', e.target.value)} placeholder="SKU-001" Icon={Tag} />
-                          <InputBox label="Size" value={v.size} onChange={e => updateVariant(vIdx, 'size', e.target.value)} placeholder="S/M/L" Icon={Layers} />
-                          <InputBox label="MRP" type="number" value={v.mrp} onChange={e => updateVariant(vIdx, 'mrp', e.target.value)} Icon={Star} />
-                          <InputBox label="Price" type="number" value={v.sellingPrice} onChange={e => updateVariant(vIdx, 'sellingPrice', e.target.value)} Icon={Percent} />
+                          {categoryAttributes.find(a => a.name.toLowerCase() === 'size') ? (
+                            <SelectBox
+                              label="Size"
+                              value={v.size}
+                              onChange={e => updateVariant(vIdx, 'size', e.target.value)}
+                              Icon={Layers}
+                            >
+                              <option value="">Select Size</option>
+                              {categoryAttributes.find(a => a.name.toLowerCase() === 'size').values.map(val => (
+                                <option key={val.attribute_value_id} value={val.value || val.value_name}>
+                                  {val.value || val.value_name}
+                                </option>
+                              ))}
+                            </SelectBox>
+                          ) : (
+                            <InputBox label="Size" value={v.size} onChange={e => updateVariant(vIdx, 'size', e.target.value)} placeholder="S/M/L" Icon={Layers} />
+                          )}
                           <InputBox label="Stock" type="number" value={v.stock} onChange={e => updateVariant(vIdx, 'stock', e.target.value)} Icon={Package} />
+                          <InputBox label="MRP" type="number" value={v.mrp} onChange={e => updateVariant(vIdx, 'mrp', e.target.value)} Icon={Star} />
+                          <InputBox label="Selling Price" type="number" value={v.sellingPrice} onChange={e => updateVariant(vIdx, 'sellingPrice', e.target.value)} Icon={Percent} />
+                          <InputBox label="GST (%)" type="number" value={productData.gstPercent} onChange={handleProductChange} Icon={Percent} name="gstPercent" />
+
+                          <div className={styles.toggleBox}>
+                            <span className={styles.toggleBoxLabel}><Tag size={12} /> Inc. GST?</span>
+                            <label className={styles.switch}>
+                              <input
+                                type="checkbox"
+                                checked={productData.priceIncludesGST}
+                                onChange={(e) => setProductData(p => ({ ...p, priceIncludesGST: e.target.checked }))}
+                              />
+                              <span className={styles.slider} />
+                            </label>
+                          </div>
+
+
+
+
+
                           {categoryAttributes.filter(a => a.name.toLowerCase() !== 'size').map(attr => (
                             <SelectBox key={attr.attribute_id} label={attr.name} value={v.attributeValues?.[attr.attribute_id]?.name || ''} Icon={Settings}
                               onChange={e => {
@@ -613,6 +648,23 @@ const AddProduct = () => {
                             </SelectBox>
                           ))}
                         </div>
+
+                        {/* Computed Pricing Summary */}
+                        <div style={{ marginTop: '1rem', background: '#eef2f6', borderRadius: '6px', padding: '0.75rem 1rem', display: 'flex', gap: '2rem', border: '1px solid #ddecfe' }}>
+                          <div>
+                            <span style={{ fontSize: '11px', textTransform: 'uppercase', color: '#64748b', display: 'block', marginBottom: '2px' }}>Base Price</span>
+                            <strong style={{ color: '#0f172a', fontSize: '14px' }}>₹{basePrice}</strong>
+                          </div>
+                          <div>
+                            <span style={{ fontSize: '11px', textTransform: 'uppercase', color: '#64748b', display: 'block', marginBottom: '2px' }}>GST Amount ({gst}%)</span>
+                            <strong style={{ color: '#0f172a', fontSize: '14px' }}>₹{gstAmount}</strong>
+                          </div>
+                          <div style={{ borderLeft: '1px solid #cbd5e1', paddingLeft: '2rem' }}>
+                            <span style={{ fontSize: '11px', textTransform: 'uppercase', color: '#0f172a', fontWeight: 600, display: 'block', marginBottom: '2px' }}>Final Price</span>
+                            <strong style={{ color: '#16a34a', fontSize: '16px' }}>₹{finalPrice}</strong>
+                          </div>
+                        </div>
+
                         <div className={styles.imageGrid}>
                           {v.images?.map((img, imgIdx) => (
                             <div key={imgIdx} className={styles.imageItem}>
@@ -628,14 +680,43 @@ const AddProduct = () => {
                           )}
                         </div>
                       </div>
-                    ))}
-                  </div>
-                  <button className={styles.addVariantBtn} onClick={addVariant}><PlusCircle size={16} /> Add Variant</button>
+                    )
+                  })}
                 </div>
-              )}
+                <button className={styles.addVariantBtn} onClick={addVariant}><PlusCircle size={16} /> Add Variant</button>
+              </div>
+            )}
+          </div>
+        </section>
+
+        {/* 4. Description & SEO */}
+        <div className={styles.formGrid2} style={{ gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+          <section className={styles.formSection} style={{ marginBottom: 0 }}>
+            <div className={styles.sectionHeader}>
+              <FileText size={16} className={styles.sectionIcon} />
+              <h3>Description</h3>
+            </div>
+            <div className={styles.sectionContent}>
+              <div className={styles.labelWrapper}>
+                <textarea name="description" value={productData.description} onChange={handleProductChange} className={styles.textarea} rows={4} placeholder="Heritage weaves details..." />
+              </div>
             </div>
           </section>
-        )}
+
+          <section className={styles.formSection} style={{ marginBottom: 0 }}>
+            <div className={styles.sectionHeader}>
+              <Search size={16} className={styles.sectionIcon} />
+              <h3>SEO Detail</h3>
+            </div>
+            <div className={styles.sectionContent}>
+              <div className={styles.formGrid2} style={{ gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '0.75rem' }}>
+                <InputBox label="Meta Title" name="meta_title" value={productData.meta_title} onChange={handleProductChange} />
+                <InputBox label="URL Slug" name="slug" value={productData.slug} onChange={handleProductChange} />
+              </div>
+              <InputBox label="Meta Description" name="meta_description" value={productData.meta_description} onChange={handleProductChange} />
+            </div>
+          </section>
+        </div>
       </div>
 
       <div className={styles.actionBar}>
@@ -648,7 +729,14 @@ const AddProduct = () => {
       {/* MODALS */}
       {/* 1. Mapping Modal */}
       {isMappingModalOpen && (
-        <Modal title="Assign Attributes to Category" onClose={() => setIsMappingModalOpen(false)}>
+        <Modal
+          isOpen={true}
+          title="Assign Attributes to Category"
+          onClose={() => {
+            setIsMappingModalOpen(false);
+            if (productData.sub_category_id) fetchSubCategoryAttributes(productData.sub_category_id);
+          }}
+        >
           <div className={styles.modalBody}>
             <div className={styles.mappingGrid}>
               {allAttributes.map(attr => (
@@ -676,7 +764,14 @@ const AddProduct = () => {
 
       {/* 2. Global Attributes Modal */}
       {isGlobalAttrModalOpen && (
-        <Modal title="Global Attributes Management" onClose={() => setIsGlobalAttrModalOpen(true)} onCloseClick={() => setIsGlobalAttrModalOpen(false)}>
+        <Modal
+          isOpen={true}
+          title="Global Attributes Management"
+          onClose={() => {
+            setIsGlobalAttrModalOpen(false);
+            if (productData.sub_category_id) fetchSubCategoryAttributes(productData.sub_category_id);
+          }}
+        >
           <div className={styles.modalBody}>
             <div className={styles.formGrid4} style={{ gridTemplateColumns: '1fr auto', marginBottom: '1rem' }}>
               <InputBox placeholder="New Attribute Name" value={newAttrName} onChange={e => setNewAttrName(e.target.value)} />
@@ -710,7 +805,14 @@ const AddProduct = () => {
 
       {/* 3. Attribute Values Modal */}
       {isValueModalOpen && (
-        <Modal title={`Values: ${currentAttribute?.name}`} onClose={() => setIsValueModalOpen(false)}>
+        <Modal
+          isOpen={true}
+          title={`Values: ${currentAttribute?.name}`}
+          onClose={() => {
+            setIsValueModalOpen(false);
+            if (productData.sub_category_id) fetchSubCategoryAttributes(productData.sub_category_id);
+          }}
+        >
           <div className={styles.modalBody}>
             <div className={styles.formGrid4} style={{ gridTemplateColumns: '1fr auto', marginBottom: '1rem' }}>
               <InputBox placeholder="Add Value (e.g. Red, XL)" value={newValueInput} onChange={e => setNewValueInput(e.target.value)} />

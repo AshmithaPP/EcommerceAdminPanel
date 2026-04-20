@@ -8,6 +8,7 @@ import DataTable from '../../components/ui/DataTable';
 import Pagination from '../../components/ui/Pagination';
 import { productService } from '../../services/productService';
 import styles from './Products.module.css';
+import toast from 'react-hot-toast';
 
 const STORAGE_URL = 'http://localhost:5000';
 
@@ -73,18 +74,28 @@ const Products = () => {
   };
 
 
-  const getStockStatus = (totalStock) => {
-    const stockCount = parseInt(totalStock || 0);
-    if (stockCount === 0) return 'Out of Stock';
-    if (stockCount <= 10) return 'Low Stock';
+  const getStockStatus = (row) => {
+    if (row.out_of_stock_count > 0) return 'Stock Warning';
+    if (row.low_stock_count > 0) return 'Low Stock';
     return 'In Stock';
   };
 
-  const getStatusVariant = (totalStock) => {
-    const stockCount = parseInt(totalStock || 0);
-    if (stockCount === 0) return 'out-of-stock';
-    if (stockCount <= 10) return 'low-stock';
-    return 'in-stock';
+  const getStatusVariant = (row) => {
+    if (row.out_of_stock_count > 0) return 'outOfStock';
+    if (row.low_stock_count > 0) return 'lowStock';
+    return 'inStock';
+  };
+
+  const toggleAvailability = async (productId) => {
+    try {
+      // Placeholder for actual API call
+      setProducts(prev => prev.map(p =>
+        p.product_id === productId ? { ...p, availability: !p.availability } : p
+      ));
+      toast.success('Availability updated');
+    } catch (err) {
+      toast.error('Failed to update availability');
+    }
   };
 
   return (
@@ -104,10 +115,10 @@ const Products = () => {
               key: 'thumbnail',
               render: (row) => (
                 <div className={styles.imageContainer}>
-                  <img 
-                    src={getImageUrl(row.thumbnail || row.image)} 
-                    alt={row.name} 
-                    className={styles.productImg} 
+                  <img
+                    src={getImageUrl(row.thumbnail || row.image)}
+                    alt={row.name}
+                    className={styles.productImg}
                   />
                 </div>
               )
@@ -123,11 +134,15 @@ const Products = () => {
               )
             },
             {
-              label: 'Price',
+              label: 'Final Price',
               key: 'starting_price',
+              width: '120px',
               render: (row) => (
                 <span className={styles.priceCell}>
-                  {row.starting_price ? `₹ ${row.starting_price}` : 'No Variants'}
+                  {row.starting_price !== null && row.starting_price !== undefined ?
+                    `₹ ${parseFloat(row.starting_price).toFixed(2)}` :
+                    <span className={styles.missingData}>No Price set</span>
+                  }
                 </span>
               )
             },
@@ -143,20 +158,47 @@ const Products = () => {
               )
             },
             {
-              label: 'Stock',
+              label: 'Stock Total',
               key: 'total_stock',
+              width: '100px',
+              align: 'center',
               render: (row) => (
-                <div className={styles.stockCell}>
-                  <Badge variant={getStatusVariant(row.total_stock)}>
-                    {row.total_stock || 0} ({getStockStatus(row.total_stock)})
-                  </Badge>
+                <div className={styles.stockCountCellCenter}>
+                  <span className={styles.totalCount}>{row.total_stock || 0}</span>
+                  <span className={styles.unitLabel}>Units</span>
                 </div>
               )
             },
             {
+              label: 'Low Stock',
+              key: 'low_stock',
+              width: '140px',
+              align: 'center',
+              render: (row) => {
+                const lowCount = parseInt(row.low_stock_count) || 0;
+                const outCount = parseInt(row.out_of_stock_count) || 0;
+
+                if (outCount === 0 && lowCount === 0) {
+                  return <span className={styles.healthyStock}>Healthy</span>;
+                }
+
+                return (
+                  <div className={styles.alertCellCenter}>
+                    {outCount > 0 && (
+                      <Badge variant="outOfStock" className={styles.compactBadge}>{outCount} Sold Out</Badge>
+                    )}
+                    {lowCount > 0 && (
+                      <Badge variant="lowStock" className={styles.compactBadge}>{lowCount} Low</Badge>
+                    )}
+                  </div>
+                );
+              }
+            },
+            {
               label: 'Actions',
               key: 'actions',
-              align: 'right',
+              align: 'left',
+              width: '120px',
               render: (row) => (
                 <div className={styles.actions}>
                   <button
@@ -166,8 +208,8 @@ const Products = () => {
                   >
                     <Edit2 size={16} />
                   </button>
-                  <button 
-                    className={styles.actionBtn} 
+                  <button
+                    className={styles.actionBtn}
                     onClick={() => handleDeleteProduct(row.product_id, row.name)}
                     title="Delete"
                   >
@@ -195,10 +237,10 @@ const Products = () => {
           <div key={product.product_id} className={styles.mobileCard}>
             <div className={styles.mobileCardTop}>
               <div className={styles.mobileImageWrap}>
-                <img 
-                  src={getImageUrl(product.thumbnail || product.image)} 
-                  alt={product.name} 
-                  className={styles.productImg} 
+                <img
+                  src={getImageUrl(product.thumbnail || product.image)}
+                  alt={product.name}
+                  className={styles.productImg}
                 />
               </div>
               <div className={styles.mobileCardMeta}>
@@ -210,8 +252,8 @@ const Products = () => {
                 <button className={styles.actionBtn} onClick={() => navigate(`/products/edit/${product.product_id}`)}>
                   <Edit2 size={15} />
                 </button>
-                <button 
-                  className={styles.actionBtn} 
+                <button
+                  className={styles.actionBtn}
                   onClick={() => handleDeleteProduct(product.product_id, product.name)}
                 >
                   <Trash2 size={15} />
@@ -221,12 +263,14 @@ const Products = () => {
             <div className={styles.mobileCardBottom}>
               <div className={styles.mobilePriceStock}>
                 <span className={styles.mobilePrice}>
-                  {product.starting_price ? `From ₹${product.starting_price}` : 'N/A'}
+                  {product.starting_price !== null ? `₹${parseFloat(product.starting_price).toFixed(2)}` : 'Price TBD'}
                 </span>
-                <span className={styles.mobileStock}>Stock: {product.total_stock || 0}</span>
+                <span className={styles.mobileStock}>
+                  Total Stock: {product.total_stock || 0}
+                </span>
               </div>
-              <Badge variant={getStatusVariant(product.total_stock)}>
-                {getStockStatus(product.total_stock)}
+              <Badge variant={getStatusVariant(product)}>
+                {product.out_of_stock_count > 0 ? `${product.out_of_stock_count} Out of Stock` : product.low_stock_count > 0 ? `${product.low_stock_count} Low Stock` : 'In Stock'}
               </Badge>
               <div className={styles.mobileToggleRow}>
                 <span className={styles.mobileToggleLabel}>Available</span>
@@ -241,7 +285,7 @@ const Products = () => {
 
       </div>
 
-      
+
 
     </div>
   );

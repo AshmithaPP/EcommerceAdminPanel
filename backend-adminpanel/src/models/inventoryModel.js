@@ -194,9 +194,10 @@ const Inventory = {
         return { items, total };
     },
 
-    updateLowStockThreshold: async (variantId, newThreshold) => {
+    updateLowStockThreshold: async (variantId, newThreshold, connection = null) => {
         const sql = `UPDATE inventory_levels SET low_stock_threshold = ? WHERE variant_id = ?`;
-        await db.query(sql, [newThreshold, variantId]);
+        const executor = connection || db;
+        await executor.query(sql, [newThreshold, variantId]);
         return true;
     },
 
@@ -208,10 +209,23 @@ const Inventory = {
                 pv.sku,
                 pv.price,
                 p.name as product_name,
-                p.slug
+                p.slug,
+                sh.action as last_action,
+                sh.quantity as last_adjustment,
+                sh.created_at as last_action_date
             FROM inventory_levels inv
             JOIN product_variants pv ON inv.variant_id = pv.variant_id
             JOIN products p ON pv.product_id = p.product_id
+            LEFT JOIN (
+                SELECT sh1.variant_id, sh1.action, sh1.quantity, sh1.created_at
+                FROM stock_history sh1
+                INNER JOIN (
+                    SELECT variant_id, MAX(created_at) as max_created
+                    FROM stock_history
+                    WHERE action = 'ORDER_CREATED'
+                    GROUP BY variant_id
+                ) sh2 ON sh1.variant_id = sh2.variant_id AND sh1.created_at = sh2.max_created
+            ) sh ON inv.variant_id = sh.variant_id
             WHERE p.status = 1
             ORDER BY p.name, pv.sku
             LIMIT ? OFFSET ?

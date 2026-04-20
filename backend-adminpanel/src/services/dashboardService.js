@@ -144,7 +144,141 @@ const dashboardService = {
             status: row.status,
             createdAt: row.created_at
         }));
+    },
+    getComparativeAnalytics: async () => {
+        const currentMonthQuery = `
+            SELECT 
+                (SELECT SUM(total_amount) FROM orders WHERE payment_status = 'Paid' AND MONTH(created_at) = MONTH(CURDATE()) AND YEAR(created_at) = YEAR(CURDATE())) as revenue,
+                (SELECT COUNT(*) FROM orders WHERE MONTH(created_at) = MONTH(CURDATE()) AND YEAR(created_at) = YEAR(CURDATE())) as orders,
+                (SELECT COUNT(*) FROM users WHERE role = 'user' AND MONTH(created_at) = MONTH(CURDATE()) AND YEAR(created_at) = YEAR(CURDATE())) as customers
+        `;
+        
+        const lastMonthQuery = `
+            SELECT 
+                (SELECT SUM(total_amount) FROM orders WHERE payment_status = 'Paid' AND MONTH(created_at) = MONTH(CURDATE() - INTERVAL 1 MONTH) AND YEAR(created_at) = YEAR(CURDATE() - INTERVAL 1 MONTH)) as revenue,
+                (SELECT COUNT(*) FROM orders WHERE MONTH(created_at) = MONTH(CURDATE() - INTERVAL 1 MONTH) AND YEAR(created_at) = YEAR(CURDATE() - INTERVAL 1 MONTH)) as orders,
+                (SELECT COUNT(*) FROM users WHERE role = 'user' AND MONTH(created_at) = MONTH(CURDATE() - INTERVAL 1 MONTH) AND YEAR(created_at) = YEAR(CURDATE() - INTERVAL 1 MONTH)) as customers
+        `;
+
+        const [currentRows] = await db.query(currentMonthQuery);
+        const [lastRows] = await db.query(lastMonthQuery);
+
+        const current = {
+            revenue: parseFloat(currentRows[0].revenue || 0),
+            orders: parseInt(currentRows[0].orders || 0),
+            customers: parseInt(currentRows[0].customers || 0)
+        };
+
+        const last = {
+            revenue: parseFloat(lastRows[0].revenue || 0),
+            orders: parseInt(lastRows[0].orders || 0),
+            customers: parseInt(lastRows[0].customers || 0)
+        };
+
+        const calculateGrowth = (curr, prev) => {
+            if (prev === 0) return curr > 0 ? 100 : 0;
+            return parseFloat((((curr - prev) / prev) * 100).toFixed(2));
+        };
+
+        return {
+            thisMonth: current,
+            lastMonth: last,
+            growth: {
+                revenue: calculateGrowth(current.revenue, last.revenue),
+                orders: calculateGrowth(current.orders, last.orders),
+                customers: calculateGrowth(current.customers, last.customers)
+            }
+        };
+    },
+
+    getOrderStatusAnalytics: async () => {
+        const query = `
+            SELECT status, COUNT(*) as count 
+            FROM orders 
+            GROUP BY status
+        `;
+        const [rows] = await db.query(query);
+        
+        const statusCounts = {
+            Pending: 0,
+            Processing: 0,
+            Shipped: 0,
+            Delivered: 0,
+            Cancelled: 0
+        };
+
+        rows.forEach(row => {
+            if (statusCounts.hasOwnProperty(row.status)) {
+                statusCounts[row.status] = parseInt(row.count);
+            } else {
+                statusCounts[row.status] = parseInt(row.count);
+            }
+        });
+
+        return statusCounts;
+    },
+
+    getExportData: async (startDate, endDate) => {
+        const start = startDate + ' 00:00:00';
+        const end = endDate + ' 23:59:59';
+
+        const ordersQuery = `
+            SELECT o.order_id, o.order_number, o.total_amount, o.status, o.created_at, u.name as customer_name
+            FROM orders o
+            LEFT JOIN users u ON o.user_id = u.user_id
+            WHERE o.created_at >= ? AND o.created_at <= ?
+            ORDER BY o.created_at DESC
+        `;
+        const [orders] = await db.query(ordersQuery, [start, end]);
+        
+        const summaryQuery = `
+            SELECT 
+                COUNT(*) as totalOrders,
+                SUM(CASE WHEN payment_status = 'Paid' THEN total_amount ELSE 0 END) as totalRevenue,
+                SUM(CASE WHEN status = 'Delivered' THEN 1 ELSE 0 END) as deliveredCount,
+                SUM(CASE WHEN status = 'Processing' THEN 1 ELSE 0 END) as processingCount,
+                SUM(CASE WHEN status = 'Cancelled' THEN 1 ELSE 0 END) as cancelledCount
+            FROM orders
+            WHERE created_at >= ? AND created_at <= ?
+        `;
+        const [summaryRows] = await db.query(summaryQuery, [start, end]);
+        const summary = summaryRows[0];
+
+        // Top 3 Products in this period
+        const topProductsQuery = `
+            SELECT 
+                oi.product_name as name,
+                SUM(oi.quantity) as unitsSold
+            FROM order_items oi
+            JOIN orders o ON oi.order_id = o.order_id
+            WHERE o.created_at >= ? AND o.created_at <= ?
+            AND o.payment_status = 'Paid'
+            GROUP BY oi.product_name
+            ORDER BY unitsSold DESC
+            LIMIT 3
+        `;
+        const [topProducts] = await db.query(topProductsQuery, [start, end]);
+
+        // Customer Growth - Total registered till end date, and new ones in period
+        const customerGrowthQuery = `
+            SELECT
+                (SELECT COUNT(*) FROM users WHERE role = 'user' AND created_at <= ?) as totalCustomers,
+                (SELECT COUNT(*) FROM users WHERE role = 'user' AND created_at >= ? AND created_at <= ?) as newCustomers
+        `;
+        const [growthRows] = await db.query(customerGrowthQuery, [end, start, end]);
+        const growth = growthRows[0];
+
+        return {
+            orders,
+            summary: {
+                ...summary,
+                totalCustomers: parseInt(growth.totalCustomers || 0),
+                newCustomers: parseInt(growth.newCustomers || 0)
+            },
+            topProducts
+        };
     }
+
 };
 
 module.exports = dashboardService;

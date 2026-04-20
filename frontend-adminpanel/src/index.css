@@ -1,6 +1,7 @@
 /* Global Styles - The Silk Curator Dashboard */
-
 @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=DM+Sans:wght@400;500;700&family=Inter:wght@400;500;600;700&family=Noto+Serif:wght@400;600;700&family=JetBrains+Mono:wght@400;500&family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap');
+
+/* @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=DM+Sans:wght@400;500;700&family=Open+Sans:wght@400;500;600;700&family=Noto+Serif:wght@400;600;700&family=JetBrains+Mono:wght@400;500&family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap'); */
 
 :root {
   /* Color Palette - Modern Admin Theme */
@@ -65,8 +66,8 @@
   /* Fonts */
   --font-serif: 'Cormorant Garamond', serif;
   --font-headline: 'Noto Serif', serif;
-  --font-sans: 'DM Sans', sans-serif;
-  --font-inter: 'Inter', sans-serif;
+  --font-sans: 'Open Sans', sans-serif;
+  --font-inter: 'Open Sans', sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
 
   --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -182,5 +183,27 @@ h1, h2, h3, h4, h5, h6, .font-serif {
 
 .status-delivered { background-color: var(--status-success-bg); color: var(--status-success); }
 .status-processing { background-color: var(--status-info-bg); color: var(--status-info); }
+.status-shipped { background-color: var(--status-info-bg); color: var(--status-info); opacity: 0.85; }
+.status-pending { background-color: var(--status-warning-bg); color: var(--status-warning); }
 .status-cancelled { background-color: var(--status-danger-bg); color: var(--status-danger); }
 .status-warning { background-color: var(--status-warning-bg); color: var(--status-warning); }
+
+
+/* Global Page Layout Container */
+.page-container {
+  padding: 0.5rem 0 3rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+@media (max-width: 767px) {
+  .page-container {
+    gap: 1.125rem;
+    padding-top: 1rem;
+    padding-bottom: 2rem;
+  }
+}

@@ -27,31 +27,7 @@ const shippingService = {
         return response.data;
     },
 
-    // Shipping Zone APIs
-    getAllZones: async () => {
-        const response = await privateApi.get('/shipping-zones');
-        return response.data;
-    },
 
-    createZone: async (zoneData) => {
-        const response = await privateApi.post('/shipping-zones', zoneData);
-        return response.data;
-    },
-
-    updateZone: async (id, zoneData) => {
-        const response = await privateApi.put(`/shipping-zones/${id}`, zoneData);
-        return response.data;
-    },
-
-    deleteZone: async (id) => {
-        const response = await privateApi.delete(`/shipping-zones/${id}`);
-        return response.data;
-    },
-
-    calculateShipping: async (data) => {
-        const response = await privateApi.post('/shipping-zones/calculate', data);
-        return response.data;
-    }
 };
 
 export default shippingService;

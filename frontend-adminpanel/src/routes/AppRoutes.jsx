@@ -14,6 +14,7 @@ import PaymentManagement from '../pages/Payments/PaymentManagement';
 import ShippingManagement from '../pages/Shipping/ShippingManagement';
 import MarketingStudio from '../pages/coupon/CouponManagement';
 import AdminManagement from '../pages/Admins/AdminManagement';
+import Settings from '../pages/Settings/Settings';
 import ResetPassword from '../pages/Auth/ResetPassword';
 
 const AppRoutes = () => {
@@ -34,6 +35,7 @@ const AppRoutes = () => {
       <Route path="/shipping" element={<ShippingManagement />} />
       <Route path="/marketing" element={<MarketingStudio />} />
       <Route path="/admins" element={<AdminManagement />} />
+      <Route path="/settings" element={<Settings />} />
       <Route path="/reset-password" element={<ResetPassword />} />
       {/* 404 Route */}
       <Route path="*" element={<div className="text-center mt-5"><h4>Page Not Found</h4></div>} />

@@ -183,14 +183,20 @@ const categoryService = {
             const currentMappedIds = [...new Set(currentMapped.map(m => m.attribute_id))];
             
             const toAssign = attributeIds.filter(id => !currentMappedIds.includes(id));
-            const skipped = attributeIds.filter(id => currentMappedIds.includes(id));
+            const toUnassign = currentMappedIds.filter(id => !attributeIds.includes(id));
 
             if (toAssign.length > 0) {
                 await SubCategory.assignAttributes(subCategoryId, toAssign, createdBy, connection);
             }
 
+            if (toUnassign.length > 0) {
+                for (const attrId of toUnassign) {
+                    await SubCategory.unassignAttribute(subCategoryId, attrId, connection);
+                }
+            }
+
             await connection.commit();
-            return { assigned: toAssign, skipped };
+            return { assigned: toAssign, unassigned: toUnassign };
         } catch (error) {
             await connection.rollback();
             throw error;
@@ -328,19 +334,25 @@ const categoryService = {
                 }
             }
 
-            // Fetch current mappings to avoid duplicates
+            // Fetch current mappings to reconcile
             const currentMapped = await Category.getAttributesFlat(categoryId);
             const currentMappedIds = [...new Set(currentMapped.map(m => m.attribute_id))];
             
             const toAssign = attributeIds.filter(id => !currentMappedIds.includes(id));
-            const skipped = attributeIds.filter(id => currentMappedIds.includes(id));
+            const toUnassign = currentMappedIds.filter(id => !attributeIds.includes(id));
 
             if (toAssign.length > 0) {
                 await Category.assignAttributes(categoryId, toAssign, createdBy, connection);
             }
 
+            if (toUnassign.length > 0) {
+                for (const attrId of toUnassign) {
+                    await Category.unassignAttribute(categoryId, attrId, connection);
+                }
+            }
+
             await connection.commit();
-            return { assigned: toAssign, skipped };
+            return { assigned: toAssign, unassigned: toUnassign };
         } catch (error) {
             await connection.rollback();
             if (error.code === 'ER_DUP_ENTRY') {
