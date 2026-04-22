@@ -1,49 +1,42 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Eye } from 'lucide-react';
 import styles from './Orders.module.css';
 import DataTable from '../../components/ui/DataTable';
 import Pagination from '../../components/ui/Pagination';
-import orderService from '../../services/orderService';
+import useOrderStore from '../../store/orderStore';
 
 const Orders = () => {
-  const [orders, setOrders] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [activeFilter, setActiveFilter] = useState('All');
-  const [searchTerm, setSearchTerm] = useState('');
-  const [pagination, setPagination] = useState({ page: 1, limit: 10, total: 0 });
+  const {
+    orders,
+    loading,
+    activeFilter,
+    searchTerm,
+    page,
+    limit,
+    total,
+    setFilter,
+    setSearch,
+    setPage,
+    fetchOrders
+  } = useOrderStore();
 
-  const filters = ['All', 'Pending', 'Confirmed', 'Shipped', 'Cancelled'];
+  const [localSearch, setLocalSearch] = useState(searchTerm);
 
-  const fetchOrders = useCallback(async () => {
-    try {
-      setLoading(true);
-      const params = {
-        page: pagination.page,
-        limit: pagination.limit,
-        status: activeFilter === 'All' ? undefined : activeFilter,
-        search: searchTerm || undefined,
-      };
-      const result = await orderService.getAllOrders(params);
-      if (result.success) {
-        setOrders(result.data);
-        setPagination(prev => ({ ...prev, total: result.total }));
-      }
-    } catch (error) {
-      console.error('Error fetching orders:', error);
-    } finally {
-      setLoading(false);
-    }
-  }, [pagination.page, pagination.limit, activeFilter, searchTerm]);
+  const filters = ['All', 'Pending', 'Confirmed', 'Shipped', 'Delivered', 'Cancelled'];
 
+  // Trigger fetch when store parameters change
   useEffect(() => {
     fetchOrders();
-  }, [fetchOrders]);
+  }, [page, activeFilter, searchTerm, fetchOrders]);
 
-  const handleFilterChange = (filter) => {
-    setActiveFilter(filter);
-    setPagination(prev => ({ ...prev, page: 1 }));
-  };
+  // Debounced search logic
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setSearch(localSearch);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [localSearch, setSearch]);
 
   // ── Helpers ──
   const formatDate = (dateString) => {
@@ -73,13 +66,14 @@ const Orders = () => {
   };
 
   const getOrderVariant = (status) => {
-    switch (status) {
-      case 'Shipped':   return 'shipped';
-      case 'Delivered': return 'delivered';
-      case 'Confirmed': return 'confirmed';
-      case 'Processing':return 'confirmed';
-      case 'Pending':   return 'pending';
-      case 'Cancelled': return 'cancelled';
+    const s = status?.toLowerCase();
+    switch (s) {
+      case 'shipped':   return 'shipped';
+      case 'delivered': return 'delivered';
+      case 'confirmed': return 'confirmed';
+      case 'processing':return 'confirmed';
+      case 'pending':   return 'pending';
+      case 'cancelled': return 'cancelled';
       default:          return '';
     }
   };
@@ -158,23 +152,20 @@ const Orders = () => {
     },
   ];
 
-  // ── Header actions: filters + search ──
   const headerActions = (
     <div className={styles.headerControls}>
-      {/* Status Filters */}
       <div className={styles.filterGroup}>
         {filters.map((filter) => (
           <button
             key={filter}
             className={`${styles.filterBtn} ${activeFilter === filter ? styles.activeFilter : ''}`}
-            onClick={() => handleFilterChange(filter)}
+            onClick={() => setFilter(filter)}
           >
             {filter}
           </button>
         ))}
       </div>
 
-      {/* Search */}
       <div className={styles.searchWrapper}>
         <svg className={styles.searchIcon} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
           <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
@@ -183,11 +174,8 @@ const Orders = () => {
           type="text"
           className={styles.searchInput}
           placeholder="Search orders..."
-          value={searchTerm}
-          onChange={(e) => {
-            setSearchTerm(e.target.value);
-            setPagination(prev => ({ ...prev, page: 1 }));
-          }}
+          value={localSearch}
+          onChange={(e) => setLocalSearch(e.target.value)}
         />
       </div>
     </div>
@@ -195,10 +183,8 @@ const Orders = () => {
 
   return (
     <div className="page-container">
-      {/* Loading state */}
       {loading && <div className={styles.loadingBar} />}
 
-      {/* Main DataTable card */}
       <div className={styles.tableCard}>
         <DataTable
           title="Order Management"
@@ -209,13 +195,12 @@ const Orders = () => {
         />
       </div>
 
-      {/* Pagination */}
-      {!loading && pagination.total > pagination.limit && (
+      {!loading && total > limit && (
         <Pagination
-          totalItems={pagination.total}
-          itemsPerPage={pagination.limit}
-          currentPage={pagination.page}
-          onPageChange={(p) => setPagination(prev => ({ ...prev, page: p }))}
+          totalItems={total}
+          itemsPerPage={limit}
+          currentPage={page}
+          onPageChange={setPage}
         />
       )}
     </div>

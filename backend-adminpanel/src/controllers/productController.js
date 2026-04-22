@@ -6,49 +6,58 @@ const imageService = require('../services/imageService');
  * based on the fieldname (e.g., "product_img_0" or "variant_0_img_2").
  */
 const injectFileUrl = (data, fieldname, urls) => {
-    // urls is an object from imageService containing URLs and metadata
-    const image_url = urls.main_url;
-    const thumbnail_url = urls.thumb_url || null;
-    const mini_thumbnail_url = urls.mini_url || null;
-    
-    // Metadata
-    const width = urls.width || null;
-    const height = urls.height || null;
-    const file_size = urls.file_size || null;
-    const format = urls.format || null;
-
-    if (fieldname === 'product_video') {
-        data.video_url = typeof urls === 'string' ? urls : urls.main_url;
+    // If urls is a string (e.g. for video), we use it as is
+    if (typeof urls === 'string') {
+        if (fieldname === 'product_video') {
+            data.video_url = urls;
+        }
         return;
     }
+
+    // urls is an object from imageService containing URLs and metadata
+    const main_url = urls.main_url || urls.image_url || null;
+    const thumbnail_url = urls.thumb_url || urls.thumbnail_url || null;
+    const mini_thumbnail_url = urls.mini_url || urls.mini_thumbnail_url || null;
+    const { width = null, height = null, file_size = null, format = null, hash = null } = urls;
 
     if (fieldname.startsWith('product_img_')) {
         const parts = fieldname.split('_');
         const index = parseInt(parts[parts.length - 1]);
         if (!data.images) data.images = [];
         if (!data.images[index]) data.images[index] = {};
-        data.images[index].image_url = image_url;
-        data.images[index].thumbnail_url = thumbnail_url;
-        data.images[index].mini_thumbnail_url = mini_thumbnail_url;
-        data.images[index].width = width;
-        data.images[index].height = height;
-        data.images[index].file_size = file_size;
-        data.images[index].format = format;
+        
+        data.images[index] = {
+            ...data.images[index],
+            image_url: main_url,
+            thumbnail_url,
+            mini_thumbnail_url,
+            width,
+            height,
+            file_size,
+            format,
+            hash
+        };
     } else if (fieldname.startsWith('variant_')) {
         const parts = fieldname.split('_');
         const vIndex = parseInt(parts[1]);
         const imgIndex = parseInt(parts[3]);
+        
         if (!data.variants) data.variants = [];
         if (!data.variants[vIndex]) data.variants[vIndex] = { images: [] };
         if (!data.variants[vIndex].images) data.variants[vIndex].images = [];
         if (!data.variants[vIndex].images[imgIndex]) data.variants[vIndex].images[imgIndex] = {};
-        data.variants[vIndex].images[imgIndex].image_url = image_url;
-        data.variants[vIndex].images[imgIndex].thumbnail_url = thumbnail_url;
-        data.variants[vIndex].images[imgIndex].mini_thumbnail_url = mini_thumbnail_url;
-        data.variants[vIndex].images[imgIndex].width = width;
-        data.variants[vIndex].images[imgIndex].height = height;
-        data.variants[vIndex].images[imgIndex].file_size = file_size;
-        data.variants[vIndex].images[imgIndex].format = format;
+        
+        data.variants[vIndex].images[imgIndex] = {
+            ...data.variants[vIndex].images[imgIndex],
+            image_url: main_url,
+            thumbnail_url,
+            mini_thumbnail_url,
+            width,
+            height,
+            file_size,
+            format,
+            hash
+        };
     }
 };
 
@@ -57,9 +66,16 @@ const productController = {
         try {
             let productData = req.body;
             
-            // If multipart/form-data, productData might be stringified JSON
-            if (req.body.productData && typeof req.body.productData === 'string') {
-                productData = JSON.parse(req.body.productData);
+            // Handle multipart/form-data where productData might be in 'productData' or 'req' field
+            const rawData = req.body.productData || req.body.req;
+            if (rawData && typeof rawData === 'string') {
+                try {
+                    productData = JSON.parse(rawData);
+                } catch (e) {
+                    const error = new Error('Invalid JSON format in product data');
+                    error.statusCode = 400;
+                    throw error;
+                }
             }
 
             // Associate uploaded files
@@ -68,9 +84,11 @@ const productController = {
                     const fieldname = file.fieldname;
                     
                     if (file.mimetype.startsWith('image/')) {
-                        // Strict validation for size (500KB)
-                        if (file.size > 500 * 1024) {
-                            throw new Error(`File ${file.originalname} exceeds 500KB limit`);
+                        // Strict validation for size (200KB)
+                        if (file.size > 200 * 1024) {
+                            const error = new Error(`File ${file.originalname} exceeds 200KB limit`);
+                            error.statusCode = 400;
+                            throw error;
                         }
 
                         // Process images into multiple sizes and get metadata
@@ -83,16 +101,7 @@ const productController = {
                 }
             }
 
-            // MAPPING FIX: Assign top-level product images to the first variant
-            // so they are processed by productService.createProduct.
-            if (productData.images && productData.images.length > 0 && productData.variants && productData.variants.length > 0) {
-                if (!productData.variants[0].images) productData.variants[0].images = [];
-                // Add top-level images to the beginning of the first variant's images
-                productData.variants[0].images = [
-                    ...productData.images.filter(img => img.image_url),
-                    ...productData.variants[0].images
-                ];
-            }
+            // Cleaned: Removed manual mapping hacks. Fallback/Mappings now handled in ProductService.
 
             const result = await productService.createProduct(productData);
             res.status(201).json({
@@ -138,9 +147,16 @@ const productController = {
         try {
             let productData = req.body;
 
-            // If multipart/form-data, productData might be stringified JSON
-            if (req.body.productData && typeof req.body.productData === 'string') {
-                productData = JSON.parse(req.body.productData);
+            // Handle multipart/form-data where productData might be in 'productData' or 'req' field
+            const rawData = req.body.productData || req.body.req;
+            if (rawData && typeof rawData === 'string') {
+                try {
+                    productData = JSON.parse(rawData);
+                } catch (e) {
+                    const error = new Error('Invalid JSON format in product data');
+                    error.statusCode = 400;
+                    throw error;
+                }
             }
 
             // Associate uploaded files
@@ -149,9 +165,11 @@ const productController = {
                     const fieldname = file.fieldname;
                     
                     if (file.mimetype.startsWith('image/')) {
-                        // Strict validation for size (500KB)
-                        if (file.size > 500 * 1024) {
-                            throw new Error(`File ${file.originalname} exceeds 500KB limit`);
+                        // Strict validation for size (200KB)
+                        if (file.size > 200 * 1024) {
+                            const error = new Error(`File ${file.originalname} exceeds 200KB limit`);
+                            error.statusCode = 400;
+                            throw error;
                         }
 
                         // Process images into multiple sizes and get metadata
@@ -164,17 +182,7 @@ const productController = {
                 }
             }
 
-            // MAPPING FIX: Assign top-level product images to the first variant
-            if (productData.images && productData.images.length > 0 && productData.variants && productData.variants.length > 0) {
-                if (!productData.variants[0].images) productData.variants[0].images = [];
-                // Add top-level images to the beginning of the first variant's images
-                // Only merge those that have a URL (newly uploaded or existing)
-                const topImages = productData.images.filter(img => img.image_url);
-                productData.variants[0].images = [
-                    ...topImages,
-                    ...productData.variants[0].images
-                ];
-            }
+            // Cleaned: Removed manual mapping hacks.
 
             const result = await productService.updateProduct(req.params.product_id, productData);
             res.status(200).json({

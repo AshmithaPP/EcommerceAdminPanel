@@ -95,11 +95,38 @@ const Attribute = {
     createValues: async (attributeId, values, createdBy, connection = db) => {
         if (!values || values.length === 0) return [];
         
-        const valuePairs = values.map(val => [uuidv4(), attributeId, val.trim()]);
-        const sql = 'INSERT INTO attribute_values (attribute_value_id, attribute_id, value) VALUES ?';
-        await connection.query(sql, [valuePairs]);
+        const results = [];
+        for (const val of values) {
+            const trimmedVal = val.trim();
+            
+            // Check if value already exists (including soft-deleted)
+            const [existing] = await connection.query(
+                'SELECT * FROM attribute_values WHERE attribute_id = ? AND value = ?',
+                [attributeId, trimmedVal]
+            );
+
+            if (existing.length > 0) {
+                const row = existing[0];
+                if (row.status === 0) {
+                    // Restore soft-deleted value
+                    await connection.query(
+                        'UPDATE attribute_values SET status = 1 WHERE attribute_value_id = ?',
+                        [row.attribute_value_id]
+                    );
+                }
+                results.push({ attribute_value_id: row.attribute_value_id, value: trimmedVal });
+            } else {
+                // Insert new value
+                const valueId = uuidv4();
+                await connection.query(
+                    'INSERT INTO attribute_values (attribute_value_id, attribute_id, value) VALUES (?, ?, ?)',
+                    [valueId, attributeId, trimmedVal]
+                );
+                results.push({ attribute_value_id: valueId, value: trimmedVal });
+            }
+        }
         
-        return valuePairs.map(p => ({ attribute_value_id: p[0], value: p[2] }));
+        return results;
     },
 
     getValues: async (attributeId) => {

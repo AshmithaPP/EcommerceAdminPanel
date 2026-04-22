@@ -10,12 +10,12 @@ const { v4: uuidv4 } = require('uuid');
 function calculateGSTFields(sellingPrice, gstPercent, priceIncludesGST) {
     const sp = parseFloat(sellingPrice) || 0;
     const gst = parseFloat(gstPercent) || 0;
-    // Default to true if not strictly false or 0
     const includesGST = priceIncludesGST === false || priceIncludesGST === 0 || priceIncludesGST === '0' || priceIncludesGST === 'false' ? false : true;
 
     if (includesGST) {
         const basePrice = parseFloat((sp / (1 + gst / 100)).toFixed(2));
         const gstAmount = parseFloat((sp - basePrice).toFixed(2));
+        // Ensure we return the EXACT selling price provided as the finalPrice
         return { basePrice, gstAmount, finalPrice: sp };
     } else {
         const gstAmount = parseFloat((sp * (gst / 100)).toFixed(2));
@@ -26,7 +26,14 @@ function calculateGSTFields(sellingPrice, gstPercent, priceIncludesGST) {
 
 const productService = {
     createProduct: async (productData) => {
-        const { name, sub_category_id, brand, variants, gstPercent, priceIncludesGST } = productData;
+        const { name, sub_category_id, brand, variants, gstPercent, priceIncludesGST, base_sku, variant_config, meta_title, meta_description } = productData;
+
+        // 0. Validation: Basic Identity
+        if (!name || name.trim() === '') {
+            const error = new Error('Product name is required');
+            error.statusCode = 400;
+            throw error;
+        }
 
         // 1. Validation: Sub-Category
         const subCategory = await SubCategory.findById(sub_category_id);
@@ -137,7 +144,11 @@ const productService = {
                 brand,
                 video_url: productData.video_url || null,
                 gstPercent: gstPercent || 0,
-                priceIncludesGST: priceIncludesGST !== undefined ? priceIncludesGST : 1
+                priceIncludesGST: priceIncludesGST !== undefined ? priceIncludesGST : 1,
+                base_sku: base_sku || null,
+                variant_config: variant_config || null,
+                meta_title: meta_title || null,
+                meta_description: meta_description || null
             }, connection);
 
             // 2. Insert Variants
@@ -162,13 +173,30 @@ const productService = {
                     await Product.addVariantAttributes(variantId, variantData.attributes, connection);
                 }
 
-                // Insert Variant Images
+                // Insert Variant Media (Mappings)
                 if (variantData.images && variantData.images.length > 0) {
-                    // Robustly filter out any images missing a URL
-                    const validImages = variantData.images.filter(img => img.image_url);
-                    if (validImages.length > 0) {
-                        await Product.addVariantImages(variantId, validImages, connection);
+                    const validImages = variantData.images.filter(img => img.url || img.image_url);
+                    for (const img of validImages) {
+                        const mediaId = await Product.findOrCreateMedia(img, connection);
+                        await Product.addVariantMedia(variantId, mediaId, img.is_primary || 0, img.sort_order || 0, connection);
                     }
+                }
+            }
+
+            // 3. Handle Product-Level Media (Visual Assets)
+            if (productData.images && productData.images.length > 0) {
+                const validImages = productData.images.filter(img => img.url || img.image_url);
+                for (const img of validImages) {
+                    const mediaId = await Product.findOrCreateMedia(img, connection);
+                    await Product.addProductMedia(productId, mediaId, img.is_primary || 0, img.sort_order || 0, connection);
+                }
+            }
+
+            // 4. Handle Attribute-Level Media (Specialized Mappings)
+            if (productData.attribute_images && productData.attribute_images.length > 0) {
+                for (const am of productData.attribute_images) {
+                    const mediaId = await Product.findOrCreateMedia(am, connection);
+                    await Product.addAttributeMedia(productId, am.attribute_id, am.attribute_value_id, mediaId, connection);
                 }
             }
 
@@ -205,7 +233,7 @@ const productService = {
             throw error;
         }
 
-        const { name, sub_category_id, brand, status, video_url, gstPercent, priceIncludesGST } = productData;
+        const { name, sub_category_id, brand, status, video_url, gstPercent, priceIncludesGST, base_sku, variant_config, meta_title, meta_description } = productData;
 
         // Validation: Sub-Category
         const targetSubCategoryId = sub_category_id || existing.sub_category_id;
@@ -242,7 +270,11 @@ const productService = {
                 status: status !== undefined ? status : existing.status,
                 video_url: video_url !== undefined ? video_url : existing.video_url,
                 gstPercent: gstPercent !== undefined ? gstPercent : existing.gstPercent,
-                priceIncludesGST: priceIncludesGST !== undefined ? priceIncludesGST : existing.priceIncludesGST
+                priceIncludesGST: priceIncludesGST !== undefined ? priceIncludesGST : existing.priceIncludesGST,
+                base_sku: base_sku !== undefined ? base_sku : existing.base_sku,
+                variant_config: variant_config !== undefined ? variant_config : existing.variant_config,
+                meta_title: meta_title !== undefined ? meta_title : existing.meta_title,
+                meta_description: meta_description !== undefined ? meta_description : existing.meta_description
             }, connection);
 
             // 2. Sync Variants (if provided)
@@ -275,6 +307,16 @@ const productService = {
                             status: vData.status !== undefined ? vData.status : 1
                         }, connection);
 
+                        // Update inventory threshold if provided
+                        if (vData.low_stock_threshold !== undefined) {
+                            await inventoryService.updateLowStockThreshold(vData.variant_id, vData.low_stock_threshold, connection);
+                        }
+
+                        // Update stock level if provided
+                        if (vData.stock !== undefined) {
+                            await inventoryService.setStockLevel(vData.variant_id, vData.stock, 'Admin update', null, null, connection);
+                        }
+
                         // Sync Variant Attributes
                         if (vData.attributes) {
                             await Product.deleteVariantAttributes(vData.variant_id, connection);
@@ -283,12 +325,13 @@ const productService = {
                             }
                         }
 
-                        // Sync Variant Images
+                        // Sync Variant Media
                         if (vData.images) {
-                            await Product.deleteVariantImages(vData.variant_id, connection);
-                            const validImages = vData.images.filter(img => img.image_url);
-                            if (validImages.length > 0) {
-                                await Product.addVariantImages(vData.variant_id, validImages, connection);
+                            await Product.deleteVariantMedia(vData.variant_id, connection);
+                            const validImages = vData.images.filter(img => img.url || img.image_url);
+                            for (const img of validImages) {
+                                const mediaId = await Product.findOrCreateMedia(img, connection);
+                                await Product.addVariantMedia(vData.variant_id, mediaId, img.is_primary || 0, img.sort_order || 0, connection);
                             }
                         }
                     } else {
@@ -306,28 +349,45 @@ const productService = {
                         }, connection);
 
                         // Initialize Inventory for the new variant
-                        await inventoryService.initializeInventory(newVid, vData.initial_stock || 0, vData.low_stock_threshold || 5, connection);
+                        await inventoryService.initializeInventory(newVid, vData.initial_stock || 0, vData.low_stock_threshold !== undefined ? vData.low_stock_threshold : 5, connection);
 
                         if (vData.attributes && vData.attributes.length > 0) {
                             await Product.addVariantAttributes(newVid, vData.attributes, connection);
                         }
 
                         if (vData.images && vData.images.length > 0) {
-                            for (const img of vData.images) {
-                                if (!img.image_url) {
-                                    const error = new Error('Image URL is missing in new variant');
-                                    error.statusCode = 400;
-                                    throw error;
-                                }
+                            const validImages = vData.images.filter(img => img.url || img.image_url);
+                            for (const img of validImages) {
+                                const mediaId = await Product.findOrCreateMedia(img, connection);
+                                await Product.addVariantMedia(newVid, mediaId, img.is_primary || 0, img.sort_order || 0, connection);
                             }
-                            await Product.addVariantImages(newVid, vData.images, connection);
                         }
                     }
                 }
             }
 
+            // 3. Sync Product-Level Media
+            if (productData.images && Array.isArray(productData.images)) {
+                await Product.deleteProductMedia(productId, connection);
+                const validImages = productData.images.filter(img => img.url || img.image_url);
+                for (const img of validImages) {
+                    const mediaId = await Product.findOrCreateMedia(img, connection);
+                    await Product.addProductMedia(productId, mediaId, img.is_primary || 0, img.sort_order || 0, connection);
+                }
+            }
+
+            // 4. Sync Attribute-Level Media
+            if (productData.attribute_images && Array.isArray(productData.attribute_images)) {
+                await Product.deleteAttributeMedia(productId, connection);
+                for (const am of productData.attribute_images) {
+                    const mediaId = await Product.findOrCreateMedia(am, connection);
+                    await Product.addAttributeMedia(productId, am.attribute_id, am.attribute_value_id, mediaId, connection);
+                }
+            }
+
             await connection.commit();
-            return { product_id: productId, slug };
+            // Return full updated product details
+            return await Product.findById(productId);
         } catch (error) {
             await connection.rollback();
             throw error;

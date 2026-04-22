@@ -144,7 +144,34 @@
   justify-content: center;
   opacity: 0;
   transition: opacity 0.2s ease;
+  z-index: 3;
 }
+
+.sourceBadgeWrap {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  z-index: 4;
+  pointer-events: none;
+}
+
+.sourceBadge {
+  font-size: 7px;
+  font-weight: 800;
+  padding: 1px 3px;
+  border-radius: 2px;
+  text-transform: uppercase;
+  color: white;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.3);
+  width: fit-content;
+}
+
+.sourceVariant { background: #9333ea; }
+.sourceAttribute { background: #2563eb; }
+.sourceProduct { background: #16a34a; }
 
 .imageItem:hover .imageOverlay {
   opacity: 1;
@@ -507,4 +534,409 @@
 
 .toggleActive .toggleThumb {
   transform: translateX(20px);
+}
+
+/* Attribute Config System */
+.configGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 1rem;
+  margin-top: 0.5rem;
+}
+
+.configCard {
+  background: #fdfdff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.02);
+}
+
+.configCardHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid #f1f5f9;
+  padding-bottom: 0.5rem;
+}
+
+.configCardTitle {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.generatorToggle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #64748b;
+}
+
+.switchSmall {
+  position: relative;
+  display: inline-block;
+  width: 32px;
+  height: 18px;
+}
+
+.switchSmall input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.sliderSmall {
+  position: absolute;
+  cursor: pointer;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background-color: #cbd5e1;
+  transition: .3s;
+  border-radius: 20px;
+}
+
+.sliderSmall:before {
+  position: absolute;
+  content: "";
+  height: 12px;
+  width: 12px;
+  left: 3px;
+  bottom: 3px;
+  background-color: white;
+  transition: .3s;
+  border-radius: 50%;
+}
+
+.switchSmall input:checked + .sliderSmall {
+  background-color: #4f7cff;
+}
+
+.switchSmall input:checked + .sliderSmall:before {
+  transform: translateX(14px);
+}
+
+.valuePicker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.valueItemWrapper {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.valueChip {
+  padding: 0.3rem 0.75rem;
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: #475569;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  transition: all 0.2s;
+}
+
+.valueChip.active {
+  background: #f0f4ff;
+  border-color: #4f7cff;
+  color: #4f7cff;
+  font-weight: 600;
+}
+
+.bulkImageTrigger {
+  position: relative;
+}
+
+.bulkImgBtn {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 1px solid #cbd5e1;
+  background: white;
+  color: #94a3b8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.bulkImgBtn:hover {
+  border-color: #4f7cff;
+  color: #4f7cff;
+}
+
+.bulkImgBtn.hasImgs {
+  background: #4f7cff;
+  color: white;
+  border-color: #4f7cff;
+}
+
+.valueItemContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.countBadge {
+  background: #4f7cff;
+  color: white;
+  font-size: 10px;
+  padding: 1px 5px;
+  border-radius: 10px;
+  margin-left: 6px;
+  font-weight: 700;
+}
+
+.bulkImageSection {
+  background: #f8fafc;
+  border: 1px dashed #e2e8f0;
+  border-radius: 8px;
+  padding: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  animation: slideIn 0.2s ease-out;
+}
+
+@keyframes slideIn {
+  from { opacity: 0; transform: translateY(-5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.bulkImageLabel {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 11px;
+  color: #64748b;
+}
+
+.bulkImageLabel strong {
+  color: #1e293b;
+}
+
+.bulkImageActions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.bulkThumbnails {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.miniThumb {
+  width: 28px;
+  height: 28px;
+  border-radius: 4px;
+  overflow: hidden;
+  border: 1px solid #e2e8f0;
+}
+
+.miniThumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.addBulkImgBtn {
+  width: 28px;
+  height: 28px;
+  border-radius: 4px;
+  border: 1px dashed #cbd5e1;
+  background: white;
+  color: #94a3b8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.addBulkImgBtn:hover {
+  border-color: #4f7cff;
+  color: #4f7cff;
+  background: #f0f4ff;
+}
+
+.clearBulkBtn {
+  font-size: 10px;
+  font-weight: 600;
+  color: #ef4444;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+}
+
+.clearBulkBtn:hover {
+  background: #fef2f2;
+}
+
+/* Variant Enhancements */
+.variantAttrBadges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  grid-column: span 5;
+  margin-top: 0.25rem;
+}
+
+.attrBadge {
+  padding: 0.2rem 0.6rem;
+  background: #f1f5f9;
+  color: #64748b;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.pricingSummaryMini {
+  margin-top: 0.5rem;
+  background: #f8fafc;
+  border: 1px solid #f1f5f9;
+  border-radius: 8px;
+  padding: 0.75rem;
+  display: flex;
+  gap: 2rem;
+  align-items: center;
+}
+
+.pricingSummaryMini div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.pricingSummaryMini span {
+  font-size: 9px;
+  text-transform: uppercase;
+  color: #94a3b8;
+  font-weight: 700;
+}
+
+.pricingSummaryMini strong {
+  font-size: 13px;
+  color: #1e293b;
+}
+
+.finalPriceWrap {
+  margin-left: auto;
+  padding-left: 2rem;
+  border-left: 1px solid #e2e8f0;
+}
+
+.finalPriceWrap strong {
+  font-size: 15px;
+  color: #16a34a;
+}
+
+/* Status Toggle & GST Notice */
+.statusToggleWrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  justify-content: center;
+}
+
+.toggleLabel {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #475569;
+}
+
+.toggleActions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.statusText {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #1e293b;
+  min-width: 60px;
+}
+
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 40px;
+  height: 22px;
+}
+
+.switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background-color: #cbd5e1;
+  transition: .4s;
+  border-radius: 34px;
+}
+
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 16px;
+  width: 16px;
+  left: 3px;
+  bottom: 3px;
+  background-color: white;
+  transition: .4s;
+  border-radius: 50%;
+}
+
+input:checked + .slider {
+  background-color: #4f7cff;
+}
+
+input:checked + .slider:before {
+  transform: translateX(18px);
+}
+
+.gstInfoNotice {
+  margin-top: 1rem;
+  padding: 0.75rem 1rem;
+  background: #f0f4ff;
+  border-left: 4px solid #4f7cff;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.8125rem;
+  color: #2D3A5D;
+}
+
+.gstInfoNotice strong {
+  color: #4f7cff;
 }

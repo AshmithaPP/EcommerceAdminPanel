@@ -7,7 +7,7 @@
   position: relative;
   border-radius: 18px;
   overflow: hidden;
-  padding: 16px 18px 14px;
+  padding: 12px 16px 10px;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -134,7 +134,7 @@
   justify-content: space-between;
   position: relative;
   z-index: 1;
-  margin-top: 8px;
+  margin-top: 4px;
 }
 
 .sc-body-left {

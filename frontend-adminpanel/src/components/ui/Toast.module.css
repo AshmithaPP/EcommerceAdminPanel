@@ -1,0 +1,91 @@
+.toastContainer {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 320px;
+  max-width: 450px;
+  padding: 12px 16px;
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-radius: 12px;
+  box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.1), 0 4px 12px -2px rgba(0, 0, 0, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+.toastContainer::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+}
+
+/* Types */
+.success { border-left-color: var(--status-success); }
+.success::before { background: var(--status-success); }
+.success .iconContainer { color: var(--status-success); background: var(--status-success-bg); }
+
+.error { border-left-color: var(--status-danger); }
+.error::before { background: var(--status-danger); }
+.error .iconContainer { color: var(--status-danger); background: var(--status-danger-bg); }
+
+.warning { border-left-color: var(--status-warning); }
+.warning::before { background: var(--status-warning); }
+.warning .iconContainer { color: var(--status-warning); background: var(--status-warning-bg); }
+
+.info { border-left-color: var(--status-info); }
+.info::before { background: var(--status-info); }
+.info .iconContainer { color: var(--status-info); background: var(--status-info-bg); }
+
+.iconContainer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  flex-shrink: 0;
+}
+
+.content {
+  flex: 1;
+}
+
+.message {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--heading-text);
+  margin: 0;
+  line-height: 1.4;
+}
+
+.closeButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: var(--muted-text);
+  cursor: pointer;
+  transition: all 0.2s;
+  padding: 0;
+}
+
+.closeButton:hover {
+  background: rgba(0, 0, 0, 0.05);
+  color: var(--body-text);
+}
+
+/* Animations handled by react-hot-toast, but we can add some micro-interactions */
+.toastContainer:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 15px 35px -5px rgba(0, 0, 0, 0.12), 0 6px 15px -2px rgba(0, 0, 0, 0.06);
+}

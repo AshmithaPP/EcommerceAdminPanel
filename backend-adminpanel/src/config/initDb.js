@@ -17,6 +17,7 @@ const initDb = async () => {
         const inventorySchemaFile = fs.readFileSync(path.join(__dirname, 'inventory_schema.sql'), 'utf8');
         const paymentSchemaFile = fs.readFileSync(path.join(__dirname, 'payment_schema.sql'), 'utf8');
         const shippingSchemaFile = fs.readFileSync(path.join(__dirname, 'shipping_delivery_schema.sql'), 'utf8');
+        const settingsSchemaFile = fs.readFileSync(path.join(__dirname, 'settings_schema.sql'), 'utf8');
 
         // Split the SQL commands (basic split by semicolon)
         const commands = [
@@ -29,7 +30,8 @@ const initDb = async () => {
             ...couponSchemaFile.split(';'),
             ...inventorySchemaFile.split(';'),
             ...paymentSchemaFile.split(';'),
-            ...shippingSchemaFile.split(';')
+            ...shippingSchemaFile.split(';'),
+            ...settingsSchemaFile.split(';')
         ].map(cmd => cmd.trim()).filter(cmd => cmd.length > 0);
 
         for (let command of commands) {

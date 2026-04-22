@@ -1,10 +1,10 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, User, MapPin, CreditCard, Package, CheckCircle, Clock } from 'lucide-react';
+import { User, MapPin, CreditCard, Package, Clock, CheckCircle } from 'lucide-react';
 import styles from './OrderDetails.module.css';
-import orderService from '../../services/orderService';
 import DataTable from '../../components/ui/DataTable';
 import StatCard from '../../components/ui/StatCard';
+import useOrderStore from '../../store/orderStore';
 
 // ── Helpers ──────────────────────────────────────────
 const formatCurrency = (amount) =>
@@ -47,35 +47,22 @@ const PaymentBadge = ({ status }) => {
 // ── Component ─────────────────────────────────────────
 const OrderDetails = () => {
   const { id } = useParams();
-  const [order, setOrder] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [actionLoading, setActionLoading] = useState(false);
+  const {
+    selectedOrder: order,
+    orderLoading: loading,
+    actionLoading,
+    fetchOrderDetails,
+    updateOrderStatus,
+    resetOrderState
+  } = useOrderStore();
 
-  const fetchOrderDetails = useCallback(async () => {
-    try {
-      setLoading(true);
-      const data = await orderService.getOrderById(id);
-      setOrder(data);
-    } catch (error) {
-      console.error('Error fetching order details:', error);
-    } finally {
-      setLoading(false);
-    }
-  }, [id]);
+  useEffect(() => {
+    fetchOrderDetails(id);
+    return () => resetOrderState(); // Clean up state when leaving page
+  }, [id, fetchOrderDetails, resetOrderState]);
 
-  useEffect(() => { fetchOrderDetails(); }, [fetchOrderDetails]);
-
-  const handleUpdateStatus = async (newStatus, comment) => {
-    try {
-      setActionLoading(true);
-      const result = await orderService.updateOrderStatus(id, { status: newStatus, comment });
-      if (result.success) await fetchOrderDetails();
-    } catch (error) {
-      console.error(`Error updating status to ${newStatus}:`, error);
-      alert(`Failed to update status: ${error.message}`);
-    } finally {
-      setActionLoading(false);
-    }
+  const handleUpdateStatus = (newStatus, comment) => {
+    updateOrderStatus(id, { status: newStatus, comment });
   };
 
   // ── Loading ──

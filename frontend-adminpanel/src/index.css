@@ -19,7 +19,7 @@
   --card-bg: #FFFFFF;
   --input-bg: #EEF0F8;
   
-  --heading-text: #0D1B3E;
+  --heading-text: #222222;
   --body-text: #1A202C;
   --on-surface: #1A202C;
   --muted-text: #7A89B0;
@@ -194,7 +194,7 @@ h1, h2, h3, h4, h5, h6, .font-serif {
   padding: 0.5rem 0 3rem;
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
+  gap: 1rem;
   width: 100%;
   min-width: 0;
   box-sizing: border-box;

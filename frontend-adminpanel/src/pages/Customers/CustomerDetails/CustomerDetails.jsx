@@ -1,13 +1,13 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import {
-  ArrowLeft, Mail, Phone, Calendar, ShoppingBag, CreditCard,
+  Mail, Phone, Calendar, ShoppingBag, CreditCard,
   TrendingUp, Star, MapPin, Eye, UserX, UserCheck,
 } from 'lucide-react';
 import styles from './CustomerDetails.module.css';
 import DataTable from '../../../components/ui/DataTable';
 import StatCard from '../../../components/ui/StatCard';
-import customerService from '../../../services/customerService';
+import useCustomerStore from '../../../store/customerStore';
 
 // ── Helpers ──────────────────────────────────────────────────────────
 const formatDate = (dateString) => {
@@ -45,41 +45,26 @@ const OrderStatusBadge = ({ status }) => {
 const CustomerDetails = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const [customer, setCustomer] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [actionLoading, setActionLoading] = useState(false);
-  const [error, setError] = useState(null);
+  
+  const {
+    selectedCustomer: customer,
+    detailsLoading: loading,
+    actionLoading,
+    detailsError: error,
+    fetchCustomerDetails,
+    updateCustomerStatus,
+    resetCustomerState
+  } = useCustomerStore();
 
-  const fetchCustomerDetails = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      // Returns response.data.data → the customer object directly
-      const data = await customerService.getCustomerById(id);
-      setCustomer(data);
-    } catch (err) {
-      console.error('Error fetching customer details:', err);
-      setError('Failed to load customer details.');
-    } finally {
-      setLoading(false);
-    }
-  }, [id]);
+  useEffect(() => {
+    fetchCustomerDetails(id);
+    return () => resetCustomerState(); // Clean up state when leaving page
+  }, [id, fetchCustomerDetails, resetCustomerState]);
 
-  useEffect(() => { fetchCustomerDetails(); }, [fetchCustomerDetails]);
-
-  const handleToggleStatus = async () => {
+  const handleToggleStatus = () => {
     if (!customer || actionLoading) return;
-    try {
-      setActionLoading(true);
-      const newStatus = customer.status === 1 ? 0 : 1;
-      await customerService.updateStatus(id, newStatus);
-      setCustomer(prev => ({ ...prev, status: newStatus }));
-    } catch (err) {
-      console.error('Error updating customer status:', err);
-      alert('Failed to update status');
-    } finally {
-      setActionLoading(false);
-    }
+    const newStatus = customer.status === 1 ? 0 : 1;
+    updateCustomerStatus(id, newStatus);
   };
 
   // ── Loading ──
@@ -119,8 +104,7 @@ const CustomerDetails = () => {
     recent_orders = [],
   } = customer;
 
-  const isHighValue  = parseFloat(stats.total_spent || 0) > 10000;
-  const isActive     = status === 1;
+  const isActive = status === 1;
 
   // ── Recent Orders DataTable columns ──────────────────────────────
   const orderColumns = [
@@ -176,9 +160,8 @@ const CustomerDetails = () => {
   return (
     <div className="page-container">
 
-      {/* ── 1. Top Bar: breadcrumb + status toggle ── */}
+      {/* ── 1. Top Bar: status toggle ── */}
       <div className={styles.topBar}>
-
         <div className={styles.topBarRight}>
           <button
             className={`${styles.actionBtn} ${isActive ? styles.blockBtn : styles.activateBtn}`}
@@ -210,7 +193,7 @@ const CustomerDetails = () => {
         </div>
       </div>
 
-      {/* ── 3. Stat Cards (from stats object) ── */}
+      {/* ── 3. Stat Cards ── */}
       <div className={styles.statsGrid}>
         <StatCard
           label="Lifetime Value"
@@ -234,7 +217,7 @@ const CustomerDetails = () => {
         />
       </div>
 
-      {/* ── 4. Main Grid: Orders (left) | Addresses + Notes (right) ── */}
+      {/* ── 4. Main Grid ── */}
       <div className={styles.mainGrid}>
 
         {/* LEFT — Recent Orders table */}
@@ -247,10 +230,9 @@ const CustomerDetails = () => {
           />
         </div>
 
-        {/* RIGHT — Addresses then Notes */}
+        {/* RIGHT — Addresses */}
         <div className={styles.rightCol}>
 
-          {/* Addresses */}
           <div className={styles.infoCard}>
             <div className={styles.infoCardHeader}>
               <span className={styles.infoCardTitle}>

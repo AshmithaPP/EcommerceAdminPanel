@@ -28,76 +28,30 @@ import TrendChart from '../../components/ui/TrendChart';
 import DataTable from '../../components/ui/DataTable';
 import InfoCard from '../../components/ui/InfoCard';
 
+import useDashboardStore from '../../store/dashboardStore';
+
 const Dashboard = () => {
   const [activeToggle, setActiveToggle] = useState('daily');
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
 
-  const [summary, setSummary] = useState({
-    totalRevenue: 0,
-    totalOrders: 0,
-    totalCustomers: 0,
-    totalActiveProducts: 0,
-    todayOrders: 0
-  });
+  // Store Selectors
+  const loading = useDashboardStore(state => state.loading);
+  const error = useDashboardStore(state => state.error);
+  const summary = useDashboardStore(state => state.summary);
+  const salesTrend = useDashboardStore(state => state.salesTrend);
+  const topProducts = useDashboardStore(state => state.topProducts);
+  const recentOrders = useDashboardStore(state => state.recentOrders);
+  const alerts = useDashboardStore(state => state.alerts);
+  const comparativeAnalytics = useDashboardStore(state => state.comparativeAnalytics);
+  const orderStatusAnalytics = useDashboardStore(state => state.orderStatusAnalytics);
+  const isExporting = useDashboardStore(state => state.isExporting);
 
-  const [salesTrend, setSalesTrend] = useState({
-    trend: [],
-    comparison: {
-      currentRevenue: 0,
-      previousRevenue: 0,
-      revenueGrowth: 0
-    }
-  });
-
-  const [topProducts, setTopProducts] = useState([]);
-  const [recentOrders, setRecentOrders] = useState([]);
-  const [alerts, setAlerts] = useState({
-    counts: {
-      lowStock: 0,
-      outOfStock: 0,
-      pendingOrders: 0,
-      failedPayments: 0
-    },
-    lowStockProducts: []
-  });
-
-  const [comparativeAnalytics, setComparativeAnalytics] = useState(null);
-  const [orderStatusAnalytics, setOrderStatusAnalytics] = useState(null);
-  const [isExporting, setIsExporting] = useState(false);
+  // Store Actions
+  const fetchDashboardData = useDashboardStore(state => state.fetchDashboardData);
+  const exportReport = useDashboardStore(state => state.exportReport);
 
   useEffect(() => {
-    const fetchDashboardData = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const [summaryRes, trendRes, productsRes, alertsRes, ordersRes, comparativeRes, statusRes] = await Promise.all([
-          dashboardService.getSummary(),
-          dashboardService.getSalesTrend(),
-          dashboardService.getTopProducts(5),
-          dashboardService.getAlerts(),
-          dashboardService.getRecentOrders(),
-          dashboardService.getComparativeAnalytics(),
-          dashboardService.getOrderStatusAnalytics()
-        ]);
-
-        if (summaryRes.success) setSummary(summaryRes.data);
-        if (trendRes.success) setSalesTrend(trendRes.data);
-        if (productsRes.success) setTopProducts(productsRes.data);
-        if (alertsRes.success) setAlerts(alertsRes.data);
-        if (ordersRes.success) setRecentOrders(ordersRes.data);
-        if (comparativeRes.success) setComparativeAnalytics(comparativeRes.data);
-        if (statusRes.success) setOrderStatusAnalytics(statusRes.data);
-      } catch (err) {
-        console.error('Error fetching dashboard data:', err);
-        setError('Failed to load dashboard data. Please try again later.');
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchDashboardData();
-  }, []);
+  }, [fetchDashboardData]);
 
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('en-IN', {
@@ -120,28 +74,14 @@ const Dashboard = () => {
   };
 
   const handleExport = async () => {
-    try {
-      setIsExporting(true);
-      const end = new Date();
-      const start = new Date();
-      start.setDate(end.getDate() - 30);
+    const end = new Date();
+    const start = new Date();
+    start.setDate(end.getDate() - 30);
 
-      const startDate = start.toISOString().split('T')[0];
-      const endDate = end.toISOString().split('T')[0];
+    const startDate = start.toISOString().split('T')[0];
+    const endDate = end.toISOString().split('T')[0];
 
-      const blob = await dashboardService.downloadReport(startDate, endDate);
-      const url = window.URL.createObjectURL(new Blob([blob]));
-      const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', `Analytics_Report_${startDate}_to_${endDate}.pdf`);
-      document.body.appendChild(link);
-      link.click();
-      link.parentNode.removeChild(link);
-    } catch (err) {
-      console.error('Export failed:', err);
-    } finally {
-      setIsExporting(false);
-    }
+    await exportReport(startDate, endDate);
   };
 
   if (loading) {
@@ -159,7 +99,7 @@ const Dashboard = () => {
         <AlertTriangle size={48} color="#E24B4A" />
         <h3>Error Loading Dashboard</h3>
         <p>{error}</p>
-        <button onClick={() => window.location.reload()} className={styles.retryBtn}>Retry</button>
+        <button onClick={() => fetchDashboardData()} className={styles.retryBtn}>Retry</button>
       </div>
     );
   }

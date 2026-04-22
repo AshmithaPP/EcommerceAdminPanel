@@ -66,11 +66,21 @@ const SubCategory = {
     },
 
     // Sub Category Attribute Mapping
-    assignAttributes: async (subCategoryId, attributeIds, createdBy, connection = db) => {
-        if (!attributeIds || attributeIds.length === 0) return;
+    assignAttributes: async (subCategoryId, attributes, createdBy, connection = db) => {
+        if (!attributes || attributes.length === 0) return;
 
-        const mappings = attributeIds.map(attrId => [uuidv4(), subCategoryId, attrId, createdBy]);
-        const sql = 'INSERT INTO sub_category_attributes (sub_category_attribute_id, sub_category_id, attribute_id, created_by) VALUES ?';
+        const mappings = attributes.map(attr => {
+            const attrId = typeof attr === 'string' ? attr : attr.attribute_id;
+            const isVariant = typeof attr === 'object' ? (attr.is_variant_attribute ? 1 : 0) : 0;
+            return [
+                uuidv4(), 
+                subCategoryId, 
+                attrId, 
+                isVariant,
+                createdBy
+            ];
+        });
+        const sql = 'INSERT INTO sub_category_attributes (sub_category_attribute_id, sub_category_id, attribute_id, is_variant_attribute, created_by) VALUES ?';
         await connection.query(sql, [mappings]);
     },
 
@@ -86,6 +96,7 @@ const SubCategory = {
             SELECT 
                 a.attribute_id, 
                 a.name as attribute_name, 
+                sca.is_variant_attribute,
                 av.attribute_value_id, 
                 av.value as attribute_value
             FROM sub_category_attributes sca

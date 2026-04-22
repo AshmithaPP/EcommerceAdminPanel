@@ -14,6 +14,8 @@ const paymentRoutes = require('./routes/paymentRoutes');
 const dashboardRoutes = require('./routes/dashboardRoutes');
 const shipmentRoutes = require('./routes/shipmentRoutes');
 const uploadRoutes = require('./routes/uploadRoutes');
+const analyticsRoutes = require('./routes/analyticsRoutes');
+const settingsRoutes = require('./routes/settingsRoutes');
 const path = require('path');
 const paymentController = require('./controllers/paymentController');
 const { protect, authorize } = require('./middlewares/authMiddleware');
@@ -50,6 +52,8 @@ app.use('/api/payments', paymentRoutes);
 app.use('/api/admin/dashboard', dashboardRoutes);
 app.use('/api/shipments', shipmentRoutes);
 app.use('/api/upload', uploadRoutes);
+app.use('/api/analytics', analyticsRoutes);
+app.use('/api/settings', settingsRoutes);
 
 // Admin Payments List
 app.get('/api/admin/payments', protect, authorize('admin', 'superadmin'), paymentController.getAllPayments);

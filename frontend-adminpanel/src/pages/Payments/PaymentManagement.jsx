@@ -1,10 +1,9 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { Eye, CreditCard, Wallet, Landmark, Truck, ChevronDown } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Eye, CreditCard, Wallet, Landmark, Truck } from 'lucide-react';
 import styles from './PaymentManagement.module.css';
 import DataTable from '../../components/ui/DataTable';
 import Pagination from '../../components/ui/Pagination';
-import paymentService from '../../services/paymentService';
-import { toast } from 'react-hot-toast';
+import usePaymentStore from '../../store/paymentStore';
 
 // ── Helpers ──────────────────────────────────────────────────────────
 const formatCurrency = (amount) =>
@@ -38,44 +37,45 @@ const statusLabel = (s) =>
 
 // ── Component ─────────────────────────────────────────────────────────
 const PaymentManagement = () => {
-  const [payments, setPayments] = useState([]);
-  const [selectedTx, setSelectedTx] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [isJsonOpen, setIsJsonOpen] = useState(false);
-  const [activeFilter, setActiveFilter] = useState('All');
-  const [searchTerm, setSearchTerm] = useState('');
-  const [pagination, setPagination] = useState({ page: 1, limit: 10, total: 0 });
+  const {
+    filteredPayments,
+    selectedTransaction: selectedTx,
+    loading,
+    activeFilter,
+    searchTerm,
+    page,
+    limit,
+    total,
+    setFilter,
+    setSearch,
+    setPage,
+    setSelectedTransaction,
+    fetchPayments,
+    resetPaymentState
+  } = usePaymentStore();
 
+  const [localSearch, setLocalSearch] = useState(searchTerm);
   const filters = ['All', 'Success', 'Pending', 'Failed'];
 
-  const fetchPayments = useCallback(async () => {
-    try {
-      setLoading(true);
-      const offset = (pagination.page - 1) * pagination.limit;
-      const response = await paymentService.getPayments({ limit: pagination.limit, offset });
-      if (response.success) {
-        setPayments(response.data);
-        setPagination(prev => ({ ...prev, total: response.total }));
-        if (response.data.length > 0 && !selectedTx) {
-          setSelectedTx(response.data[0]);
-        }
-      }
-    } catch (error) {
-      console.error('Error fetching payments:', error);
-      toast.error('Failed to load payments');
-    } finally {
-      setLoading(false);
-    }
-  }, [pagination.page, pagination.limit]);
+  // Trigger fetch when pagination changes
+  useEffect(() => {
+    fetchPayments();
+  }, [page, limit, fetchPayments]);
 
-  useEffect(() => { fetchPayments(); }, [fetchPayments]);
+  // Debounced search logic
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setSearch(localSearch);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [localSearch, setSearch]);
 
-  // ── Client-side filter on fetched page ──
-  const filteredPayments = activeFilter === 'All'
-    ? payments
-    : payments.filter(p => p.status?.toLowerCase() === activeFilter.toLowerCase());
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => resetPaymentState();
+  }, [resetPaymentState]);
 
-  // ── DataTable column definitions ──
+  // ── Column definitions ──
   const columns = [
     {
       label: 'Order',
@@ -131,7 +131,7 @@ const PaymentManagement = () => {
       render: (row) => (
         <button
           className={`${styles.viewBtn} ${selectedTx?.payment_id === row.payment_id ? styles.viewBtnActive : ''}`}
-          onClick={() => { setSelectedTx(row); setIsJsonOpen(false); }}
+          onClick={() => setSelectedTransaction(row)}
           title="View Details"
         >
           <Eye size={13} />
@@ -140,7 +140,6 @@ const PaymentManagement = () => {
     },
   ];
 
-  // ── Header actions: filter pills + search ──
   const headerActions = (
     <div className={styles.headerControls}>
       <div className={styles.filterGroup}>
@@ -148,10 +147,7 @@ const PaymentManagement = () => {
           <button
             key={f}
             className={`${styles.filterBtn} ${activeFilter === f ? styles.activeFilter : ''}`}
-            onClick={() => {
-              setActiveFilter(f);
-              setPagination(prev => ({ ...prev, page: 1 }));
-            }}
+            onClick={() => setFilter(f)}
           >
             {f}
           </button>
@@ -165,8 +161,8 @@ const PaymentManagement = () => {
           type="text"
           className={styles.searchInput}
           placeholder="Search orders..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
+          value={localSearch}
+          onChange={(e) => setLocalSearch(e.target.value)}
         />
       </div>
     </div>
@@ -177,8 +173,6 @@ const PaymentManagement = () => {
       {loading && <div className={styles.loadingBar} />}
 
       <div className={styles.mainGrid}>
-
-        {/* ── LEFT: Transaction Register (DataTable) ── */}
         <div className={styles.leftCol}>
           <DataTable
             title="Transaction Register"
@@ -187,64 +181,55 @@ const PaymentManagement = () => {
             actions={headerActions}
             emptyMessage={loading ? 'Loading payments...' : 'No transactions found.'}
           />
-          {!loading && pagination.total > pagination.limit && (
+          {!loading && total > limit && (
             <Pagination
-              totalItems={pagination.total}
-              itemsPerPage={pagination.limit}
-              currentPage={pagination.page}
-              onPageChange={(p) => setPagination(prev => ({ ...prev, page: p }))}
+              totalItems={total}
+              itemsPerPage={limit}
+              currentPage={page}
+              onPageChange={setPage}
             />
           )}
         </div>
 
-        {/* ── RIGHT: Detail Panel ── */}
         <div className={styles.rightCol}>
           {selectedTx ? (
-            <>
-              {/* Transaction Details Card */}
-              <div className={styles.infoCard}>
-                <div className={styles.infoCardHeader}>
-                  <span className={styles.infoCardTitle}>Transaction Details</span>
-                  <CreditCard size={13} style={{ color: 'var(--primary, #4361EE)', opacity: 0.7 }} />
+            <div className={styles.infoCard}>
+              <div className={styles.infoCardHeader}>
+                <span className={styles.infoCardTitle}>Transaction Details</span>
+                <CreditCard size={13} style={{ color: 'var(--primary, #4361EE)', opacity: 0.7 }} />
+              </div>
+              <div className={styles.infoCardBody}>
+                <div className={styles.detailItem}>
+                  <span className={styles.detailLabel}>Customer</span>
+                  <div>
+                    <span className={styles.detailValue}>{selectedTx.customer_name}</span>
+                    <p className={styles.detailSub}>{selectedTx.customer_email}</p>
+                  </div>
                 </div>
-                <div className={styles.infoCardBody}>
 
-                  {/* Key-value pairs */}
-                  <div className={styles.detailItem}>
-                    <span className={styles.detailLabel}>Customer</span>
-                    <div>
-                      <span className={styles.detailValue}>{selectedTx.customer_name}</span>
-                      <p className={styles.detailSub}>{selectedTx.customer_email}</p>
-                    </div>
-                  </div>
+                <div className={styles.detailItem}>
+                  <span className={styles.detailLabel}>Amount</span>
+                  <span className={styles.detailValueLg}>{formatCurrency(selectedTx.amount)}</span>
+                </div>
 
-                  <div className={styles.detailItem}>
-                    <span className={styles.detailLabel}>Amount</span>
-                    <span className={styles.detailValueLg}>{formatCurrency(selectedTx.amount)}</span>
-                  </div>
+                <div className={styles.detailItem}>
+                  <span className={styles.detailLabel}>Gateway</span>
+                  <span className={styles.detailValue}>Razorpay</span>
+                </div>
 
-                  <div className={styles.detailItem}>
-                    <span className={styles.detailLabel}>Gateway</span>
-                    <span className={styles.detailValue}>Razorpay</span>
-                  </div>
+                <div className={styles.detailItem}>
+                  <span className={styles.detailLabel}>Order ID</span>
+                  <code className={styles.txnId}>{selectedTx.razorpay_order_id || 'N/A'}</code>
+                </div>
 
-                  <div className={styles.detailItem}>
-                    <span className={styles.detailLabel}>Order ID</span>
-                    <code className={styles.txnId}>{selectedTx.razorpay_order_id || 'N/A'}</code>
-                  </div>
-
-                  <div className={styles.detailItem}>
-                    <span className={styles.detailLabel}>Status</span>
-                    <span className={`${styles.badge} ${styles[`badge_${STATUS_CLS[selectedTx.status] || 'pending'}`]}`}>
-                      {statusLabel(selectedTx.status)}
-                    </span>
-                  </div>
-              
+                <div className={styles.detailItem}>
+                  <span className={styles.detailLabel}>Status</span>
+                  <span className={`${styles.badge} ${styles[`badge_${STATUS_CLS[selectedTx.status] || 'pending'}`]}`}>
+                    {statusLabel(selectedTx.status)}
+                  </span>
                 </div>
               </div>
-
-
-            </>
+            </div>
           ) : (
             <div className={styles.emptyDetail}>
               <CreditCard size={32} style={{ opacity: 0.15 }} />

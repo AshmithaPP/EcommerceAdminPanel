@@ -3,6 +3,7 @@ const crypto = require('crypto');
 const Payment = require('../models/paymentModel');
 const Order = require('../models/orderModel');
 const inventoryService = require('./inventoryService');
+const analyticsService = require('./analyticsService');
 
 const razorpay = new Razorpay({
     key_id: process.env.RAZORPAY_KEY_ID,
@@ -68,6 +69,10 @@ const PaymentService = {
                     paymentRecord.order_id
                 );
             }
+
+            // 4. Update Analytics daily_stats (Real-time update)
+            const today = new Date().toISOString().split('T')[0];
+            await analyticsService.updateDailyStats(today);
         }
 
         return { success: true, message: 'Payment verified successfully' };

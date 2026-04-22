@@ -1,10 +1,9 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { PlusCircle, Edit, History, X } from 'lucide-react';
 import styles from './InventoryList.module.css';
 import DataTable from '../../components/ui/DataTable';
 import Pagination from '../../components/ui/Pagination';
-import inventoryService from '../../services/inventoryService';
-import { toast } from 'react-hot-toast';
+import useInventoryStore from '../../store/inventoryStore';
 
 // ── Components & Helpers ─────────────────────────────────────────────
 const formatDate = (dateString) => {
@@ -35,59 +34,52 @@ const getHistoryActionBadge = (action) => {
 
 // ── Main Page ────────────────────────────────────────────────────────
 const InventoryList = () => {
-  const [inventory, setInventory] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const {
+    filteredInventory,
+    loading,
+    history,
+    historyLoading,
+    page,
+    limit,
+    total,
+    searchTerm,
+    activeFilter,
+    setFilter,
+    setSearch,
+    setPage,
+    fetchInventory,
+    fetchHistory,
+    restock,
+    setStock,
+    resetInventoryState
+  } = useInventoryStore();
 
-  // Pagination State
-  const [pagination, setPagination] = useState({ page: 1, limit: 10, total: 0 });
+  const [localSearch, setLocalSearch] = useState(searchTerm);
 
-  // Modal / Action State
+  // Modal / Action State (Ephemeral)
   const [selectedVariant, setSelectedVariant] = useState(null);
   const [actionType, setActionType] = useState(null); // 'ADD', 'SET', 'HISTORY'
   const [inputValue, setInputValue] = useState('');
   const [thresholdValue, setThresholdValue] = useState('');
   const [reason, setReason] = useState('');
 
-  // History State
-  const [history, setHistory] = useState([]);
-  const [historyLoading, setHistoryLoading] = useState(false);
+  // Trigger fetch when pagination changes
+  useEffect(() => {
+    fetchInventory();
+  }, [page, limit, fetchInventory]);
 
-  // Filters
-  const [searchTerm, setSearchTerm] = useState('');
-  const [activeFilter, setActiveFilter] = useState('All');
+  // Debounced search logic
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setSearch(localSearch);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [localSearch, setSearch]);
 
-  const fetchInventory = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      // Backend does not natively filter by search/status in the API right now, 
-      // but we pull limit and page. However, our search is client-side for now.
-      const res = await inventoryService.getFullInventory(pagination.page, pagination.limit);
-      setInventory(res.data || []);
-      setPagination(prev => ({ ...prev, total: res.pagination?.total_items || res.data?.length || 0 }));
-    } catch (err) {
-      console.error('Error fetching inventory:', err);
-      setError('Failed to load inventory data');
-      toast.error('Failed to load inventory');
-    } finally {
-      setLoading(false);
-    }
-  }, [pagination.page, pagination.limit]);
-
-  useEffect(() => { fetchInventory(); }, [fetchInventory]);
-
-  const fetchHistory = async (variantId) => {
-    try {
-      setHistoryLoading(true);
-      const res = await inventoryService.getStockHistory(variantId);
-      setHistory(res.data || []);
-    } catch (err) {
-      console.error('Error fetching history:', err);
-    } finally {
-      setHistoryLoading(false);
-    }
-  };
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => resetInventoryState();
+  }, [resetInventoryState]);
 
   const handleActionClick = (item, type) => {
     setSelectedVariant(item);
@@ -105,49 +97,30 @@ const InventoryList = () => {
   const closeModals = () => {
     setSelectedVariant(null);
     setActionType(null);
-    setHistory([]);
     setInputValue('');
     setReason('');
   };
 
   const handleSave = async () => {
     if (!selectedVariant || !actionType) return;
-    try {
-      if (actionType === 'ADD') {
-        await inventoryService.restock(selectedVariant.variant_id, {
-          quantity: parseInt(inputValue),
-          reason,
-          threshold: parseInt(thresholdValue)
-        });
-        toast.success(`Successfully added ${inputValue} units`);
-      } else {
-        await inventoryService.setStock(selectedVariant.variant_id, {
-          stock: parseInt(inputValue),
-          reason,
-          threshold: parseInt(thresholdValue)
-        });
-        toast.success(`Stock correctly set to ${inputValue}`);
-      }
-
-      fetchInventory();
-      closeModals();
-    } catch (err) {
-      console.error('Error updating stock:', err);
-      toast.error(err.response?.data?.message || 'Failed to update stock');
+    
+    let success = false;
+    if (actionType === 'ADD') {
+      success = await restock(selectedVariant.variant_id, {
+        quantity: parseInt(inputValue),
+        reason,
+        threshold: parseInt(thresholdValue)
+      });
+    } else {
+      success = await setStock(selectedVariant.variant_id, {
+        stock: parseInt(inputValue),
+        reason,
+        threshold: parseInt(thresholdValue)
+      });
     }
+
+    if (success) closeModals();
   };
-
-  // ── Client-side Filtering ──
-  const filteredInventory = inventory.filter(item => {
-    const matchesSearch = item.product_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.sku?.toLowerCase().includes(searchTerm.toLowerCase());
-
-    if (!matchesSearch) return false;
-    if (activeFilter === 'All') return true;
-
-    const { label } = getStockStatus(item.quantity, item.low_stock_threshold);
-    return label === activeFilter;
-  });
 
   // ── DataTable Columns ───────────────────────────────────────────────
   const columns = [
@@ -296,10 +269,7 @@ const InventoryList = () => {
           <button
             key={f}
             className={`${styles.filterBtn} ${activeFilter === f ? styles.activeFilter : ''}`}
-            onClick={() => {
-              setActiveFilter(f);
-              setPagination(prev => ({ ...prev, page: 1 }));
-            }}
+            onClick={() => setFilter(f)}
           >
             {f}
           </button>
@@ -313,8 +283,8 @@ const InventoryList = () => {
           type="text"
           className={styles.searchInput}
           placeholder="Search by name or SKU..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
+          value={localSearch}
+          onChange={(e) => setLocalSearch(e.target.value)}
         />
       </div>
     </div>
@@ -322,7 +292,6 @@ const InventoryList = () => {
 
   return (
     <div className="page-container">
-
       <div className={styles.tableContainer}>
         <DataTable
           title="Inventory Management"
@@ -331,12 +300,12 @@ const InventoryList = () => {
           actions={headerActions}
           emptyMessage={loading ? "Loading inventory..." : "No inventory records found."}
         />
-        {!loading && pagination.total > pagination.limit && (
+        {!loading && total > limit && (
           <Pagination
-            totalItems={pagination.total}
-            itemsPerPage={pagination.limit}
-            currentPage={pagination.page}
-            onPageChange={(p) => setPagination(prev => ({ ...prev, page: p }))}
+            totalItems={total}
+            itemsPerPage={limit}
+            currentPage={page}
+            onPageChange={setPage}
           />
         )}
       </div>

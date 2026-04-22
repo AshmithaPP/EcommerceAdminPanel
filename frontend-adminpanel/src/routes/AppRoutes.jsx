@@ -1,6 +1,7 @@
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import Dashboard from '../pages/Dashboard/Dashboard';
+import Analytics from '../pages/Analytics/Analytics';
 import Products from '../pages/Products/Products';
 import AddProduct from '../pages/AddProduct/AddProduct';
 import EditProduct from '../pages/EditProduct/EditProduct';
@@ -22,6 +23,7 @@ const AppRoutes = () => {
     <Routes>
       <Route path="/" element={<Navigate to="/dashboard" replace />} />
       <Route path="/dashboard" element={<Dashboard />} />
+      <Route path="/analytics" element={<Analytics />} />
       <Route path="/inventory" element={<InventoryList />} />
       <Route path="/products" element={<Products />} />
       <Route path="/categories" element={<Categories />} />

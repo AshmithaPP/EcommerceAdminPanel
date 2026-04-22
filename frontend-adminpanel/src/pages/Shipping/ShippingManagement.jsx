@@ -1,58 +1,39 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import styles from './ShippingManagement.module.css';
-import shippingService from '../../services/shippingService';
 import DataTable from '../../components/ui/DataTable';
 import Pagination from '../../components/ui/Pagination';
-import { toast } from 'react-hot-toast';
-
-const STATUS_TABS = [
-  { id: 'PACKED', label: 'Packed' },
-  { id: 'SHIPPED', label: 'Shipped' },
-  { id: 'OFD', label: 'Out for Delivery' },
-  { id: 'DELIVERED', label: 'Delivered' },
-  { id: 'RTO', label: 'RTO' }
-];
-
-const statusMap = STATUS_TABS.reduce((acc, tab) => {
-  acc[tab.id] = tab.label;
-  return acc;
-}, {});
+import useShippingStore, { STATUS_TABS } from '../../store/shippingStore';
 
 const ShippingManagement = () => {
-  const [activeTab, setActiveTab] = useState('PACKED');
-  const [shipments, setShipments] = useState([]);
-  const [loading, setLoading] = useState(true);
-  
-  // Basic Pagination State
-  const [pagination, setPagination] = useState({ page: 1, limit: 15, total: 0 });
+  const {
+    shipments,
+    loading,
+    activeTab,
+    page,
+    limit,
+    total,
+    selectedShipment,
+    actionLoading,
+    setActiveTab,
+    setPage,
+    setSelectedShipment,
+    fetchShipments,
+    updateShipmentStatus,
+    resetShippingState
+  } = useShippingStore();
 
-  // Update Status Modal
   const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
-  const [selectedShipment, setSelectedShipment] = useState(null);
   const [updateStatusData, setUpdateStatusData] = useState({ status: '', location: '', comment: '' });
 
-  const fetchShipments = useCallback(async () => {
-    setLoading(true);
-    try {
-      const status = statusMap[activeTab];
-      const response = await shippingService.getShipments({ 
-        status, 
-        page: pagination.page, 
-        limit: pagination.limit 
-      });
-      setShipments(response.data || []);
-      setPagination(prev => ({ ...prev, total: response.pagination?.total_items || response.data?.length || 0 }));
-    } catch (error) {
-      console.error('Failed to fetch shipments:', error);
-      toast.error('Failed to load shipments.');
-    } finally {
-      setLoading(false);
-    }
-  }, [activeTab, pagination.page, pagination.limit]);
-
+  // Trigger fetch when tab or pagination changes
   useEffect(() => {
     fetchShipments();
-  }, [fetchShipments]);
+  }, [activeTab, page, fetchShipments]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => resetShippingState();
+  }, [resetShippingState]);
 
   const handleOpenStatusModal = (shipment) => {
     setSelectedShipment(shipment);
@@ -66,15 +47,8 @@ const ShippingManagement = () => {
 
   const handleUpdateStatus = async () => {
     if (!selectedShipment) return;
-    try {
-      await shippingService.updateShipmentStatus(selectedShipment.shipment_id, updateStatusData);
-      setIsStatusModalOpen(false);
-      toast.success('Shipment status updated successfully');
-      fetchShipments(); // Refresh list
-    } catch (error) {
-      console.error('Update failed:', error);
-      toast.error('Failed to update status: ' + (error.response?.data?.message || error.message));
-    }
+    const success = await updateShipmentStatus(selectedShipment.shipment_id, updateStatusData);
+    if (success) setIsStatusModalOpen(false);
   };
 
   const getStatusBadgeClass = (status) => {
@@ -164,10 +138,7 @@ const ShippingManagement = () => {
           <button
             key={tab.id}
             className={`${styles.filterBtn} ${activeTab === tab.id ? styles.activeFilter : ''}`}
-            onClick={() => {
-              setActiveTab(tab.id);
-              setPagination(prev => ({ ...prev, page: 1 }));
-            }}
+            onClick={() => setActiveTab(tab.id)}
           >
             {tab.id === 'OFD' ? 'OUT FOR DELIVERY' : tab.label}
           </button>
@@ -178,6 +149,7 @@ const ShippingManagement = () => {
 
   return (
     <div className="page-container">
+      {loading && <div className={styles.loadingBar} />}
       <div className={styles.tableContainer}>
         <DataTable
           title="Logistics & Shipping"
@@ -186,12 +158,12 @@ const ShippingManagement = () => {
           actions={headerActions}
           emptyMessage={loading ? "Loading shipments..." : "No shipments found in this category."}
         />
-        {!loading && pagination.total > pagination.limit && (
+        {!loading && total > limit && (
            <Pagination
-             totalItems={pagination.total}
-             itemsPerPage={pagination.limit}
-             currentPage={pagination.page}
-             onPageChange={(p) => setPagination(prev => ({ ...prev, page: p }))}
+             totalItems={total}
+             itemsPerPage={limit}
+             currentPage={page}
+             onPageChange={setPage}
            />
         )}
       </div>
@@ -244,7 +216,13 @@ const ShippingManagement = () => {
 
             <div className={styles.modalActions}>
               <button className={styles.cancelBtn} onClick={() => setIsStatusModalOpen(false)}>Cancel</button>
-              <button className={styles.saveBtn} onClick={handleUpdateStatus}>Save Update</button>
+              <button 
+                className={styles.saveBtn} 
+                onClick={handleUpdateStatus}
+                disabled={actionLoading}
+              >
+                {actionLoading ? 'Saving...' : 'Save Update'}
+              </button>
             </div>
           </div>
         </div>

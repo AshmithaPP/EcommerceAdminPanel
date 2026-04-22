@@ -65,11 +65,20 @@ const Category = {
     },
 
     // Category-Attribute Mapping
-    assignAttributes: async (categoryId, attributeIds, createdBy, connection = db) => {
-        if (!attributeIds || attributeIds.length === 0) return;
+    assignAttributes: async (categoryId, attributes, createdBy, connection = db) => {
+        if (!attributes || attributes.length === 0) return;
 
-        const mappings = attributeIds.map(attrId => [uuidv4(), categoryId, attrId]);
-        const sql = 'INSERT INTO category_attributes (category_attribute_id, category_id, attribute_id) VALUES ?';
+        const mappings = attributes.map(attr => {
+            const attrId = typeof attr === 'string' ? attr : attr.attribute_id;
+            const isVariant = typeof attr === 'object' ? (attr.is_variant_attribute ? 1 : 0) : 0;
+            return [
+                uuidv4(), 
+                categoryId, 
+                attrId, 
+                isVariant
+            ];
+        });
+        const sql = 'INSERT INTO category_attributes (category_attribute_id, category_id, attribute_id, is_variant_attribute) VALUES ?';
         await connection.query(sql, [mappings]);
     },
 
@@ -85,6 +94,7 @@ const Category = {
             SELECT 
                 a.attribute_id, 
                 a.name as attribute_name, 
+                ca.is_variant_attribute,
                 av.attribute_value_id, 
                 av.value as attribute_value
             FROM category_attributes ca

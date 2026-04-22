@@ -5,6 +5,7 @@ import styles from './Sidebar.module.css';
 
 const menuItems = [
   { name: 'Dashboard', icon: 'dashboard', path: '/dashboard' },
+  { name: 'Analytics', icon: 'bar_chart', path: '/analytics' },
   { name: 'Products', icon: 'inventory_2', path: '/products' },
   { name: 'Categories', icon: 'category', path: '/categories' },
   { name: 'Orders', icon: 'shopping_bag', path: '/orders' },

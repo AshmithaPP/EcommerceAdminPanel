@@ -1,76 +1,50 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Edit2, Trash2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Edit2, Trash2 } from 'lucide-react';
 import Badge from '../../components/ui/Badge';
 import Toggle from '../../components/ui/Toggle';
 import Button from '../../components/ui/Button';
 import DataTable from '../../components/ui/DataTable';
 import Pagination from '../../components/ui/Pagination';
-import { productService } from '../../services/productService';
 import styles from './Products.module.css';
-import toast from 'react-hot-toast';
+import useProductStore from '../../store/productStore';
+import { showToast } from '../../utils/toast';
 
 const STORAGE_URL = 'http://localhost:5000';
 
 const getImageUrl = (url) => {
-  if (!url) return '';
+  if (!url) return null;
   if (url.startsWith('http')) return url;
-  if (url.startsWith('blob:')) return ''; // Ignore broken legacy blobs
+  if (url.startsWith('blob:')) return null; // Ignore broken legacy blobs
   return `${STORAGE_URL}${url}`;
 };
 
-/* ─────────────────────────────────────────
-   Products Page
-   ───────────────────────────────────────── */
 const Products = () => {
   const navigate = useNavigate();
-  const [currentPage, setCurrentPage] = useState(1);
-  const [products, setProducts] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [totalProducts, setTotalProducts] = useState(0);
-  const [itemsPerPage, setItemsPerPage] = useState(4);
+
+  // Store Selectors
+  const products = useProductStore(state => state.products);
+  const totalProducts = useProductStore(state => state.totalProducts);
+  const currentPage = useProductStore(state => state.currentPage);
+  const itemsPerPage = useProductStore(state => state.itemsPerPage);
+  const loading = useProductStore(state => state.loading);
+  const error = useProductStore(state => state.error);
+
+  // Store Actions
+  const fetchProducts = useProductStore(state => state.fetchProducts);
+  const deleteProduct = useProductStore(state => state.deleteProduct);
+  const toggleAvailability = useProductStore(state => state.toggleAvailability);
+  const setCurrentPage = useProductStore(state => state.setCurrentPage);
 
   useEffect(() => {
-    fetchProducts(currentPage, itemsPerPage);
-  }, [currentPage, itemsPerPage]);
-
-  const fetchProducts = async (page, limit) => {
-    setLoading(true);
-    try {
-      const result = await productService.getProducts(page, limit);
-      setProducts(result.data);
-      setTotalProducts(result.total);
-      if (result.limit) setItemsPerPage(result.limit);
-      setError(null);
-    } catch (err) {
-      setError('Failed to fetch products');
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  };
+    fetchProducts();
+  }, [fetchProducts]);
 
   const handleDeleteProduct = async (productId, productName) => {
     if (!window.confirm(`Are you sure you want to delete "${productName}"?`)) {
       return;
     }
-
-    try {
-      setLoading(true);
-      await productService.deleteProduct(productId);
-      // Refresh the current page
-      await fetchProducts(currentPage, itemsPerPage);
-      // If we deleted the last item on a page (other than page 1), go back one page
-      if (products.length === 1 && currentPage > 1) {
-        setCurrentPage(prev => prev - 1);
-      }
-    } catch (err) {
-      console.error('Delete error', err);
-      alert(err.response?.data?.message || 'Failed to delete product');
-    } finally {
-      setLoading(false);
-    }
+    await deleteProduct(productId);
   };
 
 
@@ -86,23 +60,22 @@ const Products = () => {
     return 'inStock';
   };
 
-  const toggleAvailability = async (productId) => {
-    try {
-      // Placeholder for actual API call
-      setProducts(prev => prev.map(p =>
-        p.product_id === productId ? { ...p, availability: !p.availability } : p
-      ));
-      toast.success('Availability updated');
-    } catch (err) {
-      toast.error('Failed to update availability');
-    }
-  };
-
   return (
     <div className={styles.pageContainer}>
 
-      {loading && <div>Loading products...</div>}
-      {error && <div>Error: {error}</div>}
+      {loading && !products.length && (
+        <div className={styles.loadingOverlay}>
+          <div className={styles.spinner}></div>
+          <p>Loading products...</p>
+        </div>
+      )}
+      
+      {error && !products.length && (
+        <div className={styles.errorState}>
+          <p>Error: {error}</p>
+          <Button onClick={() => fetchProducts()}>Retry</Button>
+        </div>
+      )}
 
       <div className={styles.tableCard}>
         <DataTable

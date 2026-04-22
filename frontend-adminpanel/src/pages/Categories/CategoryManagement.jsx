@@ -1,149 +1,64 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Edit2, Trash2, Plus, ChevronRight, ChevronDown, FolderOpen, Folder } from 'lucide-react';
 import styles from './CategoryManagement.module.css';
 import Modal from '../../components/common/Modal';
 import Button from '../../components/ui/Button';
-import toast from 'react-hot-toast';
-import { privateApi } from '../../services/api';
+import useCategoryStore from '../../store/categoryStore';
 
 const CategoryManagement = () => {
-  // ---------- State ----------
-  const [categories, setCategories] = useState([]);
-  const [selectedCategory, setSelectedCategory] = useState(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [expanded, setExpanded] = useState({});
+  // ---------- Store ----------
+  const {
+    viewMode,
+    page,
+    totalPages,
+    searchQuery,
+    expandedNodes,
+    isLoading,
+    selectedCategory,
+    
+    setViewMode,
+    setSearchQuery,
+    setPage,
+    toggleNode,
+    setSelectedCategory,
+    
+    fetchCategories,
+    createCategory,
+    updateCategory,
+    deleteCategory,
+    
+    getFilteredCategories,
+    getTotalStats
+  } = useCategoryStore();
+
+  // ---------- Ephemeral UI State ----------
   const [addingTo, setAddingTo] = useState(null);
   const [newCategoryName, setNewCategoryName] = useState('');
   const [deleteId, setDeleteId] = useState(null);
   const [editingCategory, setEditingCategory] = useState(null);
   const [editName, setEditName] = useState('');
   const [editOrder, setEditOrder] = useState(0);
-  const [viewMode, setViewMode] = useState('hierarchy');
-  const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [searchQuery, setSearchQuery] = useState('');
-  const limit = 10;
 
-  // ---------- Category API ----------
-  const fetchCategoryTree = async () => {
-    setIsLoading(true);
-    try {
-      const { data } = await privateApi.get('/categories/category-tree');
-      setCategories(data.data.items);
-      if (data.data.items.length && !selectedCategory) setSelectedCategory(data.data.items[0]);
-    } catch (error) {
-      toast.error(error.response?.data?.message || 'Failed to load categories');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const fetchCategoryList = async (pageNum = page) => {
-    setIsLoading(true);
-    try {
-      const { data } = await privateApi.get(`/categories/category-list?page=${pageNum}&limit=${limit}`);
-      setCategories(data.data.items);
-      setTotalPages(data.data.pagination.pages);
-      if (data.data.items.length && !selectedCategory) setSelectedCategory(data.data.items[0]);
-    } catch (error) {
-      toast.error(error.response?.data?.message || 'Failed to load categories');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const createCategory = async (name, parentId = null) => {
-    try {
-      if (parentId) {
-        await privateApi.post('/categories/sub-category-create', { name, category_id: parentId, display_order: 1 });
-        toast.success(`Sub-category "${name}" created`);
-      } else {
-        await privateApi.post('/categories/category-create', { name, display_order: 1 });
-        toast.success(`Category "${name}" created`);
-      }
-      viewMode === 'hierarchy' ? fetchCategoryTree() : fetchCategoryList(page);
-    } catch (error) {
-      toast.error(error.response?.data?.message || 'Failed to create category');
-    }
-  };
-
-  const updateCategory = async (node, updatedData) => {
-    try {
-      if (node.parent_category_id) {
-        await privateApi.put(`/categories/sub-category-update/${node.sub_category_id}`, updatedData);
-      } else {
-        await privateApi.put(`/categories/category-update/${node.category_id}`, updatedData);
-      }
-      toast.success('Category updated');
-      viewMode === 'hierarchy' ? fetchCategoryTree() : fetchCategoryList(page);
-    } catch (error) {
-      toast.error(error.response?.data?.message || 'Failed to update category');
-    }
-  };
-
-  const deleteCategory = async (node) => {
-    try {
-      if (node.parent_category_id) {
-        await privateApi.delete(`/categories/sub-category-delete/${node.sub_category_id}`);
-      } else {
-        await privateApi.delete(`/categories/category-delete/${node.category_id}`);
-      }
-      toast.success('Category deleted');
-      if (selectedCategory?.category_id === node.category_id) setSelectedCategory(null);
-      viewMode === 'hierarchy' ? fetchCategoryTree() : fetchCategoryList(page);
-    } catch (error) {
-      toast.error(error.response?.data?.message || 'Failed to delete category');
-    }
-  };
+  // ---------- Derived Data ----------
+  const filteredCategories = getFilteredCategories();
+  const { total: totalCats, subs: totalSubCats } = getTotalStats();
 
   // ---------- Effects ----------
   useEffect(() => {
-    viewMode === 'hierarchy' ? fetchCategoryTree() : fetchCategoryList(1);
-  }, [viewMode]);
-
-  // ---------- Search & Stats ----------
-  const filteredCategories = useMemo(() => {
-    if (!searchQuery.trim()) return categories;
-    const filterTree = (items) =>
-      items.reduce((acc, item) => {
-        const matches = item.name.toLowerCase().includes(searchQuery.toLowerCase());
-        const filteredChildren = item.children ? filterTree(item.children) : [];
-        if (matches || filteredChildren.length > 0) acc.push({ ...item, children: filteredChildren });
-        return acc;
-      }, []);
-    if (viewMode === 'hierarchy') return filterTree(categories);
-    return categories.filter(c => c.name.toLowerCase().includes(searchQuery.toLowerCase()));
-  }, [categories, searchQuery, viewMode]);
-
-  const totalCats = useMemo(() => {
-    if (viewMode === 'list') return categories.length;
-    let count = 0;
-    const count_r = (items) => items.forEach(i => { count++; if (i.children) count_r(i.children); });
-    count_r(categories);
-    return count;
-  }, [categories, viewMode]);
-
-  const totalSubCats = useMemo(() => {
-    if (viewMode !== 'hierarchy') return 0;
-    let count = 0;
-    const count_r = (items) => items.forEach(i => { if (i.children?.length) { count += i.children.length; count_r(i.children); } });
-    count_r(categories);
-    return count;
-  }, [categories, viewMode]);
+    fetchCategories();
+  }, []); // Only fetch on mount, setViewMode/setPage handle subsequent fetches
 
   // ---------- UI Helpers ----------
-  const toggle = (id) => setExpanded(prev => ({ ...prev, [id]: !prev[id] }));
-
   const handleAddClick = (e, parentId) => {
     e.stopPropagation();
     setAddingTo(parentId);
     setNewCategoryName('');
-    if (parentId && parentId !== 'root') setExpanded(prev => ({ ...prev, [parentId]: true }));
+    if (parentId && parentId !== 'root') toggleNode(parentId);
   };
 
   const submitAdd = () => {
     if (!newCategoryName.trim()) { setAddingTo(null); return; }
-    createCategory(newCategoryName.trim(), addingTo === 'root' ? null : addingTo);
+    createCategory({ name: newCategoryName.trim(), parentId: addingTo === 'root' ? null : addingTo });
     setAddingTo(null);
     setNewCategoryName('');
   };
@@ -198,7 +113,7 @@ const CategoryManagement = () => {
     if (!items?.length) return null;
     return items.map(node => {
       const hasChildren = node.children?.length > 0;
-      const isExpanded = expanded[node.category_id] || (searchQuery.trim() !== '');
+      const isExpanded = expandedNodes[node.category_id] || (searchQuery.trim() !== '');
       const isSelected = selectedCategory?.category_id === node.category_id;
       const isEditing = editingCategory?.category_id === node.category_id;
 
@@ -212,7 +127,7 @@ const CategoryManagement = () => {
             {/* Expand / leaf icon */}
             <span
               className={styles.expandBtn}
-              onClick={(e) => { e.stopPropagation(); if (hasChildren) toggle(node.category_id); }}
+              onClick={(e) => { e.stopPropagation(); if (hasChildren) toggleNode(node.category_id); }}
             >
               {hasChildren
                 ? (isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />)
@@ -360,17 +275,17 @@ const CategoryManagement = () => {
 
       {totalPages > 1 && !searchQuery && (
         <div className={styles.pagination}>
-          <button className={styles.pageBtn} disabled={page === 1} onClick={() => { const p = page - 1; setPage(p); fetchCategoryList(p); }}>
+          <button className={styles.pageBtn} disabled={page === 1} onClick={() => setPage(page - 1)}>
             <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>chevron_left</span>
           </button>
           {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
             <button
               key={p}
               className={`${styles.pageBtn} ${p === page ? styles.activePage : ''}`}
-              onClick={() => { setPage(p); fetchCategoryList(p); }}
+              onClick={() => setPage(p)}
             >{p}</button>
           ))}
-          <button className={styles.pageBtn} disabled={page === totalPages} onClick={() => { const p = page + 1; setPage(p); fetchCategoryList(p); }}>
+          <button className={styles.pageBtn} disabled={page === totalPages} onClick={() => setPage(page + 1)}>
             <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>chevron_right</span>
           </button>
         </div>
@@ -386,7 +301,7 @@ const CategoryManagement = () => {
       <div className={styles.statsRow}>
         <div className={styles.statCard}>
           <span className={styles.statLabel}>Total Categories</span>
-          <span className={styles.statValue}>{categories.length}</span>
+          <span className={styles.statValue}>{totalCats}</span>
         </div>
         {viewMode === 'hierarchy' && (
           <div className={styles.statCard}>

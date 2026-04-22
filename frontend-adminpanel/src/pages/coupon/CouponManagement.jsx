@@ -1,24 +1,37 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Plus, X, Edit, Trash2 } from 'lucide-react';
 import styles from './CouponManagement.module.css';
 import DataTable from '../../components/ui/DataTable';
 import Pagination from '../../components/ui/Pagination';
-import Toggle from '../../components/ui/Toggle';
-import couponService from '../../services/couponService';
-import { toast } from 'react-hot-toast';
+import useCouponStore from '../../store/couponStore';
 
 const CouponManagement = () => {
-  const [activeTab, setActiveTab] = useState('All');
-  const [searchTerm, setSearchTerm] = useState('');
-  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
-  const [coupons, setCoupons] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const [selectedCoupon, setSelectedCoupon] = useState(null);
-  const [usageHistory, setUsageHistory] = useState([]);
-  const [isCreating, setIsCreating] = useState(false);
+  const {
+    filteredCoupons,
+    loading,
+    actionLoading,
+    usageHistory,
+    selectedCoupon,
+    page,
+    limit,
+    total,
+    activeTab,
+    searchTerm,
+    setTab,
+    setSearch,
+    setPage,
+    setSelectedCoupon,
+    fetchCoupons,
+    fetchUsageHistory,
+    createCoupon,
+    updateCoupon,
+    deleteCoupon,
+    resetCouponState
+  } = useCouponStore();
 
-  const [pagination, setPagination] = useState({ page: 1, limit: 15, total: 0 });
+  const [localSearch, setLocalSearch] = useState(searchTerm);
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
   
   const [formData, setFormData] = useState({
     code: '',
@@ -32,47 +45,23 @@ const CouponManagement = () => {
     is_active: true
   });
 
-  const fetchCoupons = useCallback(async () => {
-    setLoading(true);
-    try {
-      const response = await couponService.listCoupons({ 
-        search: searchTerm,
-        page: pagination.page,
-        limit: pagination.limit
-      });
-      if (response.success) {
-        setCoupons(response.data || []);
-        // Setup pagination data based on the API response structure provided
-        setPagination(prev => ({
-          ...prev,
-          total: response.pagination?.total || response.data?.length || 0,
-          limit: response.pagination?.limit || prev.limit,
-          page: response.pagination?.page || prev.page
-        }));
-      }
-    } catch (err) {
-      setError('Failed to fetch coupons');
-      console.error(err);
-      toast.error('Failed to load coupons data.');
-    } finally {
-      setLoading(false);
-    }
-  }, [searchTerm, pagination.page, pagination.limit]);
-
+  // Trigger fetch when tab or pagination changes
   useEffect(() => {
     fetchCoupons();
-  }, [fetchCoupons]);
+  }, [page, limit, activeTab, searchTerm, fetchCoupons]);
 
-  const handleFetchUsageHistory = async (couponId) => {
-    try {
-      const response = await couponService.getUsageHistory(couponId);
-      if (response.success) {
-        setUsageHistory(response.data || []);
-      }
-    } catch (err) {
-      console.error('Failed to fetch usage history', err);
-    }
-  };
+  // Debounced search logic
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setSearch(localSearch);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [localSearch, setSearch]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => resetCouponState();
+  }, [resetCouponState]);
 
   const handleSelectCoupon = (coupon) => {
     setSelectedCoupon(coupon);
@@ -88,8 +77,7 @@ const CouponManagement = () => {
       per_user_usage_limit: coupon.per_user_usage_limit || '',
       is_active: Number(coupon.is_active) === 1
     });
-    setUsageHistory([]);
-    handleFetchUsageHistory(coupon.coupon_id);
+    fetchUsageHistory(coupon.coupon_id);
     setIsDrawerOpen(true);
   };
 
@@ -107,7 +95,6 @@ const CouponManagement = () => {
       per_user_usage_limit: '',
       is_active: true
     });
-    setUsageHistory([]);
     setIsDrawerOpen(true);
   };
 
@@ -121,73 +108,31 @@ const CouponManagement = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setLoading(true);
-    try {
-      const payload = {
-        ...formData,
-        code: formData.code.replace(/[^a-zA-Z0-9]/g, '').toUpperCase(),
-        discount_value: parseFloat(formData.discount_value),
-        min_order_value: parseFloat(formData.min_order_value || 0),
-        max_discount_cap: formData.max_discount_cap ? parseFloat(formData.max_discount_cap) : null,
-        total_usage_limit: formData.total_usage_limit ? parseInt(formData.total_usage_limit) : null,
-        per_user_usage_limit: formData.per_user_usage_limit ? parseInt(formData.per_user_usage_limit) : null,
-        expiry_date: formData.expiry_date || null,
-      };
+    const payload = {
+      ...formData,
+      code: formData.code.replace(/[^a-zA-Z0-9]/g, '').toUpperCase(),
+      discount_value: parseFloat(formData.discount_value),
+      min_order_value: parseFloat(formData.min_order_value || 0),
+      max_discount_cap: formData.max_discount_cap ? parseFloat(formData.max_discount_cap) : null,
+      total_usage_limit: formData.total_usage_limit ? parseInt(formData.total_usage_limit) : null,
+      per_user_usage_limit: formData.per_user_usage_limit ? parseInt(formData.per_user_usage_limit) : null,
+      expiry_date: formData.expiry_date || null,
+    };
 
-      if (isCreating) {
-        await couponService.createCoupon(payload);
-        toast.success('Coupon created successfully');
-      } else {
-        await couponService.updateCoupon(selectedCoupon.coupon_id, payload);
-        toast.success('Coupon updated successfully');
-      }
-      
-      setIsDrawerOpen(false);
-      fetchCoupons();
-    } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to save coupon');
-      console.error(err);
-    } finally {
-      setLoading(false);
+    let success = false;
+    if (isCreating) {
+      success = await createCoupon(payload);
+    } else {
+      success = await updateCoupon(selectedCoupon.coupon_id, payload);
     }
-  };
-
-  const handleToggleActive = async (e, coupon) => {
-    e.stopPropagation();
-    try {
-      const newStatus = Number(coupon.is_active) === 1 ? 0 : 1;
-      await couponService.updateCoupon(coupon.coupon_id, { is_active: newStatus });
-      setCoupons(prev => prev.map(c => c.coupon_id === coupon.coupon_id ? { ...c, is_active: newStatus } : c));
-      toast.success(`Coupon marked as ${newStatus ? 'Active' : 'Inactive'}`);
-    } catch (err) {
-      console.error('Failed to toggle status', err);
-      toast.error('Status override failed');
-    }
+    
+    if (success) setIsDrawerOpen(false);
   };
 
   const handleDeleteCoupon = async (coupon) => {
     if(!window.confirm(`Are you sure you want to permanently delete coupon ${coupon.code}?`)) return;
-    try {
-      await couponService.deleteCoupon(coupon.coupon_id);
-      toast.success('Coupon deleted successfully');
-      fetchCoupons();
-    } catch (err) {
-      console.error('Failed to delete coupon', err);
-      toast.error('Failed to delete coupon');
-    }
+    await deleteCoupon(coupon.coupon_id);
   };
-
-  const filteredCoupons = coupons.filter(c => {
-    const now = new Date();
-    const expiry = c.expiry_date ? new Date(c.expiry_date) : null;
-    const isActive = Number(c.is_active) === 1;
-    
-    if (activeTab === 'All') return true;
-    if (activeTab === 'Expired') return expiry && expiry < now;
-    if (activeTab === 'Active') return isActive && (!expiry || expiry >= now);
-    if (activeTab === 'Inactive') return !isActive && (!expiry || expiry >= now);
-    return true;
-  });
 
   const TABS = ['All', 'Active', 'Inactive', 'Expired'];
 
@@ -347,10 +292,7 @@ const CouponManagement = () => {
           <button
             key={tab}
             className={`${styles.filterBtn} ${activeTab === tab ? styles.activeFilter : ''}`}
-            onClick={() => {
-              setActiveTab(tab);
-              setPagination(prev => ({ ...prev, page: 1 }));
-            }}
+            onClick={() => setTab(tab)}
           >
             {tab}
           </button>
@@ -361,8 +303,8 @@ const CouponManagement = () => {
           type="text"
           className={styles.searchInput}
           placeholder="Search by code..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
+          value={localSearch}
+          onChange={(e) => setLocalSearch(e.target.value)}
         />
       </div>
       <button className={styles.createBtn} onClick={handleOpenCreateDrawer}>
@@ -374,7 +316,6 @@ const CouponManagement = () => {
 
   return (
     <div className="page-container">
-
       <div className={styles.tableContainer}>
         <DataTable
           title="Coupon Management"
@@ -383,12 +324,12 @@ const CouponManagement = () => {
           actions={headerActions}
           emptyMessage={loading ? "Loading coupons..." : "No coupons found matching criteria."}
         />
-        {!loading && pagination.total > pagination.limit && (
+        {!loading && total > limit && (
            <Pagination
-             totalItems={pagination.total}
-             itemsPerPage={pagination.limit}
-             currentPage={pagination.page}
-             onPageChange={(p) => setPagination(prev => ({ ...prev, page: p }))}
+             totalItems={total}
+             itemsPerPage={limit}
+             currentPage={page}
+             onPageChange={setPage}
            />
         )}
       </div>
@@ -532,8 +473,8 @@ const CouponManagement = () => {
             </div>
 
             <div className={styles.drawerFooter}>
-               <button type="submit" form="couponForm" className={styles.submitBtn} disabled={loading}>
-                 {loading ? 'Saving...' : isCreating ? 'CREATE COUPON' : 'UPDATE COUPON'}
+               <button type="submit" form="couponForm" className={styles.submitBtn} disabled={actionLoading}>
+                 {actionLoading ? 'Saving...' : isCreating ? 'CREATE COUPON' : 'UPDATE COUPON'}
                </button>
             </div>
           </aside>

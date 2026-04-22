@@ -1,6 +1,7 @@
 const sharp = require('sharp');
 const path = require('path');
 const fs = require('fs').promises;
+const crypto = require('crypto');
 
 /**
  * Image Service for handling product imagery optimization.
@@ -8,39 +9,21 @@ const fs = require('fs').promises;
 const imageService = {
   /**
    * Processes a single image file into three WebP versions:
-   * 1. Main: 1000x1000 (square crop as requested)
-   * 2. Thumbnail: 300x300 (square crop)
-   * 3. Mini Thumbnail: 150x150 (square crop)
    */
   processProductImage: async (file) => {
-    const filename = path.parse(file.filename).name; // get filename without extension
+    // Disable sharp cache to prevent file locking on Windows
+    sharp.cache(false);
+
+    const filename = path.parse(file.filename).name;
     const uploadDir = file.destination;
     
+    // Read original into buffer once to avoid multiple file locks/handles
+    const inputBuffer = await fs.readFile(file.path);
+    
     const versions = [
-      { 
-        name: 'main', 
-        suffix: '_main', 
-        width: 1000, 
-        height: 1000, 
-        fit: 'cover', // square crop to fit 1000x1000
-        quality: 80 
-      },
-      { 
-        name: 'thumb', 
-        suffix: '_thumb', 
-        width: 300, 
-        height: 300, 
-        fit: 'cover', // center crop
-        quality: 75 
-      },
-      { 
-        name: 'mini', 
-        suffix: '_mini', 
-        width: 150, 
-        height: 150, 
-        fit: 'cover', // center crop
-        quality: 70 
-      }
+      { name: 'main', suffix: '_main', width: 1000, height: 1000, quality: 80 },
+      { name: 'thumb', suffix: '_thumb', width: 300, height: 300, quality: 75 },
+      { name: 'mini', suffix: '_mini', width: 150, height: 150, quality: 70 }
     ];
 
     const results = {};
@@ -49,29 +32,30 @@ const imageService = {
       const outputFilename = `${filename}${v.suffix}.webp`;
       const outputPath = path.join(uploadDir, outputFilename);
 
-      const info = await sharp(file.path)
+      const info = await sharp(inputBuffer)
         .resize({
           width: v.width,
           height: v.height,
-          fit: v.fit,
-          background: { r: 255, g: 255, b: 255, alpha: 1 } // handle transparency
+          fit: 'cover',
+          background: { r: 255, g: 255, b: 255, alpha: 1 }
         })
         .webp({ quality: v.quality })
         .toFile(outputPath);
 
       results[`${v.name}_url`] = `/uploads/${outputFilename}`;
       
-      // Store metadata for the main image
       if (v.name === 'main') {
         results.width = info.width;
         results.height = info.height;
         results.file_size = info.size;
         results.format = info.format;
+        // Hash the optimized main file
+        const optimizedBuffer = await fs.readFile(outputPath);
+        results.hash = crypto.createHash('sha256').update(optimizedBuffer).digest('hex');
       }
     }
 
-    // Optional: Delete the original uploaded file to save space
-    // Since we only want optimized WebP files.
+    // Safely delete the original uploaded file
     try {
       await fs.unlink(file.path);
     } catch (err) {
