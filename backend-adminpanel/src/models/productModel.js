@@ -5,16 +5,36 @@ const crypto = require('crypto');
 const Product = {
     // === Product Core ===
     create: async (productData, connection = db) => {
-        const { product_id, name, slug, description, sub_category_id, brand, video_url, gstPercent, priceIncludesGST, base_sku, variant_config, meta_title, meta_description } = productData;
+        const { 
+            product_id, name, slug, description, sub_category_id, brand, video_url, 
+            gstPercent, priceIncludesGST, base_sku, variant_config, meta_title, meta_description,
+            badge, tagline, pricing_meta, stock_meta, services, trust_badges, highlights, 
+            care_instructions, additional_info, origin_info, stats
+        } = productData;
         const sql = `
-            INSERT INTO products (product_id, name, slug, description, sub_category_id, brand, video_url, gstPercent, priceIncludesGST, base_sku, variant_config, meta_title, meta_description)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO products (
+                product_id, name, slug, description, sub_category_id, brand, video_url, 
+                gstPercent, priceIncludesGST, base_sku, variant_config, meta_title, meta_description,
+                badge, tagline, pricing_meta, stock_meta, services, trust_badges, highlights, 
+                care_instructions, additional_info, origin_info, stats
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
         await connection.query(sql, [
-            product_id, name, slug, description, sub_category_id, brand, 
+            product_id, name, slug, description, sub_category_id, brand,
             video_url || null, gstPercent || 0, priceIncludesGST !== undefined ? priceIncludesGST : 1,
             base_sku || null, variant_config ? JSON.stringify(variant_config) : null,
-            meta_title || null, meta_description || null
+            meta_title || null, meta_description || null,
+            badge || null, tagline || null,
+            pricing_meta ? JSON.stringify(pricing_meta) : null,
+            stock_meta ? JSON.stringify(stock_meta) : null,
+            services ? JSON.stringify(services) : null,
+            trust_badges ? JSON.stringify(trust_badges) : null,
+            highlights ? JSON.stringify(highlights) : null,
+            care_instructions ? JSON.stringify(care_instructions) : null,
+            additional_info ? JSON.stringify(additional_info) : null,
+            origin_info ? JSON.stringify(origin_info) : null,
+            stats ? JSON.stringify(stats) : null
         ]);
         return product_id;
     },
@@ -53,7 +73,14 @@ const Product = {
                       AND inv.quantity <= 0) as out_of_stock_count,
                    (SELECT MIN(COALESCE(NULLIF(finalPrice, 0), NULLIF(sellingPrice, 0), price)) 
                     FROM product_variants 
-                    WHERE product_id = p.product_id AND status = 1) as starting_price
+                    WHERE product_id = p.product_id AND status = 1) as starting_price,
+                   (SELECT mrp 
+                    FROM product_variants 
+                    WHERE product_id = p.product_id AND status = 1 
+                    ORDER BY COALESCE(NULLIF(finalPrice, 0), NULLIF(sellingPrice, 0), price) ASC 
+                    LIMIT 1) as starting_mrp,
+                   (SELECT AVG(rating) FROM product_reviews WHERE product_id = p.product_id AND status = 1) as avg_rating,
+                   (SELECT COUNT(*) FROM product_reviews WHERE product_id = p.product_id AND status = 1) as rating_count
             FROM products p
             LEFT JOIN sub_categories sc ON p.sub_category_id = sc.sub_category_id
             LEFT JOIN categories c ON sc.category_id = c.category_id
@@ -62,17 +89,35 @@ const Product = {
             LIMIT ? OFFSET ?
         `;
         const [rows] = await db.query(sql, [parseInt(limit), parseInt(offset)]);
-        
+
+        // Safe JSON parsing for each product in the list
+        const jsonFields = ['variant_config', 'pricing_meta', 'stock_meta', 'services', 'trust_badges', 'highlights', 'care_instructions', 'additional_info', 'origin_info', 'stats'];
+        rows.forEach(product => {
+            jsonFields.forEach(field => {
+                if (product[field] && typeof product[field] === 'string') {
+                    try {
+                        product[field] = JSON.parse(product[field]);
+                    } catch (e) {
+                        product[field] = ['services', 'trust_badges', 'highlights', 'care_instructions', 'stats'].includes(field) ? [] : {};
+                    }
+                } else if (!product[field]) {
+                    product[field] = ['services', 'trust_badges', 'highlights', 'care_instructions', 'stats'].includes(field) ? [] : {};
+                }
+            });
+        });
+
         const [[{ total }]] = await db.query('SELECT COUNT(*) as total FROM products WHERE status = 1');
         return { products: rows, total };
     },
 
     findById: async (productId) => {
         const sql = `
-            SELECT p.*, sc.name as sub_category_name, c.name as category_name,
+            SELECT p.*, sc.name as sub_category_name, c.name as category_name, c.category_id,
                    (SELECT MIN(COALESCE(NULLIF(finalPrice, 0), NULLIF(sellingPrice, 0), price)) 
                     FROM product_variants 
-                    WHERE product_id = p.product_id AND status = 1) as starting_price
+                    WHERE product_id = p.product_id AND status = 1) as starting_price,
+                   (SELECT AVG(rating) FROM product_reviews WHERE product_id = p.product_id AND status = 1) as avg_rating,
+                   (SELECT COUNT(*) FROM product_reviews WHERE product_id = p.product_id AND status = 1) as rating_count
             FROM products p
             LEFT JOIN sub_categories sc ON p.sub_category_id = sc.sub_category_id
             LEFT JOIN categories c ON sc.category_id = c.category_id
@@ -82,16 +127,22 @@ const Product = {
         if (rows.length === 0) return null;
 
         const product = rows[0];
-        
-        // Parse variant_config if it's a string
-        if (product.variant_config && typeof product.variant_config === 'string') {
-            try {
-                product.variant_config = JSON.parse(product.variant_config);
-            } catch (e) {
-                console.error('Error parsing variant_config:', e);
+
+        // Safe JSON parsing for all JSON fields
+        const jsonFields = ['variant_config', 'pricing_meta', 'stock_meta', 'services', 'trust_badges', 'highlights', 'care_instructions', 'additional_info', 'origin_info', 'stats'];
+        jsonFields.forEach(field => {
+            if (product[field] && typeof product[field] === 'string') {
+                try {
+                    product[field] = JSON.parse(product[field]);
+                } catch (e) {
+                    console.error(`Error parsing ${field} for product ${productId}:`, e);
+                    product[field] = ['services', 'trust_badges', 'highlights', 'care_instructions', 'stats'].includes(field) ? [] : {};
+                }
+            } else if (!product[field]) {
+                product[field] = ['services', 'trust_badges', 'highlights', 'care_instructions', 'stats'].includes(field) ? [] : {};
             }
-        }
-        
+        });
+
         // Fetch Variants
         const variants = await Product.getVariants(productId);
         product.variants = variants;
@@ -100,23 +151,75 @@ const Product = {
     },
 
     findBySlug: async (slug) => {
-        const [rows] = await db.query('SELECT * FROM products WHERE slug = ?', [slug]);
-        return rows[0];
+        const sql = `
+            SELECT p.*, sc.name as sub_category_name, c.name as category_name, c.category_id,
+                   (SELECT MIN(COALESCE(NULLIF(finalPrice, 0), NULLIF(sellingPrice, 0), price)) 
+                    FROM product_variants 
+                    WHERE product_id = p.product_id AND status = 1) as starting_price,
+                   (SELECT AVG(rating) FROM product_reviews WHERE product_id = p.product_id AND status = 1) as avg_rating,
+                   (SELECT COUNT(*) FROM product_reviews WHERE product_id = p.product_id AND status = 1) as rating_count
+            FROM products p
+            LEFT JOIN sub_categories sc ON p.sub_category_id = sc.sub_category_id
+            LEFT JOIN categories c ON sc.category_id = c.category_id
+            WHERE p.slug = ? AND p.status = 1
+        `;
+        const [rows] = await db.query(sql, [slug]);
+        if (rows.length === 0) return null;
+
+        const product = rows[0];
+
+        // Safe JSON parsing for all JSON fields
+        const jsonFields = ['variant_config', 'pricing_meta', 'stock_meta', 'services', 'trust_badges', 'highlights', 'care_instructions', 'additional_info', 'origin_info', 'stats'];
+        jsonFields.forEach(field => {
+            if (product[field] && typeof product[field] === 'string') {
+                try {
+                    product[field] = JSON.parse(product[field]);
+                } catch (e) {
+                    console.error(`Error parsing ${field} for slug ${slug}:`, e);
+                    product[field] = ['services', 'trust_badges', 'highlights', 'care_instructions', 'stats'].includes(field) ? [] : {};
+                }
+            } else if (!product[field]) {
+                product[field] = ['services', 'trust_badges', 'highlights', 'care_instructions', 'stats'].includes(field) ? [] : {};
+            }
+        });
+
+        // Fetch Variants
+        product.variants = await Product.getVariants(product.product_id);
+
+        return product;
     },
 
     update: async (productId, productData, connection = db) => {
-        const { name, slug, description, sub_category_id, brand, status, video_url, gstPercent, priceIncludesGST, base_sku, variant_config, meta_title, meta_description } = productData;
+        const { 
+            name, slug, description, sub_category_id, brand, video_url, gstPercent, 
+            priceIncludesGST, base_sku, variant_config, meta_title, meta_description,
+            badge, tagline, pricing_meta, stock_meta, services, trust_badges, highlights, 
+            care_instructions, additional_info, origin_info, stats
+        } = productData;
         const sql = `
             UPDATE products 
-            SET name = ?, slug = ?, description = ?, sub_category_id = ?, brand = ?, status = ?, video_url = ?, gstPercent = ?, priceIncludesGST = ?, base_sku = ?, variant_config = ?, meta_title = ?, meta_description = ?
+            SET name = ?, slug = ?, description = ?, sub_category_id = ?, brand = ?, video_url = ?, 
+                gstPercent = ?, priceIncludesGST = ?, base_sku = ?, variant_config = ?, meta_title = ?, meta_description = ?,
+                badge = ?, tagline = ?, pricing_meta = ?, stock_meta = ?, services = ?, trust_badges = ?, highlights = ?, 
+                care_instructions = ?, additional_info = ?, origin_info = ?, stats = ?
             WHERE product_id = ?
         `;
         await connection.query(sql, [
-            name, slug, description, sub_category_id, brand, 
-            status !== undefined ? status : 1, video_url || null, gstPercent || 0, 
+            name, slug, description, sub_category_id, brand,
+            video_url || null, gstPercent || 0,
             priceIncludesGST !== undefined ? priceIncludesGST : 1,
             base_sku || null, variant_config ? JSON.stringify(variant_config) : null,
             meta_title || null, meta_description || null,
+            badge || null, tagline || null,
+            pricing_meta ? JSON.stringify(pricing_meta) : null,
+            stock_meta ? JSON.stringify(stock_meta) : null,
+            services ? JSON.stringify(services) : null,
+            trust_badges ? JSON.stringify(trust_badges) : null,
+            highlights ? JSON.stringify(highlights) : null,
+            care_instructions ? JSON.stringify(care_instructions) : null,
+            additional_info ? JSON.stringify(additional_info) : null,
+            origin_info ? JSON.stringify(origin_info) : null,
+            stats ? JSON.stringify(stats) : null,
             productId
         ]);
     },
@@ -125,21 +228,13 @@ const Product = {
         const timestamp = Date.now();
         // 1. Rename product slug and set status = 0
         await connection.query(
-            'UPDATE products SET slug = CONCAT(slug, "-deleted-", ?), status = 0 WHERE product_id = ?', 
+            'UPDATE products SET slug = CONCAT(slug, "-deleted-", ?), status = 0 WHERE product_id = ?',
             [timestamp, productId]
         );
         // 2. Rename all associated variant SKUs and set status = 0
         await connection.query(
-            'UPDATE product_variants SET sku = CONCAT(sku, "-deleted-", ?), status = 0 WHERE product_id = ?', 
+            'UPDATE product_variants SET sku = CONCAT(sku, "-deleted-", ?), status = 0 WHERE product_id = ?',
             [timestamp, productId]
-        );
-    },
-
-    softDeleteVariant: async (variantId, connection = db) => {
-        const timestamp = Date.now();
-        await connection.query(
-            'UPDATE product_variants SET sku = CONCAT(sku, "-deleted-", ?), status = 0 WHERE variant_id = ?', 
-            [timestamp, variantId]
         );
     },
 
@@ -167,7 +262,7 @@ const Product = {
             variant.attributes = await Product.getVariantAttributes(variant.variant_id);
             // New Fallback Logic: Get media for this variant with context
             variant.images = await Product.getVariantMedia(variant.variant_id, productId, variant.attributes);
-            
+
             // Map back to legacy frontend name if needed
             variant.images = variant.images.map(img => ({ ...img, image_url: img.url }));
 
@@ -191,11 +286,11 @@ const Product = {
         `;
         const [rows] = await db.query(sql, [variantId]);
         if (rows.length === 0) return null;
-        
+
         const variant = rows[0];
         variant.attributes = await Product.getVariantAttributes(variantId);
         variant.images = await Product.getVariantMedia(variantId, variant.product_id, variant.attributes);
-        
+
         // Map back to legacy frontend name if needed
         variant.images = variant.images.map(img => ({ ...img, image_url: img.url }));
 
@@ -215,14 +310,14 @@ const Product = {
     },
 
     updateVariant: async (variantId, variantData, connection = db) => {
-        const { sku, price, status, mrp, sellingPrice, basePrice, gstAmount, finalPrice } = variantData;
+        const { sku, price, mrp, sellingPrice, basePrice, gstAmount, finalPrice } = variantData;
         const sql = `
             UPDATE product_variants 
-            SET sku = ?, price = ?, status = ?, mrp = ?, sellingPrice = ?, basePrice = ?, gstAmount = ?, finalPrice = ?
+            SET sku = ?, price = ?, mrp = ?, sellingPrice = ?, basePrice = ?, gstAmount = ?, finalPrice = ?
             WHERE variant_id = ?
         `;
         await connection.query(sql, [
-            sku, price, status !== undefined ? status : 1, mrp || 0, sellingPrice || 0, basePrice || 0, gstAmount || 0, finalPrice || 0, variantId
+            sku, price, mrp || 0, sellingPrice || 0, basePrice || 0, gstAmount || 0, finalPrice || 0, variantId
         ]);
     },
 
@@ -233,14 +328,14 @@ const Product = {
     // === Variant Attributes ===
     addVariantAttributes: async (variantId, attributes, connection = db) => {
         if (!attributes || attributes.length === 0) return;
-        
+
         const values = attributes.map(attr => [
             uuidv4(),
             variantId,
             attr.attribute_id,
             attr.attribute_value_id
         ]);
-        
+
         const sql = 'INSERT INTO variant_attributes (variant_attribute_id, variant_id, attribute_id, attribute_value_id) VALUES ?';
         await connection.query(sql, [values]);
     },
@@ -251,7 +346,7 @@ const Product = {
 
     getVariantAttributes: async (variantId) => {
         const sql = `
-            SELECT va.*, a.name as attribute_name, av.value as attribute_value
+            SELECT va.*, a.name as attribute_name, av.value as attribute_value, av.color_code
             FROM variant_attributes va
             JOIN attributes a ON va.attribute_id = a.attribute_id
             JOIN attribute_values av ON va.attribute_value_id = av.attribute_value_id
@@ -265,19 +360,19 @@ const Product = {
     findOrCreateMedia: async (mediaData, connection = db) => {
         const url = mediaData.url || mediaData.image_url;
         let hash = mediaData.hash;
-        
+
         if (!url) {
             console.error('Failed findOrCreateMedia: Missing URL in mediaData', mediaData);
             throw new Error('Media URL is required and cannot be null');
         }
-        
+
         // If hash is missing, generate a deterministic one from URL
         if (!hash) {
             hash = crypto.createHash('sha256').update(url).digest('hex');
         }
 
         const { width, height, file_size, format } = mediaData;
-        
+
         // 1. Check if hash exists
         const [existing] = await connection.query('SELECT media_id FROM media WHERE hash = ?', [hash]);
         if (existing.length > 0) return existing[0].media_id;
@@ -291,8 +386,8 @@ const Product = {
             INSERT INTO media (media_id, url, hash, thumbnail_url, mini_thumbnail_url, width, height, file_size, format)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         `, [
-            media_id, url, hash, 
-            thumb, mini, 
+            media_id, url, hash,
+            thumb, mini,
             width || null, height || null, file_size || null, format || null
         ]);
         return media_id;
@@ -324,7 +419,7 @@ const Product = {
         // If Variant images exist -> Show ONLY Variant.
         // ELSE IF Attribute images exist -> Show ONLY Attribute.
         // ELSE -> Show Product images.
-        
+
         const sql = `
             SELECT m.*, combined.source, combined.is_primary, combined.sort_order, combined.priority
             FROM (
@@ -349,10 +444,10 @@ const Product = {
             )
             ORDER BY combined.is_primary DESC, combined.sort_order ASC
         `;
-        
+
         const attrTuples = (attributes && attributes.length > 0) ? attributes.map(a => [a.attribute_id, a.attribute_value_id]) : [['NONE', 'NONE']];
         const [rows] = await connection.query(sql, [
-            variantId, productId, attrTuples, productId, 
+            variantId, productId, attrTuples, productId,
             variantId, productId, attrTuples, productId
         ]);
         return rows;

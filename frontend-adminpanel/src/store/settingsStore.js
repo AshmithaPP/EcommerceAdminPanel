@@ -34,23 +34,11 @@ const useSettingsStore = create((set, get) => ({
       if (res.success) {
         const data = res.data;
 
-        // Normalize site_info: Array to Object
-        const normalizedSiteInfo = {};
-        if (data.site_info && Array.isArray(data.site_info)) {
-          data.site_info.forEach(item => {
-            normalizedSiteInfo[item.id] = {
-              name: item.name,
-              value: item.value,
-              type: item.type
-            };
-          });
-        }
-
         set({
-          siteInfo: normalizedSiteInfo,
-          storeSettings: data.store_settings || initialState.storeSettings,
-          heroSettings: data.hero_settings || initialState.heroSettings,
-          bannerSettings: data.banner_settings || initialState.bannerSettings,
+          siteInfo: data.site_info || {},
+          storeSettings: { ...initialState.storeSettings, ...data.store_settings },
+          heroSettings: { ...initialState.heroSettings, ...data.hero_settings },
+          bannerSettings: { ...initialState.bannerSettings, ...data.banner_settings },
           hasChanges: false
         });
       }
@@ -68,14 +56,8 @@ const useSettingsStore = create((set, get) => ({
     const state = get();
 
     try {
-      // Map normalized siteInfo back to expected array format
-      const siteInfoArray = Object.entries(state.siteInfo).map(([id, details]) => ({
-        id,
-        ...details
-      }));
-
       const payload = {
-        site_info: siteInfoArray,
+        site_info: state.siteInfo,
         store_settings: state.storeSettings,
         hero_settings: state.heroSettings,
         banner_settings: state.bannerSettings
@@ -144,17 +126,14 @@ const useSettingsStore = create((set, get) => ({
     }));
   },
 
-  updateSiteInfoValue: (id, value) => {
-    set(state => {
-      if (!state.siteInfo[id]) return state;
-      return {
-        siteInfo: {
-          ...state.siteInfo,
-          [id]: { ...state.siteInfo[id], value }
-        },
-        hasChanges: true
-      };
-    });
+  updateSiteInfoValue: (key, value) => {
+    set(state => ({
+      siteInfo: {
+        ...state.siteInfo,
+        [key]: value
+      },
+      hasChanges: true
+    }));
   },
 
   // Helper only for modal batch updates

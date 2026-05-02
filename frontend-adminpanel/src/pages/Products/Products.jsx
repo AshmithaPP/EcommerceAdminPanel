@@ -69,7 +69,7 @@ const Products = () => {
           <p>Loading products...</p>
         </div>
       )}
-      
+
       {error && !products.length && (
         <div className={styles.errorState}>
           <p>Error: {error}</p>

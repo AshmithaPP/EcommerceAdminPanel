@@ -48,4 +48,31 @@ const authorize = (...roles) => {
     };
 };
 
-module.exports = { protect, authorize };
+const optionalProtect = async (req, res, next) => {
+    let token;
+
+    if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
+        token = req.headers.authorization.split(' ')[1];
+    }
+
+    if (!token) {
+        return next();
+    }
+
+    try {
+        const decoded = verifyAccessToken(token);
+        if (!decoded) {
+            return next();
+        }
+
+        const user = await User.findById(decoded.user_id);
+        if (user) {
+            req.user = user;
+        }
+        next();
+    } catch (error) {
+        next();
+    }
+};
+
+module.exports = { protect, authorize, optionalProtect };

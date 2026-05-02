@@ -103,7 +103,16 @@ const attributeService = {
             throw error;
         }
 
-        const normalizedValues = values.map(v => v.trim()).filter(v => v.length > 0);
+        const normalizedValues = values.map(v => {
+            if (typeof v === 'object') {
+                return {
+                    value: v.value.trim(),
+                    color_code: v.color_code || null
+                };
+            }
+            return v.trim();
+        }).filter(v => (typeof v === 'object' ? v.value.length > 0 : v.length > 0));
+
         if (normalizedValues.length === 0) {
             const error = new Error('At least one non-empty value is required');
             error.statusCode = 400;
@@ -140,7 +149,6 @@ const attributeService = {
     },
 
     updateAttributeValue: async (valueId, newValue, updatedBy) => {
-        const trimmedValue = newValue.trim();
         const value = await Attribute.getValueById(valueId);
         if (!value) {
             const error = new Error('Attribute value not found');
@@ -151,7 +159,15 @@ const attributeService = {
         const connection = await db.getConnection();
         try {
             await connection.beginTransaction();
-            await Attribute.updateValue(valueId, trimmedValue, updatedBy, connection);
+            // newValue can be a string or an object
+            const data = typeof newValue === 'object' ? {
+                value: newValue.value.trim(),
+                color_code: newValue.color_code || null
+            } : {
+                value: newValue.trim(),
+                color_code: null
+            };
+            await Attribute.updateValue(valueId, data, updatedBy, connection);
             await connection.commit();
         } catch (error) {
             await connection.rollback();

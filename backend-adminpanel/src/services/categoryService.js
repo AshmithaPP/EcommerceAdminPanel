@@ -234,7 +234,8 @@ const categoryService = {
             if (row.attribute_value_id) {
                 attr.values.push({
                     attribute_value_id: row.attribute_value_id,
-                    value: row.attribute_value
+                    value: row.attribute_value,
+                    color_code: row.color_code
                 });
             }
             return acc;

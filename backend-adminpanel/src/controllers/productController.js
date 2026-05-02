@@ -84,9 +84,9 @@ const productController = {
                     const fieldname = file.fieldname;
                     
                     if (file.mimetype.startsWith('image/')) {
-                        // Strict validation for size (200KB)
-                        if (file.size > 200 * 1024) {
-                            const error = new Error(`File ${file.originalname} exceeds 200KB limit`);
+                        // Relaxed validation: 2MB limit for images
+                        if (file.size > 2 * 1024 * 1024) {
+                            const error = new Error(`File ${file.originalname} exceeds 2MB limit`);
                             error.statusCode = 400;
                             throw error;
                         }
@@ -110,6 +110,7 @@ const productController = {
                 data: result
             });
         } catch (error) {
+            console.error('Create Product Error:', error);
             next(error);
         }
     },
@@ -125,6 +126,35 @@ const productController = {
                 total: result.total,
                 page,
                 limit
+            });
+        } catch (error) {
+            next(error);
+        }
+    },
+
+    getProductsFrontend: async (req, res, next) => {
+        try {
+            const page = parseInt(req.query.page) || 1;
+            const limit = parseInt(req.query.limit) || 10;
+            const result = await productService.getProductsFrontend(page, limit);
+            res.status(200).json({
+                success: true,
+                data: result.products,
+                total: result.total,
+                page,
+                limit
+            });
+        } catch (error) {
+            next(error);
+        }
+    },
+
+    getProductBySlug: async (req, res, next) => {
+        try {
+            const result = await productService.getProductBySlug(req.params.slug);
+            res.status(200).json({
+                success: true,
+                data: result
             });
         } catch (error) {
             next(error);
@@ -165,9 +195,9 @@ const productController = {
                     const fieldname = file.fieldname;
                     
                     if (file.mimetype.startsWith('image/')) {
-                        // Strict validation for size (200KB)
-                        if (file.size > 200 * 1024) {
-                            const error = new Error(`File ${file.originalname} exceeds 200KB limit`);
+                        // Relaxed validation: 2MB limit for images
+                        if (file.size > 2 * 1024 * 1024) {
+                            const error = new Error(`File ${file.originalname} exceeds 2MB limit`);
                             error.statusCode = 400;
                             throw error;
                         }
@@ -191,6 +221,7 @@ const productController = {
                 data: result
             });
         } catch (error) {
+            console.error('Update Product Error:', error);
             next(error);
         }
     },

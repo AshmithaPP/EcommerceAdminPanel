@@ -6,6 +6,7 @@ const inventoryService = require('./inventoryService');
 const db = require('../config/database');
 const slugify = require('../utils/slugify');
 const { v4: uuidv4 } = require('uuid');
+const { formatProductList, formatProductDetail } = require('../utils/productFormatter');
 
 function calculateGSTFields(sellingPrice, gstPercent, priceIncludesGST) {
     const sp = parseFloat(sellingPrice) || 0;
@@ -26,7 +27,23 @@ function calculateGSTFields(sellingPrice, gstPercent, priceIncludesGST) {
 
 const productService = {
     createProduct: async (productData) => {
-        const { name, sub_category_id, brand, variants, gstPercent, priceIncludesGST, base_sku, variant_config, meta_title, meta_description } = productData;
+        const {
+            name, sub_category_id, brand, variants, gstPercent, priceIncludesGST,
+            base_sku, meta_title, meta_description,
+            badge, tagline
+        } = productData;
+
+        // Extract JSON fields with support for both camelCase and snake_case
+        const variant_config = productData.variantConfig || productData.variant_config || null;
+        const pricing_meta = productData.pricingMeta || productData.pricing_meta || null;
+        const stock_meta = productData.stockMeta || productData.stock_meta || null;
+        const services = productData.services || productData.services || null;
+        const trust_badges = productData.trustBadges || productData.trust_badges || null;
+        const highlights = productData.highlights || productData.highlights || null;
+        const care_instructions = productData.careInstructions || productData.care_instructions || null;
+        const additional_info = productData.additionalInfo || productData.additional_info || null;
+        const origin_info = productData.originInfo || productData.origin_info || null;
+        const stats = productData.stats || productData.stats || null;
 
         // 0. Validation: Basic Identity
         if (!name || name.trim() === '') {
@@ -146,9 +163,20 @@ const productService = {
                 gstPercent: gstPercent || 0,
                 priceIncludesGST: priceIncludesGST !== undefined ? priceIncludesGST : 1,
                 base_sku: base_sku || null,
-                variant_config: variant_config || null,
+                variant_config: variant_config,
                 meta_title: meta_title || null,
-                meta_description: meta_description || null
+                meta_description: meta_description || null,
+                badge: badge || null,
+                tagline: tagline || null,
+                pricing_meta,
+                stock_meta,
+                services,
+                trust_badges,
+                highlights,
+                care_instructions,
+                additional_info,
+                origin_info,
+                stats
             }, connection);
 
             // 2. Insert Variants
@@ -225,6 +253,30 @@ const productService = {
         return product;
     },
 
+    getProductsFrontend: async (page = 1, limit = 10) => {
+        const offset = (page - 1) * limit;
+        const result = await Product.findAll(limit, offset);
+
+        return {
+            products: result.products.map(p => formatProductList(p)),
+            total: result.total
+        };
+    },
+
+    getProductBySlug: async (slug) => {
+        const product = await Product.findBySlug(slug);
+        if (!product) {
+            const error = new Error('Product not found');
+            error.statusCode = 404;
+            throw error;
+        }
+
+        // Get subcategory attribute mapping to distinguish variant vs specification
+        const subCategoryAttributes = await SubCategory.getAttributesFlat(product.sub_category_id);
+
+        return formatProductDetail(product, product.variants, subCategoryAttributes);
+    },
+
     updateProduct: async (productId, productData) => {
         const existing = await Product.findById(productId);
         if (!existing) {
@@ -233,7 +285,33 @@ const productService = {
             throw error;
         }
 
-        const { name, sub_category_id, brand, status, video_url, gstPercent, priceIncludesGST, base_sku, variant_config, meta_title, meta_description } = productData;
+        const {
+            name, sub_category_id, brand, video_url, gstPercent, priceIncludesGST,
+            base_sku, meta_title, meta_description,
+            badge, tagline
+        } = productData;
+
+        // Extract JSON fields with support for both camelCase and snake_case, falling back to existing
+        const variant_config = productData.variantConfig !== undefined ? productData.variantConfig : 
+                              (productData.variant_config !== undefined ? productData.variant_config : existing.variant_config);
+        const pricing_meta = productData.pricingMeta !== undefined ? productData.pricingMeta : 
+                             (productData.pricing_meta !== undefined ? productData.pricing_meta : existing.pricing_meta);
+        const stock_meta = productData.stockMeta !== undefined ? productData.stockMeta : 
+                            (productData.stock_meta !== undefined ? productData.stock_meta : existing.stock_meta);
+        const services = productData.services !== undefined ? productData.services : 
+                         (productData.services !== undefined ? productData.services : existing.services);
+        const trust_badges = productData.trustBadges !== undefined ? productData.trustBadges : 
+                             (productData.trust_badges !== undefined ? productData.trust_badges : existing.trust_badges);
+        const highlights = productData.highlights !== undefined ? productData.highlights : 
+                           (productData.highlights !== undefined ? productData.highlights : existing.highlights);
+        const care_instructions = productData.careInstructions !== undefined ? productData.careInstructions : 
+                                  (productData.care_instructions !== undefined ? productData.care_instructions : existing.care_instructions);
+        const additional_info = productData.additionalInfo !== undefined ? productData.additionalInfo : 
+                                (productData.additional_info !== undefined ? productData.additional_info : existing.additional_info);
+        const origin_info = productData.originInfo !== undefined ? productData.originInfo : 
+                            (productData.origin_info !== undefined ? productData.origin_info : existing.origin_info);
+        const stats = productData.stats !== undefined ? productData.stats : 
+                      (productData.stats !== undefined ? productData.stats : existing.stats);
 
         // Validation: Sub-Category
         const targetSubCategoryId = sub_category_id || existing.sub_category_id;
@@ -267,14 +345,24 @@ const productService = {
                 description: productData.description !== undefined ? productData.description : existing.description,
                 sub_category_id: targetSubCategoryId,
                 brand: brand || existing.brand,
-                status: status !== undefined ? status : existing.status,
                 video_url: video_url !== undefined ? video_url : existing.video_url,
                 gstPercent: gstPercent !== undefined ? gstPercent : existing.gstPercent,
                 priceIncludesGST: priceIncludesGST !== undefined ? priceIncludesGST : existing.priceIncludesGST,
                 base_sku: base_sku !== undefined ? base_sku : existing.base_sku,
-                variant_config: variant_config !== undefined ? variant_config : existing.variant_config,
+                variant_config: variant_config,
                 meta_title: meta_title !== undefined ? meta_title : existing.meta_title,
-                meta_description: meta_description !== undefined ? meta_description : existing.meta_description
+                meta_description: meta_description !== undefined ? meta_description : existing.meta_description,
+                badge: badge !== undefined ? badge : existing.badge,
+                tagline: tagline !== undefined ? tagline : existing.tagline,
+                pricing_meta,
+                stock_meta,
+                services,
+                trust_badges,
+                highlights,
+                care_instructions,
+                additional_info,
+                origin_info,
+                stats
             }, connection);
 
             // 2. Sync Variants (if provided)
@@ -518,15 +606,15 @@ const productService = {
 
         const product = await Product.findById(existing.product_id);
         const gstFields = calculateGSTFields(
-            variantData.sellingPrice !== undefined ? variantData.sellingPrice : existing.sellingPrice, 
-            product.gstPercent, 
+            variantData.sellingPrice !== undefined ? variantData.sellingPrice : existing.sellingPrice,
+            product.gstPercent,
             product.priceIncludesGST
         );
 
         const connection = await db.getConnection();
         try {
             await connection.beginTransaction();
-            
+
             // 1. Update Core Fields
             await Product.updateVariant(variantId, {
                 sku: variantData.sku || existing.sku,
@@ -558,7 +646,7 @@ const productService = {
             if (variantData.initial_stock !== undefined) {
                 // Check if inventory record exists
                 const existingInventory = await inventoryService.getInventoryByVariant(variantId).catch(() => null);
-                
+
                 if (existingInventory) {
                     // Update existing
                     await inventoryService.setStockLevel(variantId, variantData.initial_stock, 'Updated via variant edit', null, variantData.low_stock_threshold, connection);
@@ -569,7 +657,7 @@ const productService = {
             }
 
             await connection.commit();
-            
+
             // Return updated variant with attributes/images
             return await Product.getVariantById(variantId);
         } catch (error) {

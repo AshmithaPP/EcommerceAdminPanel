@@ -2,28 +2,35 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   CloudUpload,
-  Star,
-  Trash2,
-  PlusCircle,
-  List,
-  Link as LinkIcon,
-  Loader,
-  X,
-  Video,
-  Info,
-  Package,
+  Check,
+  DollarSign,
+  Truck,
+  ShieldCheck,
+  Zap,
+  Award,
+  MapPin,
+  Activity,
+  History,
+  BadgeCheck,
+  Package as PackageIcon,
   Tag,
-  Percent,
+  List,
   Layers,
+  Star,
+  Info,
+  Settings,
+  X,
+  ImageIcon,
+  PlusCircle,
+  Trash2,
+  Video,
+  LayoutGrid,
+  Percent,
   FileText,
   Search,
-  Image as ImageIcon,
-  User,
-  Settings,
-  LayoutGrid,
+  Loader,
   Edit2,
-  Check,
-  DollarSign
+  User
 } from 'lucide-react';
 import Button from '../../components/ui/Button';
 import InputBox from '../../components/ui/InputBox';
@@ -264,7 +271,7 @@ const EditProduct = () => {
           </div>
           <div className={styles.sectionContent}>
             <div className={styles.formGrid4}>
-              <InputBox label="Product Name" name="name" value={productData.name} onChange={handleProductChange} required Icon={Package} />
+              <InputBox label="Product Name" name="name" value={productData.name} onChange={handleProductChange} required Icon={PackageIcon} />
               <InputBox label="Base SKU" value={baseSku} onChange={e => setBaseSku(e.target.value)} required Icon={Tag} placeholder="e.g. KURTHI" />
               <SelectBox label="Parent Category" name="category_id" value={productData.category_id} onChange={handleProductChange} required Icon={List}>
                 <option value="">Select category</option>
@@ -275,6 +282,8 @@ const EditProduct = () => {
                 {subCategories.map(sub => <option key={sub.sub_category_id} value={sub.sub_category_id}>{sub.name}</option>)}
               </SelectBox>
               <InputBox label="Brand" name="brand" value={productData.brand} onChange={handleProductChange} Icon={Tag} />
+              <InputBox label="Badge" name="badge" value={productData.badge} onChange={handleProductChange} placeholder="e.g. Bridal Special" Icon={BadgeCheck} />
+              <InputBox label="Tagline" name="tagline" value={productData.tagline} onChange={handleProductChange} placeholder="Short subtitle" Icon={Star} />
               
              
 
@@ -322,7 +331,7 @@ const EditProduct = () => {
               <p className={styles.emptyPrompt}>No attributes mapped. Click <strong>Assign to Category</strong> to add some.</p>
             ) : (
               <div className={styles.configGrid}>
-                {variantConfig.map((attr, idx) => (
+              {Array.isArray(variantConfig) && variantConfig.map((attr, idx) => (
                   <div key={attr.attribute_id || idx} className={styles.configCard}>
                     <div className={styles.configCardHeader}>
                       <span className={styles.configCardTitle}>{attr.name}</span>
@@ -333,7 +342,7 @@ const EditProduct = () => {
                             type="checkbox" 
                             checked={attr.is_generator} 
                             onChange={(e) => {
-                              const updated = [...variantConfig];
+                              const updated = [...(Array.isArray(variantConfig) ? variantConfig : [])];
                               updated[idx] = { ...updated[idx], is_generator: e.target.checked };
                               setVariantConfig(updated);
                             }}
@@ -449,6 +458,190 @@ const EditProduct = () => {
           </div>
         </section>
 
+        {/* Highlights & Care */}
+        <div className={styles.formGrid2} style={{ gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+          <section className={styles.formSection}>
+            <div className={styles.sectionHeader}>
+              <Award size={16} className={styles.sectionIcon} />
+              <h3>Highlights & Why Choose Us</h3>
+            </div>
+            <div className={styles.sectionContent}>
+              <div className={styles.dynamicListWrapper}>
+                <div className={styles.listInputRow}>
+                  <InputBox 
+                    placeholder="Add highlight" 
+                    id="edit-highlight-input"
+                    Icon={Check}
+                    onKeyPress={(e) => {
+                      if (e.key === 'Enter') {
+                        const val = e.target.value.trim();
+                        if (val) {
+                          setProductData({ highlights: [...(productData.highlights || []), val] });
+                          e.target.value = '';
+                        }
+                      }
+                    }}
+                  />
+                  <button 
+                    className={styles.addBtnIcon}
+                    onClick={() => {
+                      const input = document.getElementById('edit-highlight-input');
+                      const val = input.value.trim();
+                      if (val) {
+                        setProductData({ highlights: [...(productData.highlights || []), val] });
+                        input.value = '';
+                      }
+                    }}
+                  >
+                    <PlusCircle size={18} />
+                  </button>
+                </div>
+                <div className={styles.chipsContainer}>
+                  {(productData.highlights || []).map((h, i) => (
+                    <div key={i} className={styles.listChip}>
+                      <span>{h}</span>
+                      <X size={12} onClick={() => setProductData({ highlights: productData.highlights.filter((_, idx) => idx !== i) })} />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section className={styles.formSection}>
+            <div className={styles.sectionHeader}>
+              <History size={16} className={styles.sectionIcon} />
+              <h3>Care Instructions</h3>
+            </div>
+            <div className={styles.sectionContent}>
+              <div className={styles.dynamicListWrapper}>
+                <div className={styles.listInputRow}>
+                  <InputBox 
+                    placeholder="Add instruction" 
+                    id="edit-care-input"
+                    Icon={Info}
+                    onKeyPress={(e) => {
+                      if (e.key === 'Enter') {
+                        const val = e.target.value.trim();
+                        if (val) {
+                          setProductData({ careInstructions: [...(productData.careInstructions || []), val] });
+                          e.target.value = '';
+                        }
+                      }
+                    }}
+                  />
+                  <button 
+                    className={styles.addBtnIcon}
+                    onClick={() => {
+                      const input = document.getElementById('edit-care-input');
+                      const val = input.value.trim();
+                      if (val) {
+                        setProductData({ careInstructions: [...(productData.careInstructions || []), val] });
+                        input.value = '';
+                      }
+                    }}
+                  >
+                    <PlusCircle size={18} />
+                  </button>
+                </div>
+                <div className={styles.chipsContainer}>
+                  {(productData.careInstructions || []).map((c, i) => (
+                    <div key={i} className={styles.listChip}>
+                      <span>{c}</span>
+                      <X size={12} onClick={() => setProductData({ careInstructions: productData.careInstructions.filter((_, idx) => idx !== i) })} />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </section>
+        </div>
+
+        {/* Services & Trust */}
+        <div className={styles.formGrid2} style={{ gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+          <section className={styles.formSection}>
+            <div className={styles.sectionHeader}>
+              <Truck size={16} className={styles.sectionIcon} />
+              <h3>Services</h3>
+            </div>
+            <div className={styles.sectionContent}>
+              <div className={styles.complexListWrapper}>
+                <div className={styles.listInputRow}>
+                  <InputBox placeholder="Service title" id="edit-service-input" Icon={Truck} />
+                  <button 
+                    className={styles.addBtnIcon}
+                    onClick={() => {
+                      const input = document.getElementById('edit-service-input');
+                      const val = input.value.trim();
+                      if (val) {
+                        setProductData({ services: [...(productData.services || []), { title: val }] });
+                        input.value = '';
+                      }
+                    }}
+                  >
+                    <PlusCircle size={18} />
+                  </button>
+                </div>
+                <div className={styles.complexItemsList}>
+                  {(productData.services || []).map((s, i) => (
+                    <div key={i} className={styles.complexItem}>
+                      <Truck size={14} />
+                      <span>{s.title}</span>
+                      <Trash2 size={14} onClick={() => setProductData({ services: productData.services.filter((_, idx) => idx !== i) })} />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section className={styles.formSection}>
+            <div className={styles.sectionHeader}>
+              <ShieldCheck size={16} className={styles.sectionIcon} />
+              <h3>Trust Badges</h3>
+            </div>
+            <div className={styles.sectionContent}>
+              <div className={styles.complexListWrapper}>
+                <div className={styles.multiInputRow}>
+                  <InputBox placeholder="Title" id="edit-trust-title" />
+                  <InputBox placeholder="Subtitle" id="edit-trust-sub" />
+                  <button 
+                    className={styles.addBtnIcon}
+                    onClick={() => {
+                      const titleInp = document.getElementById('edit-trust-title');
+                      const subInp = document.getElementById('edit-trust-sub');
+                      if (titleInp.value.trim()) {
+                        setProductData({ 
+                          trustBadges: [...(productData.trustBadges || []), { 
+                            title: titleInp.value.trim(), 
+                            subtitle: subInp.value.trim() 
+                          }] 
+                        });
+                        titleInp.value = '';
+                        subInp.value = '';
+                      }
+                    }}
+                  >
+                    <PlusCircle size={18} />
+                  </button>
+                </div>
+                <div className={styles.complexItemsList}>
+                  {(productData.trustBadges || []).map((b, i) => (
+                    <div key={i} className={styles.complexItem}>
+                      <ShieldCheck size={14} />
+                      <div className={styles.itemText}>
+                        <p>{b.title}</p>
+                        <small>{b.subtitle}</small>
+                      </div>
+                      <Trash2 size={14} onClick={() => setProductData({ trustBadges: productData.trustBadges.filter((_, idx) => idx !== i) })} />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </section>
+        </div>
+
         {/* 4. Variants & Inventory */}
         <section className={styles.formSection}>
           <div className={styles.sectionHeader}>
@@ -477,7 +670,7 @@ const EditProduct = () => {
                       </div>
                       <div className={styles.inlineGridWide}>
                         <InputBox label="SKU" value={v.sku} onChange={e => updateVariant(vIdx, 'sku', e.target.value)} Icon={Tag} />
-                        <InputBox label="Stock" type="number" value={v.stock} onChange={e => updateVariant(vIdx, 'stock', e.target.value)} Icon={Package} />
+                        <InputBox label="Stock" type="number" value={v.stock} onChange={e => updateVariant(vIdx, 'stock', e.target.value)} Icon={PackageIcon} />
                         <InputBox label="Alert Level" type="number" value={v.low_stock_threshold} onChange={e => updateVariant(vIdx, 'low_stock_threshold', e.target.value)} Icon={Info} />
                         <InputBox label="MRP" type="text" value={v.mrp} onChange={e => updateVariant(vIdx, 'mrp', e.target.value)} Icon={Star} />
                         <InputBox label="Selling Price" type="text" value={v.sellingPrice} onChange={e => updateVariant(vIdx, 'sellingPrice', e.target.value)} Icon={Percent} />
@@ -576,6 +769,91 @@ const EditProduct = () => {
             </div>
           </section>
         </div>
+
+        {/* New: UX & Metadata Section */}
+        <section className={styles.formSection}>
+          <div className={styles.sectionHeader}>
+            <Zap size={16} className={styles.sectionIcon} />
+            <h3>UX Enhancements & Metadata</h3>
+          </div>
+          <div className={styles.sectionContent}>
+            <div className={styles.formGrid4}>
+              <InputBox 
+                label="Tax Text" 
+                value={productData.pricingMeta?.taxIncludedText} 
+                onChange={(e) => setProductData({ pricingMeta: { ...productData.pricingMeta, taxIncludedText: e.target.value } })}
+                placeholder="e.g. Inclusive of all taxes"
+                Icon={DollarSign}
+              />
+              <InputBox 
+                label="Low Stock Alert Text" 
+                value={productData.stockMeta?.lowStockText} 
+                onChange={(e) => setProductData({ stockMeta: { ...productData.stockMeta, lowStockText: e.target.value } })}
+                placeholder="Only 5 left!"
+                Icon={PackageIcon}
+              />
+              <InputBox 
+                label="Urgency Text" 
+                value={productData.stockMeta?.urgencyText} 
+                onChange={(e) => setProductData({ stockMeta: { ...productData.stockMeta, urgencyText: e.target.value } })}
+                placeholder="Selling fast!"
+                Icon={Zap}
+              />
+              <InputBox 
+                label="Fake View Count" 
+                type="number"
+                value={productData.stockMeta?.viewCount} 
+                onChange={(e) => setProductData({ stockMeta: { ...productData.stockMeta, viewCount: parseInt(e.target.value) || 0 } })}
+                Icon={User}
+              />
+            </div>
+            
+            <div className={styles.divider} style={{ margin: '1.5rem 0 1rem 0', borderTop: '1px solid #f1f5f9' }} />
+            
+            <div className={styles.formGrid2} style={{ gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+              <div className={styles.kvContainer}>
+                <div className={styles.kvHeader}>
+                  <MapPin size={14} /> <span>Origin Details</span>
+                </div>
+                <div className={styles.kvInputs}>
+                  <InputBox placeholder="City" id="edit-origin-city" defaultValue={productData.originInfo?.city} />
+                  <InputBox placeholder="State" id="edit-origin-state" defaultValue={productData.originInfo?.state} />
+                  <button className={styles.actionBtn} onClick={() => {
+                    const city = document.getElementById('edit-origin-city').value;
+                    const state = document.getElementById('edit-origin-state').value;
+                    setProductData({ originInfo: { madeIn: 'India', city, state } });
+                  }}>Apply Origin</button>
+                </div>
+              </div>
+
+              <div className={styles.statsContainer}>
+                <div className={styles.kvHeader}>
+                  <Activity size={14} /> <span>Product Stats</span>
+                </div>
+                <div className={styles.statsInputs}>
+                  <InputBox placeholder="Label" id="edit-stat-label" />
+                  <InputBox placeholder="Value" id="edit-stat-value" />
+                  <button className={styles.addBtnIcon} onClick={() => {
+                    const l = document.getElementById('edit-stat-label');
+                    const v = document.getElementById('edit-stat-value');
+                    if (l.value && v.value) {
+                      setProductData({ stats: [...(productData.stats || []), { label: l.value, value: v.value }] });
+                      l.value = ''; v.value = '';
+                    }
+                  }}><PlusCircle size={18} /></button>
+                </div>
+                <div className={styles.statsList}>
+                  {(productData.stats || []).map((s, i) => (
+                    <div key={i} className={styles.statChip}>
+                      <b>{s.label}:</b> {s.value}
+                      <X size={10} onClick={() => setProductData({ stats: productData.stats.filter((_, idx) => idx !== i) })} />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
       </div>
 
       <div className={styles.actionBar}>

@@ -54,23 +54,8 @@ const authService = {
             throw error;
         }
 
-        // STRICT Single Session Check
-        const existingSession = await RefreshToken.findByUserId(user.user_id);
-        if (existingSession) {
-            const now = new Date();
-            const expiresAt = new Date(existingSession.expires_at);
-
-            if (now < expiresAt) {
-                // Session is still active -> block login
-                const error = new Error('User already logged in. Please logout first.');
-                error.statusCode = 403;
-                error.user_id = user.user_id; // Attach user_id for force logout
-                throw error;
-            } else {
-                // Session is expired -> delete it and allow login
-                await RefreshToken.deleteByUserId(user.user_id);
-            }
-        }
+        // Single Session Enforcement: Delete any existing session before issuing new tokens
+        await RefreshToken.deleteByUserId(user.user_id);
 
         const tokens = await authService.issueTokens(user.user_id, user.email, user.role);
 

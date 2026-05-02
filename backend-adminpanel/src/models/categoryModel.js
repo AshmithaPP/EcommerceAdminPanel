@@ -96,7 +96,8 @@ const Category = {
                 a.name as attribute_name, 
                 ca.is_variant_attribute,
                 av.attribute_value_id, 
-                av.value as attribute_value
+                av.value as attribute_value,
+                av.color_code
             FROM category_attributes ca
             JOIN attributes a ON ca.attribute_id = a.attribute_id
             LEFT JOIN attribute_values av ON a.attribute_id = av.attribute_id AND av.status = 1

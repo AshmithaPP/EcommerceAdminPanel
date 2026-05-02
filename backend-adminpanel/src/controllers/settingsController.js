@@ -4,6 +4,26 @@ const settingsController = {
     getAllSettings: async (req, res) => {
         try {
             const settings = await Settings.getAll();
+            
+            // Transform site_info from array of objects to key-value object
+            if (settings.site_info && Array.isArray(settings.site_info)) {
+                const transformed = {};
+                const keyMap = {
+                    'Site URL': 'site_url',
+                    'Website Title': 'site_title',
+                    'Website Logo': 'site_logo',
+                    'Contact Email': 'email',
+                    'Phone Number': 'phone',
+                    'Office Address': 'address'
+                };
+
+                settings.site_info.forEach(item => {
+                    const key = keyMap[item.name] || item.name.toLowerCase().replace(/\s+/g, '_');
+                    transformed[key] = item.value;
+                });
+                settings.site_info = transformed;
+            }
+
             res.status(200).json({
                 success: true,
                 data: settings

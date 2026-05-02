@@ -5,11 +5,20 @@ const attributeSchema = Joi.object({
 });
 
 const attributeValuesSchema = Joi.object({
-    values: Joi.array().items(Joi.string().min(1).max(255)).min(1).required()
+    values: Joi.array().items(
+        Joi.alternatives().try(
+            Joi.string().min(1).max(255),
+            Joi.object({
+                value: Joi.string().min(1).max(255).required(),
+                color_code: Joi.string().pattern(/^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/).allow(null, '')
+            })
+        )
+    ).min(1).required()
 });
 
 const updateAttributeValueSchema = Joi.object({
-    value: Joi.string().min(1).max(255).required()
+    value: Joi.string().min(1).max(255).required(),
+    color_code: Joi.string().pattern(/^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/).allow(null, '')
 });
 
 const uuidSchema = Joi.string().guid({ version: 'uuidv4' }).required();

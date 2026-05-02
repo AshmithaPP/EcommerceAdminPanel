@@ -1,14 +1,14 @@
 const rateLimit = require('express-rate-limit');
 
 const loginLimiter = rateLimit({
-    windowMs: 1 * 60 * 1000, // 15 minutes // for testing purpose - 1min
-    max: 5, // Limit each IP to 5 login requests per `window`
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 100, // Limit each IP to 100 login requests per `window`
     message: {
         success: false,
         error: 'Too many login attempts from this IP, please try again after 15 minutes'
     },
-    standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
-    legacyHeaders: false, // Disable the `X-RateLimit-*` headers
+    standardHeaders: true,
+    legacyHeaders: false,
 });
 
 module.exports = { loginLimiter };

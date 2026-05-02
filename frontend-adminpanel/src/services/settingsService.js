@@ -8,7 +8,7 @@ export const settingsService = {
 
   updateSettings: async (settingsData) => {
     // Current backend supports both PUT and POST
-    const response = await privateApi.post('/settings', settingsData);
+    const response = await privateApi.put('/settings', settingsData);
     return response.data;
   }
 };

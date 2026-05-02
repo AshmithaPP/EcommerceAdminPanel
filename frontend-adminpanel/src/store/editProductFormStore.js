@@ -29,7 +29,18 @@ const useEditProductFormStore = create((set, get) => ({
         meta_description: '',
         slug: '',
         gstPercent: 5,
-        priceIncludesGST: true
+        priceIncludesGST: true,
+        badge: '',
+        tagline: '',
+        pricingMeta: { taxIncludedText: 'Inclusive of all taxes' },
+        stockMeta: { lowStockText: '', urgencyText: '', viewCount: 0 },
+        services: [],
+        trustBadges: [],
+        highlights: [],
+        careInstructions: [],
+        additionalInfo: {},
+        originInfo: {},
+        stats: []
     },
     baseSku: '',
     variants: [],
@@ -61,8 +72,8 @@ const useEditProductFormStore = create((set, get) => ({
             const categories = catRes.data?.data?.items || [];
             
             // 2. Fetch Product Data
-            const prodRes = await privateApi.get(`/products/${id}`);
-            const data = prodRes.data.data;
+            const prodRes = await productService.getProductById(id);
+            const data = prodRes.data;
 
             // 3. Normalized Hydration
             const productData = {
@@ -75,7 +86,18 @@ const useEditProductFormStore = create((set, get) => ({
                 meta_description: data.meta_description || '',
                 slug: data.slug || '',
                 gstPercent: data.gstPercent || 0,
-                priceIncludesGST: data.priceIncludesGST !== undefined ? !!data.priceIncludesGST : true
+                priceIncludesGST: data.priceIncludesGST !== undefined ? !!data.priceIncludesGST : true,
+                badge: data.badge || '',
+                tagline: data.tagline || '',
+                pricingMeta: data.pricingMeta || { taxIncludedText: 'Inclusive of all taxes' },
+                stockMeta: data.stockMeta || { lowStockText: '', urgencyText: '', viewCount: 0 },
+                services: data.services || [],
+                trustBadges: data.trustBadges || [],
+                highlights: data.highlights || [],
+                careInstructions: data.careInstructions || [],
+                additionalInfo: data.additionalInfo || {},
+                originInfo: data.originInfo || {},
+                stats: data.stats || []
             };
 
             const variants = (data.variants || []).map(v => ({
@@ -104,7 +126,7 @@ const useEditProductFormStore = create((set, get) => ({
                 categories,
                 productData,
                 baseSku: data.base_sku || '',
-                variantConfig: data.variant_config || [],
+                variantConfig: Array.isArray(data.variant_config) ? data.variant_config : [],
                 status: data.status === 1, // Treat as boolean for toggle
                 variants,
                 productImages,
@@ -128,7 +150,12 @@ const useEditProductFormStore = create((set, get) => ({
             productData: {
                 name: '', description: '', category_id: '', sub_category_id: '',
                 brand: '', meta_title: '', meta_description: '', slug: '',
-                gstPercent: 5, priceIncludesGST: true
+                gstPercent: 5, priceIncludesGST: true,
+                badge: '', tagline: '', pricingMeta: { taxIncludedText: 'Inclusive of all taxes' },
+                stockMeta: { lowStockText: '', urgencyText: '', viewCount: 0 },
+                services: [], trustBadges: [], highlights: [],
+                careInstructions: [], additionalInfo: {}, originInfo: {},
+                stats: []
             },
             baseSku: '', variants: [], productImages: [], productVideo: null,
             bulkImages: {}, subCategories: [], categoryAttributes: [],

@@ -32,8 +32,24 @@ app.use(cookieParser());
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 // Enable CORS with credentials support
+const allowedOrigins = [
+    'http://localhost:5173', 
+    'http://127.0.0.1:5173', 
+    'http://localhost:5174', 
+    'http://127.0.0.1:5174',
+    'http://localhost:3000',
+    'http://127.0.0.1:3000'
+];
 app.use(cors({
-    origin: 'http://localhost:5173', // frontend URL
+    origin: function (origin, callback) {
+        // Allow requests with no origin (like mobile apps or curl requests)
+        if (!origin) return callback(null, true);
+        if (allowedOrigins.indexOf(origin) === -1) {
+            const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
+            return callback(new Error(msg), false);
+        }
+        return callback(null, true);
+    },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization']
@@ -57,8 +73,6 @@ app.use('/api/settings', settingsRoutes);
 
 // Admin Payments List
 app.get('/api/admin/payments', protect, authorize('admin', 'superadmin'), paymentController.getAllPayments);
-
-
 
 // Health check route
 app.get('/health', (req, res) => {

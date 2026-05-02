@@ -22,7 +22,24 @@ const useProductFormStore = create((set, get) => ({
         meta_description: '',
         slug: '',
         gstPercent: 5,
-        priceIncludesGST: true
+        priceIncludesGST: true,
+        badge: '',
+        tagline: '',
+        pricingMeta: {
+            taxIncludedText: 'Inclusive of all taxes'
+        },
+        stockMeta: {
+            lowStockText: '',
+            urgencyText: '',
+            viewCount: 0
+        },
+        services: [],
+        trustBadges: [],
+        highlights: [],
+        careInstructions: [],
+        additionalInfo: {},
+        originInfo: {},
+        stats: []
     },
     baseSku: '',
     variants: [],
@@ -100,7 +117,7 @@ const useProductFormStore = create((set, get) => ({
                 is_generator: !!attr.is_variant_attribute || ['size', 'color', 'sizes', 'colors'].includes(attr.name.trim().toLowerCase()),
                 selectedValues: []
             }));
-            set({ variantConfig: config });
+            set({ variantConfig: Array.isArray(config) ? config : [] });
         } catch (err) {
             console.error(err);
         }
@@ -194,12 +211,18 @@ const useProductFormStore = create((set, get) => ({
         set((state) => ({
             variantConfig: state.variantConfig.map(attr => {
                 if (String(attr.attribute_id) !== String(attrId)) return attr;
-                const isSelected = attr.selectedValues.find(v => String(v.id) === String(valueObj.id));
+                const isSelected = attr.selectedValues.find(v => String(v.id) === String(valueObj.attribute_value_id || valueObj.id));
+                
                 return {
                     ...attr,
                     selectedValues: isSelected
-                        ? attr.selectedValues.filter(v => String(v.id) !== String(valueObj.id))
-                        : [...attr.selectedValues, { ...valueObj, id: String(valueObj.id) }]
+                        ? attr.selectedValues.filter(v => String(v.id) !== String(valueObj.attribute_value_id || valueObj.id))
+                        : [...attr.selectedValues, { 
+                            ...valueObj, 
+                            id: String(valueObj.attribute_value_id || valueObj.id),
+                            name: valueObj.value || valueObj.name,
+                            color_code: valueObj.color_code || null
+                          }]
                 };
             })
         }));

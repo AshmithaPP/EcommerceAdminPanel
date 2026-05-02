@@ -41,9 +41,12 @@ const CustomTooltip = ({ active, payload, label, prefix = '' }) => {
     return (
       <div className={styles.customTooltip}>
         <p className={styles.tooltipLabel}>{label}</p>
-        <p className={styles.tooltipValue}>
-          {prefix}{payload[0].value.toLocaleString()}
-        </p>
+        <div className={styles.tooltipContent}>
+           <div className={styles.tooltipIndicator} style={{ background: payload[0].color || payload[0].fill }} />
+           <p className={styles.tooltipValue}>
+             {prefix}{payload[0].value.toLocaleString()}
+           </p>
+        </div>
       </div>
     );
   }
@@ -74,12 +77,18 @@ const SalesView = ({ data }) => {
           <ChartHeader title="Daily Order Volume" subtitle="Number of orders processed per day" />
           <div style={{ width: '100%', height: 320 }}>
             <ResponsiveContainer>
-              <BarChart data={data} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(216, 220, 240, 0.4)" />
-                <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fontSize: 11, fontWeight: 600, fill: 'var(--muted-text)' }} />
-                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fontWeight: 600, fill: 'var(--muted-text)' }} />
-                <Tooltip cursor={{ fill: 'rgba(79, 124, 255, 0.05)' }} content={<CustomTooltip />} />
-                <Bar dataKey="orders" fill="var(--primary)" radius={[6, 6, 0, 0]} barSize={32} />
+              <BarChart data={data} margin={{ top: 10, right: 10, left: -5, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="barGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#4f46e5" stopOpacity={1} />
+                    <stop offset="100%" stopColor="#818cf8" stopOpacity={0.8} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="4 4" vertical={false} stroke="rgba(216, 220, 240, 0.4)" />
+                <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fontSize: 11, fontWeight: 700, fill: 'var(--muted-text)' }} />
+                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fontWeight: 700, fill: 'var(--muted-text)' }} />
+                <Tooltip cursor={{ fill: 'rgba(79, 124, 255, 0.05)', radius: 6 }} content={<CustomTooltip />} />
+                <Bar dataKey="orders" fill="url(#barGradient)" radius={[6, 6, 0, 0]} barSize={28} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -115,7 +124,7 @@ const SalesView = ({ data }) => {
 };
 
 const Analytics = () => {
-  const [activeTab, setActiveTab] = useState('overview');
+  const [activeTab, setActiveTab] = useState('sales');
   const [timeRange, setTimeRange] = useState('30 Days');
   const [loading, setLoading] = useState(true);
   const [summary, setSummary] = useState(null);
@@ -165,12 +174,7 @@ const Analytics = () => {
   return (
     <div className="page-container">
       <header className={styles.header}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-          <h1 className={styles.title}>Analytics</h1>
-          <div className={styles.badge}>Live</div>
-        </div>
-        
-        <div style={{ display: 'flex', gap: '1rem' }}>
+        <div style={{ display: 'flex', gap: '0.75rem', marginLeft: 'auto', alignItems: 'center' }}>
           <div className={styles.timeFilter}>
             {['7 Days', '30 Days', '90 Days'].map(range => (
               <button 
@@ -189,35 +193,76 @@ const Analytics = () => {
         </div>
       </header>
 
-      {/* KPI Section */}
-      <div className={styles.kpiGrid}>
-        <StatCard 
-          label="Estimated Revenue" 
-          value={formatCurrency(summary?.today?.revenue)} 
-          trend={summary?.growth?.revenue >= 0 ? "up" : "down"}
-          trendValue={`${Math.abs(summary?.growth?.revenue || 0)}%`}
-          icon={<IndianRupee size={20} />}
-          gradient={["#4F7CFF", "#8B5CF6"]}
-          sparklineData={trendData.length > 0 ? trendData.map(d => d.revenue) : [0]}
-        />
-        <StatCard 
-          label="Daily Orders" 
-          value={(summary?.today?.orders || 0).toString()} 
-          trend={summary?.growth?.orders >= 0 ? "up" : "down"}
-          trendValue={`${Math.abs(summary?.growth?.orders || 0)}%`}
-          icon={<ShoppingBag size={20} />}
-          gradient={["#EC4899", "#F43F5E"]}
-          sparklineData={trendData.length > 0 ? trendData.map(d => d.orders) : [0]}
-        />
-        <StatCard 
-          label="New Signups" 
-          value={(summary?.today?.customers || 0).toString()} 
-          trend="up"
-          trendValue="Active"
-          icon={<Users size={20} />}
-          gradient={["#10B981", "#34D399"]}
-          sparklineData={[5, 12, 18, 14, 22, 19, 25, 30, 20, 45, 35]} 
-        />
+      {/* Dashboard Hero: KPI Column + Revenue Chart */}
+      <div className={styles.dashboardHero}>
+        <div className={styles.kpiColumn}>
+          <StatCard 
+            label="Revenue" 
+            value={formatCurrency(summary?.today?.revenue)} 
+            trend={summary?.growth?.revenue >= 0 ? "up" : "down"}
+            icon={<IndianRupee size={20} />}
+            gradient={["#4F7CFF", "#8B5CF6"]}
+            width={210}
+            height={160}
+            sparklineData={trendData.length > 0 ? trendData.map(d => d.revenue) : [0, 5, 2, 8, 4, 10, 6]}
+          />
+          <StatCard 
+            label="Orders" 
+            value={(summary?.today?.orders || 0).toString()} 
+            trend={summary?.growth?.orders >= 0 ? "up" : "down"}
+            icon={<ShoppingBag size={20} />}
+            gradient={["#EC4899", "#F43F5E"]}
+            width={210}
+            height={160}
+            sparklineData={trendData.length > 0 ? trendData.map(d => d.orders) : [2, 4, 3, 7, 5, 8, 6]}
+          />
+          <StatCard 
+            label="New Users" 
+            value={(summary?.today?.customers || 0).toString()} 
+            trend="up"
+            icon={<Users size={20} />}
+            gradient={["#10B981", "#34D399"]}
+            width={210}
+            height={160}
+            sparklineData={[5, 12, 18, 14, 22, 19, 25, 30, 20]} 
+          />
+        </div>
+
+        <div className={styles.heroChartSection}>
+          <div className={styles.chartCard} style={{ flex: 1 }}>
+            <ChartHeader title="Revenue Insights" badge="Performance" />
+            <div style={{ width: '100%', flex: 1, minHeight: 400, marginTop: '1rem' }}>
+              <ResponsiveContainer>
+                <AreaChart data={trendData} margin={{ top: 20, right: 10, left: 0, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="colorRevPremium" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#6366f1" stopOpacity={0.4}/>
+                      <stop offset="60%" stopColor="#6366f1" stopOpacity={0.1}/>
+                      <stop offset="100%" stopColor="#6366f1" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(216, 220, 240, 0.4)" />
+                  <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fontSize: 11, fontWeight: 700, fill: 'var(--muted-text)' }} dy={10} />
+                  <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fontWeight: 700, fill: 'var(--muted-text)' }} tickFormatter={(val) => `₹${val >= 1000 ? (val/1000).toFixed(1) + 'k' : val}`} width={45} />
+                  <Tooltip 
+                    cursor={{ stroke: 'rgba(99, 102, 241, 0.2)', strokeWidth: 2 }}
+                    content={<CustomTooltip prefix="₹" />} 
+                  />
+                  <Area 
+                    type="monotone" 
+                    dataKey="revenue" 
+                    stroke="#6366f1" 
+                    strokeWidth={4} 
+                    fillOpacity={1} 
+                    fill="url(#colorRevPremium)" 
+                    activeDot={{ r: 7, stroke: '#fff', strokeWidth: 3, fill: '#6366f1' }}
+                    animationDuration={1500}
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Smart Insights Panel */}
@@ -246,7 +291,7 @@ const Analytics = () => {
 
       <div className={styles.tabsContainer}>
         <nav className={styles.tabHeader}>
-          {['Overview', 'Sales', 'Products', 'Customers'].map(tab => (
+          {['Sales', 'Products', 'Customers'].map(tab => (
             <button 
               key={tab}
               className={`${styles.tabBtn} ${activeTab === tab.toLowerCase() ? styles.tabBtnActive : ''}`}
@@ -259,7 +304,6 @@ const Analytics = () => {
 
         <main className={styles.tabContent}>
           <Suspense fallback={<TabLoader />}>
-            {activeTab === 'overview' && <OverviewTab data={trendData} />}
             {activeTab === 'sales' && <SalesView data={trendData} />}
             {activeTab === 'products' && <ProductsTab />}
             {activeTab === 'customers' && <CustomersTab />}
@@ -280,40 +324,9 @@ const TabLoader = () => (
 );
 
 const OverviewTab = ({ data }) => {
-  if (!data || data.length === 0) return <div className={styles.chartCard}><p>No data found.</p></div>;
-
-  return (
-    <div className={styles.viewContainer}>
-      <div className={styles.chartCard}>
-        <ChartHeader title="Revenue Insights" subtitle="Track your daily revenue growth and performance" badge="Performance" />
-        <div style={{ width: '100%', height: 380 }}>
-          <ResponsiveContainer>
-            <AreaChart data={data} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
-              <defs>
-                <linearGradient id="colorRevPremium" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#4F7CFF" stopOpacity={0.25}/>
-                  <stop offset="95%" stopColor="#4F7CFF" stopOpacity={0}/>
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(216, 220, 240, 0.4)" />
-              <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fontSize: 11, fontWeight: 600, fill: 'var(--muted-text)' }} />
-              <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fontWeight: 600, fill: 'var(--muted-text)' }} tickFormatter={(val) => `₹${val.toLocaleString('en-IN')}`} />
-              <Tooltip content={<CustomTooltip prefix="₹" />} />
-              <Area 
-                type="monotone" 
-                dataKey="revenue" 
-                stroke="#4F7CFF" 
-                strokeWidth={4} 
-                fillOpacity={1} 
-                fill="url(#colorRevPremium)" 
-                activeDot={{ r: 8, stroke: '#fff', strokeWidth: 4, shadow: '0 0 10px rgba(79, 124, 255, 0.4)' }}
-              />
-            </AreaChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
-    </div>
-  );
+  if (!data || data.length === 0) return null;
+  // This component logic is now moved to the hero section for a more "graph-like" feel
+  return null;
 };
 
 const ProductsTab = () => {

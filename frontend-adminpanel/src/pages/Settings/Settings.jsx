@@ -20,6 +20,15 @@ import styles from './Settings.module.css';
 
 const STORAGE_URL = 'http://localhost:5000';
 
+const SITE_INFO_FIELDS = [
+  { key: 'site_url', name: 'Site URL', type: 'url' },
+  { key: 'site_title', name: 'Website Title', type: 'text' },
+  { key: 'site_logo', name: 'Website Logo', type: 'image' },
+  { key: 'email', name: 'Contact Email', type: 'email' },
+  { key: 'phone', name: 'Phone Number', type: 'phone' },
+  { key: 'address', name: 'Office Address', type: 'textarea' }
+];
+
 const Settings = () => {
   const {
     siteInfo,
@@ -43,43 +52,52 @@ const Settings = () => {
   // Modal State (Ephemeral - local only)
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [tempSiteInfo, setTempSiteInfo] = useState({});
+  const [tempStoreSettings, setTempStoreSettings] = useState({});
+  const [tempHeroSettings, setTempHeroSettings] = useState({});
+  const [tempBannerSettings, setTempBannerSettings] = useState({});
 
   useEffect(() => {
     fetchSettings();
   }, [fetchSettings]);
 
-  // Transform normalized object back to array for DataTable
+  // Transform flat object to array for DataTable using metadata
   const siteInfoArray = useMemo(() => {
-    return Object.entries(siteInfo).map(([id, details]) => ({
-      id,
-      ...details
+    return SITE_INFO_FIELDS.map(field => ({
+      ...field,
+      value: siteInfo[field.key] || ''
     }));
   }, [siteInfo]);
 
   const handleEditAllSettings = () => {
     setTempSiteInfo({ ...siteInfo });
+    setTempStoreSettings({ ...storeSettings });
+    setTempHeroSettings({ ...heroSettings });
+    setTempBannerSettings({ ...bannerSettings });
     setIsModalOpen(true);
   };
 
   const handleModalSave = () => {
     setSiteInfo(tempSiteInfo);
+    updateStoreSettings(tempStoreSettings);
+    updateHeroSettings(tempHeroSettings);
+    updateBannerSettings(tempBannerSettings);
     setIsModalOpen(false);
   };
 
-  const handleTempSiteInfoChange = (id, newValue) => {
+  const handleTempSiteInfoChange = (key, newValue) => {
     setTempSiteInfo(prev => ({
       ...prev,
-      [id]: { ...prev[id], value: newValue }
+      [key]: newValue
     }));
   };
 
-  const handleModalImageUpload = async (e, id) => {
+  const handleModalImageUpload = async (e, key) => {
     const file = e.target.files[0];
     if (!file) return;
 
     const url = await uploadAsset(file, 'modal');
     if (url) {
-      handleTempSiteInfoChange(id, url);
+      handleTempSiteInfoChange(key, url);
     }
   };
 
@@ -177,6 +195,9 @@ const Settings = () => {
             <h2 className={styles.sectionTitle}>
               <Store size={14} /> Store Defaults
             </h2>
+            <button className={styles.editAllBtn} onClick={handleEditAllSettings}>
+              <Edit2 size={12} /> Edit
+            </button>
           </header>
           <div className={styles.sectionContent}>
             <div className={styles.inputGroup}>
@@ -204,29 +225,32 @@ const Settings = () => {
             <h2 className={styles.sectionTitle}>
               <ImageIcon size={14} /> Homepage Hero Section
             </h2>
+            <button className={styles.editAllBtn} onClick={handleEditAllSettings}>
+              <Edit2 size={12} /> Edit
+            </button>
           </header>
           <div className={styles.sectionContent}>
             <div className={styles.heroLayout}>
               <div className={styles.formControls}>
                 <InputBox 
                   label="Hero Title" 
-                  value={heroSettings.title} 
+                  value={heroSettings?.title || ''} 
                   onChange={(e) => updateHeroSettings({ title: e.target.value })}
                 />
                 <InputBox 
                   label="Hero Subtitle" 
-                  value={heroSettings.subtitle} 
+                  value={heroSettings?.subtitle || ''} 
                   onChange={(e) => updateHeroSettings({ subtitle: e.target.value })}
                 />
                 <div className={styles.rowInputs}>
                   <InputBox 
                     label="Button Text" 
-                    value={heroSettings.buttonText} 
+                    value={heroSettings?.buttonText || ''} 
                     onChange={(e) => updateHeroSettings({ buttonText: e.target.value })}
                   />
                   <InputBox 
                     label="Button Link" 
-                    value={heroSettings.buttonLink} 
+                    value={heroSettings?.buttonLink || ''} 
                     onChange={(e) => updateHeroSettings({ buttonLink: e.target.value })}
                   />
                 </div>
@@ -260,6 +284,9 @@ const Settings = () => {
             <h2 className={styles.sectionTitle}>
               <Flag size={14} /> Seasonal Campaign Banner
             </h2>
+            <button className={styles.editAllBtn} onClick={handleEditAllSettings}>
+              <Edit2 size={12} /> Edit
+            </button>
           </header>
           <div className={styles.sectionContent}>
             <div className={styles.bannerLayout}>
@@ -325,44 +352,174 @@ const Settings = () => {
           </>
         }
       >
-        <div className={styles.modalGrid}>
-          {Object.entries(tempSiteInfo).map(([id, item]) => (
-            <div key={id} className={styles.modalField}>
-              {item.type === 'image' ? (
-                <div className={styles.modalImageField}>
-                  <label className={styles.fieldLabel}>{item.name}</label>
+        <div className={styles.modalScrollArea}>
+          <div className={styles.modalGrid}>
+            {/* --- Site Info Section --- */}
+            <div className={styles.modalSectionTitle}>Website Identity</div>
+            {SITE_INFO_FIELDS.map((field) => (
+              <div key={field.key} className={styles.modalField}>
+                {field.type === 'image' ? (
+                  <div className={styles.modalImageField}>
+                    <label className={styles.fieldLabel}>{field.name}</label>
+                    <div className={styles.modalImageRow}>
+                      <img src={getImageUrl(tempSiteInfo[field.key])} alt="Preview" className={styles.modalImgMini} />
+                      <label className={styles.modalUploadIcon}>
+                        {uploading.modal ? <Loader2 className="animate-spin" size={16} /> : <Upload size={16} />}
+                        Change
+                        <input type="file" hidden onChange={(e) => handleModalImageUpload(e, field.key)} accept="image/*" />
+                      </label>
+                    </div>
+                  </div>
+                ) : field.type === 'textarea' ? (
+                  <div className={styles.modalFullField}>
+                    <label className={styles.fieldLabel}>{field.name}</label>
+                    <textarea 
+                      className={styles.modalTextarea}
+                      value={tempSiteInfo[field.key] || ''}
+                      onChange={(e) => handleTempSiteInfoChange(field.key, e.target.value)}
+                      placeholder={`Enter ${field.name}...`}
+                      rows={3}
+                    />
+                  </div>
+                ) : (
+                  <div className={styles.modalHalfField}>
+                    <InputBox 
+                      label={field.name}
+                      type={field.type || 'text'}
+                      value={tempSiteInfo[field.key] || ''}
+                      onChange={(e) => handleTempSiteInfoChange(field.key, e.target.value)}
+                    />
+                  </div>
+                )}
+              </div>
+            ))}
+
+            {/* --- Store Defaults Section --- */}
+            <div className={styles.modalSectionDivider}></div>
+            <div className={styles.modalSectionTitle}>Store Defaults</div>
+            <div className={styles.modalHalfField}>
+              <InputBox 
+                label="Common GST (%)" 
+                type="number" 
+                value={tempStoreSettings.gst} 
+                onChange={(e) => setTempStoreSettings(prev => ({ ...prev, gst: e.target.value }))}
+                Icon={Percent}
+              />
+            </div>
+            <div className={styles.modalHalfField}>
+              <InputBox 
+                label="Default Stock Count" 
+                type="number" 
+                value={tempStoreSettings.default_stock} 
+                onChange={(e) => setTempStoreSettings(prev => ({ ...prev, default_stock: e.target.value }))}
+                Icon={Package}
+              />
+            </div>
+
+            {/* --- Hero Section --- */}
+            <div className={styles.modalSectionDivider}></div>
+            <div className={styles.modalSectionTitle}>Homepage Hero</div>
+            <div className={styles.modalFullField}>
+              <InputBox 
+                label="Hero Title" 
+                value={tempHeroSettings.title || ''} 
+                onChange={(e) => setTempHeroSettings(prev => ({ ...prev, title: e.target.value }))}
+              />
+            </div>
+            <div className={styles.modalFullField}>
+              <InputBox 
+                label="Hero Subtitle" 
+                value={tempHeroSettings.subtitle || ''} 
+                onChange={(e) => setTempHeroSettings(prev => ({ ...prev, subtitle: e.target.value }))}
+              />
+            </div>
+            <div className={styles.modalHalfField}>
+              <InputBox 
+                label="Button Text" 
+                value={tempHeroSettings.buttonText || ''} 
+                onChange={(e) => setTempHeroSettings(prev => ({ ...prev, buttonText: e.target.value }))}
+              />
+            </div>
+            <div className={styles.modalHalfField}>
+              <InputBox 
+                label="Button Link" 
+                value={tempHeroSettings.buttonLink || ''} 
+                onChange={(e) => setTempHeroSettings(prev => ({ ...prev, buttonLink: e.target.value }))}
+              />
+            </div>
+            <div className={styles.modalFullField}>
+               <div className={styles.modalImageField}>
+                  <label className={styles.fieldLabel}>Hero Image</label>
                   <div className={styles.modalImageRow}>
-                    <img src={getImageUrl(item.value)} alt="Preview" className={styles.modalImgMini} />
+                    <img src={getImageUrl(tempHeroSettings.image)} alt="Hero" className={styles.modalImgMini} />
                     <label className={styles.modalUploadIcon}>
-                      {uploading.modal ? <Loader2 className="animate-spin" size={16} /> : <Upload size={16} />}
-                      Change
-                      <input type="file" hidden onChange={(e) => handleModalImageUpload(e, id)} accept="image/*" />
+                      {uploading.hero ? <Loader2 className="animate-spin" size={16} /> : <Upload size={16} />}
+                      Change Hero Image
+                      <input type="file" hidden onChange={async (e) => {
+                        const file = e.target.files[0];
+                        if (file) {
+                          const url = await uploadAsset(file, 'hero');
+                          if (url) setTempHeroSettings(prev => ({ ...prev, image: url }));
+                        }
+                      }} accept="image/*" />
                     </label>
                   </div>
-                </div>
-              ) : item.type === 'textarea' ? (
-                <div className={styles.modalFullField}>
-                  <label className={styles.fieldLabel}>{item.name}</label>
-                  <textarea 
-                    className={styles.modalTextarea}
-                    value={item.value}
-                    onChange={(e) => handleTempSiteInfoChange(id, e.target.value)}
-                    placeholder={`Enter ${item.name}...`}
-                    rows={3}
-                  />
-                </div>
-              ) : (
-                <div className={styles.modalHalfField}>
-                  <InputBox 
-                    label={item.name}
-                    type={item.type || 'text'}
-                    value={item.value}
-                    onChange={(e) => handleTempSiteInfoChange(id, e.target.value)}
-                  />
-                </div>
-              )}
+               </div>
             </div>
-          ))}
+
+            {/* --- Banner Section --- */}
+            <div className={styles.modalSectionDivider}></div>
+            <div className={styles.modalSectionTitle}>Campaign Banner</div>
+            <div className={styles.modalFullField}>
+              <label className={styles.toggleLabel}>
+                <span>Enable Banner</span>
+                <input 
+                  type="checkbox" 
+                  checked={tempBannerSettings.enabled} 
+                  onChange={(e) => setTempBannerSettings(prev => ({ ...prev, enabled: e.target.checked }))} 
+                />
+              </label>
+            </div>
+            <div className={styles.modalFullField}>
+              <InputBox 
+                label="Banner Title" 
+                value={tempBannerSettings.title || ''} 
+                onChange={(e) => setTempBannerSettings(prev => ({ ...prev, title: e.target.value }))}
+              />
+            </div>
+            <div className={styles.modalFullField}>
+              <InputBox 
+                label="Banner Description" 
+                value={tempBannerSettings.description || ''} 
+                onChange={(e) => setTempBannerSettings(prev => ({ ...prev, description: e.target.value }))}
+              />
+            </div>
+            <div className={styles.modalHalfField}>
+              <InputBox label="Start Date" type="date" value={tempBannerSettings.startDate || ''} onChange={(e) => setTempBannerSettings(prev => ({ ...prev, startDate: e.target.value }))} Icon={Calendar} />
+            </div>
+            <div className={styles.modalHalfField}>
+              <InputBox label="End Date" type="date" value={tempBannerSettings.endDate || ''} onChange={(e) => setTempBannerSettings(prev => ({ ...prev, endDate: e.target.value }))} Icon={Calendar} />
+            </div>
+            <div className={styles.modalFullField}>
+               <div className={styles.modalImageField}>
+                  <label className={styles.fieldLabel}>Banner Image</label>
+                  <div className={styles.modalImageRow}>
+                    <img src={getImageUrl(tempBannerSettings.image)} alt="Banner" className={styles.modalImgMini} />
+                    <label className={styles.modalUploadIcon}>
+                      {uploading.banner ? <Loader2 className="animate-spin" size={16} /> : <Upload size={16} />}
+                      Change Banner Image
+                      <input type="file" hidden onChange={async (e) => {
+                        const file = e.target.files[0];
+                        if (file) {
+                          const url = await uploadAsset(file, 'banner');
+                          if (url) setTempBannerSettings(prev => ({ ...prev, image: url }));
+                        }
+                      }} accept="image/*" />
+                    </label>
+                  </div>
+               </div>
+            </div>
+          </div>
         </div>
       </Modal>
 

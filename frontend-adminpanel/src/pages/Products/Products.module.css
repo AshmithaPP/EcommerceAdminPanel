@@ -18,7 +18,10 @@
   gap: 1rem;
 }
 
-.pageHeaderLeft { flex: 1; min-width: 0; }
+.pageHeaderLeft {
+  flex: 1;
+  min-width: 0;
+}
 
 .title {
   font-family: var(--font-serif);
@@ -84,7 +87,10 @@
   background: var(--surface-container-lowest);
 }
 
-.dropdown:hover { color: #C9A84C; border-color: rgba(201, 168, 76, 0.35); }
+.dropdown:hover {
+  color: #C9A84C;
+  border-color: rgba(201, 168, 76, 0.35);
+}
 
 .addBtn {
   display: flex;
@@ -105,8 +111,13 @@
   box-shadow: 0 2px 8px rgba(201, 168, 76, 0.3);
 }
 
-.addBtn:hover  { filter: brightness(1.08); }
-.addBtn:active { transform: scale(0.97); }
+.addBtn:hover {
+  filter: brightness(1.08);
+}
+
+.addBtn:active {
+  transform: scale(0.97);
+}
 
 /* ── Table Card ── */
 .tableCard {
@@ -137,17 +148,30 @@
   background: var(--surface-container-lowest);
 }
 
-.thThumbnail { width: 80px; }
-.thDetails   { min-width: 180px; }
-.thActions   { text-align: left; }
+.thThumbnail {
+  width: 80px;
+}
+
+.thDetails {
+  min-width: 180px;
+}
+
+.thActions {
+  text-align: left;
+}
 
 .tableRow {
   border-bottom: 1px solid rgba(208, 197, 178, 0.07);
   transition: background-color 0.15s ease;
 }
 
-.tableRow:last-child { border-bottom: none; }
-.tableRow:hover { background-color: rgba(201, 168, 76, 0.03); }
+.tableRow:last-child {
+  border-bottom: none;
+}
+
+.tableRow:hover {
+  background-color: rgba(201, 168, 76, 0.03);
+}
 
 .table td {
   padding: 1rem 1rem;
@@ -193,8 +217,17 @@
   letter-spacing: -0.01em;
 }
 
-.priceCell    { font-weight: 500; white-space: nowrap; font-size: 0.9375rem; }
-.categoryCell { color: var(--on-surface-variant); white-space: nowrap; font-size: 0.875rem; }
+.priceCell {
+  font-weight: 500;
+  white-space: nowrap;
+  font-size: 0.9375rem;
+}
+
+.categoryCell {
+  color: var(--on-surface-variant);
+  white-space: nowrap;
+  font-size: 0.875rem;
+}
 
 .stockCell {
   text-align: left;
@@ -406,7 +439,9 @@
 }
 
 /* ── Mobile List (hidden on desktop) ── */
-.mobileList { display: none; }
+.mobileList {
+  display: none;
+}
 
 /* ── Footer ── */
 .footerActions {
@@ -453,8 +488,13 @@
   white-space: nowrap;
 }
 
-.publishBtn:hover  { filter: brightness(1.08); }
-.publishBtn:active { transform: scale(0.97); }
+.publishBtn:hover {
+  filter: brightness(1.08);
+}
+
+.publishBtn:active {
+  transform: scale(0.97);
+}
 
 /* =============================================
    MOBILE CARD LIST
@@ -550,8 +590,13 @@
    TABLET  768px – 1024px
    ============================================= */
 @media (max-width: 1024px) {
-  .title    { font-size: 1.875rem; }
-  .subtitle { font-size: 0.875rem; }
+  .title {
+    font-size: 1.875rem;
+  }
+
+  .subtitle {
+    font-size: 0.875rem;
+  }
 
   .statsText {
     font-size: 9px;
@@ -563,11 +608,22 @@
   }
 
   .table th,
-  .table td { padding: 0.875rem 0.75rem; }
+  .table td {
+    padding: 0.875rem 0.75rem;
+  }
 
-  .imageContainer { width: 48px; height: 48px; }
-  .productName    { font-size: 0.875rem; }
-  .priceCell      { font-size: 0.875rem; }
+  .imageContainer {
+    width: 48px;
+    height: 48px;
+  }
+
+  .productName {
+    font-size: 0.875rem;
+  }
+
+  .priceCell {
+    font-size: 0.875rem;
+  }
 
   /* Allow table to scroll horizontally if needed */
   .tableCard {
@@ -575,7 +631,9 @@
     -webkit-overflow-scrolling: touch;
   }
 
-  .table { min-width: 640px; }
+  .table {
+    min-width: 640px;
+  }
 }
 
 /* =============================================
@@ -596,7 +654,9 @@
     gap: 0.375rem;
   }
 
-  .pageHeaderRight { align-items: flex-start; }
+  .pageHeaderRight {
+    align-items: flex-start;
+  }
 
   .statsText {
     font-size: 9px;
@@ -605,8 +665,13 @@
     line-height: 1.5;
   }
 
-  .title    { font-size: 1.5rem; }
-  .subtitle { font-size: 0.875rem; }
+  .title {
+    font-size: 1.5rem;
+  }
+
+  .subtitle {
+    font-size: 0.875rem;
+  }
 
   /* Toolbar: wrap on mobile */
   .toolbar {
@@ -614,7 +679,10 @@
     gap: 0.75rem;
   }
 
-  .filters { gap: 0.75rem; flex-wrap: wrap; }
+  .filters {
+    gap: 0.75rem;
+    flex-wrap: wrap;
+  }
 
   .dropdown {
     font-size: 0.8125rem;
@@ -628,7 +696,10 @@
   }
 
   /* Hide desktop table, show mobile cards */
-  .tableCard  { display: none !important; }
+  .tableCard {
+    display: none !important;
+  }
+
   .mobileList {
     display: flex;
     flex-direction: column;
@@ -654,22 +725,38 @@
    SMALL MOBILE  < 420px
    ============================================= */
 @media (max-width: 419px) {
-  .title { font-size: 1.25rem; }
+  .title {
+    font-size: 1.25rem;
+  }
 
-  .mobileCard { padding: 0.875rem; }
+  .mobileCard {
+    padding: 0.875rem;
+  }
 
-  .mobileImageWrap { width: 44px; height: 44px; }
+  .mobileImageWrap {
+    width: 44px;
+    height: 44px;
+  }
 
-  .productName { font-size: 0.8125rem; }
-  .mobilePrice { font-size: 0.875rem; }
+  .productName {
+    font-size: 0.8125rem;
+  }
 
-  .paginationControls { gap: 3px; }
+  .mobilePrice {
+    font-size: 0.875rem;
+  }
+
+  .paginationControls {
+    gap: 3px;
+  }
+
   .pageBtn {
     width: 30px;
     height: 30px;
     font-size: 11px;
     border-radius: 5px;
   }
+
   .pageEllipsis {
     width: 18px;
     font-size: 11px;

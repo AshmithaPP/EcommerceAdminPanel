@@ -8,19 +8,29 @@ export const productService = {
    * @returns {Promise<Object>}
    */
   getProducts: async (page = 1, limit = 10) => {
-    const response = await publicApi.get('/products', {
+    const response = await privateApi.get('/products/raw', {
       params: { page, limit }
     });
     return response.data;
   },
 
   /**
-   * Get product by ID
+   * Get product by ID (Raw data for editing)
    * @param {string} productId 
    * @returns {Promise<Object>}
    */
   getProductById: async (productId) => {
-    const response = await publicApi.get(`/products/${productId}`);
+    const response = await privateApi.get(`/products/id/${productId}`);
+    return response.data;
+  },
+
+  /**
+   * Get product by Slug (Formatted data for preview)
+   * @param {string} slug 
+   * @returns {Promise<Object>}
+   */
+  getProductBySlug: async (slug) => {
+    const response = await publicApi.get(`/products/${slug}`);
     return response.data;
   },
 

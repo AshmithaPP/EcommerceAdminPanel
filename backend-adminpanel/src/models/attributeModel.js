@@ -96,7 +96,11 @@ const Attribute = {
         if (!values || values.length === 0) return [];
         
         const results = [];
-        for (const val of values) {
+        for (const valObj of values) {
+            const isObject = typeof valObj === 'object';
+            const val = isObject ? valObj.value : valObj;
+            const colorCode = isObject ? valObj.color_code : null;
+            
             const trimmedVal = val.trim();
             
             // Check if value already exists (including soft-deleted)
@@ -107,22 +111,30 @@ const Attribute = {
 
             if (existing.length > 0) {
                 const row = existing[0];
-                if (row.status === 0) {
-                    // Restore soft-deleted value
+                if (row.status === 0 || colorCode !== row.color_code) {
+                    // Restore soft-deleted value or update existing metadata
                     await connection.query(
-                        'UPDATE attribute_values SET status = 1 WHERE attribute_value_id = ?',
-                        [row.attribute_value_id]
+                        'UPDATE attribute_values SET status = 1, color_code = ? WHERE attribute_value_id = ?',
+                        [colorCode || row.color_code, row.attribute_value_id]
                     );
                 }
-                results.push({ attribute_value_id: row.attribute_value_id, value: trimmedVal });
+                results.push({ 
+                    attribute_value_id: row.attribute_value_id, 
+                    value: trimmedVal,
+                    color_code: colorCode || row.color_code
+                });
             } else {
                 // Insert new value
                 const valueId = uuidv4();
                 await connection.query(
-                    'INSERT INTO attribute_values (attribute_value_id, attribute_id, value) VALUES (?, ?, ?)',
-                    [valueId, attributeId, trimmedVal]
+                    'INSERT INTO attribute_values (attribute_value_id, attribute_id, value, color_code) VALUES (?, ?, ?, ?)',
+                    [valueId, attributeId, trimmedVal, colorCode]
                 );
-                results.push({ attribute_value_id: valueId, value: trimmedVal });
+                results.push({ 
+                    attribute_value_id: valueId, 
+                    value: trimmedVal,
+                    color_code: colorCode
+                });
             }
         }
         
@@ -145,10 +157,11 @@ const Attribute = {
         return rows[0];
     },
 
-    updateValue: async (valueId, newValue, updatedBy) => {
+    updateValue: async (valueId, data, updatedBy) => {
+        const { value, color_code } = data;
         await db.query(
-            'UPDATE attribute_values SET value = ? WHERE attribute_value_id = ?',
-            [newValue.trim(), valueId]
+            'UPDATE attribute_values SET value = ?, color_code = ? WHERE attribute_value_id = ?',
+            [value.trim(), color_code || null, valueId]
         );
     },
 
