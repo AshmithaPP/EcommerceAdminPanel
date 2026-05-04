@@ -7,6 +7,7 @@ const { protect } = require('../middlewares/authMiddleware');
 router.use(protect);
 
 // Parent Categories
+router.get('/', categoryController.getCategories);
 router.post('/category-create', categoryController.createCategory);
 router.get('/category-list', categoryController.getCategories);
 router.get('/category-tree', categoryController.getCategoryTree);

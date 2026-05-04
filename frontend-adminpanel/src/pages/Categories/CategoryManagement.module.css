@@ -782,6 +782,70 @@
   margin: 0;
 }
 
+/* ── Modal Form ── */
+.modalForm {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  padding: 0.5rem 0;
+}
+
+.formGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.formGroup label {
+  font-family: var(--font-inter, sans-serif);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted-text, #7A89B0);
+}
+
+.formRow {
+  display: grid;
+  grid-template-columns: 1fr 100px;
+  gap: 1rem;
+}
+
+.modalInput {
+  padding: 0.625rem 0.875rem;
+  border: 1px solid var(--border-default, #D8DCF0);
+  border-radius: 8px;
+  font-family: var(--font-inter, sans-serif);
+  font-size: 13px;
+  color: var(--on-surface, #1A202C);
+  background-color: var(--input-bg, #EEF0F8);
+  outline: none;
+  transition: all 0.2s ease;
+}
+
+.modalInput:focus {
+  border-color: var(--primary, #4361EE);
+  background-color: #fff;
+  box-shadow: 0 0 0 3px rgba(67, 97, 238, 0.1);
+}
+
+.featuredToggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem;
+  background-color: rgba(67, 97, 238, 0.04);
+  border-radius: 8px;
+  border: 1px dashed var(--primary, #4361EE);
+}
+
+.featuredToggle label {
+  font-family: var(--font-inter, sans-serif);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--primary, #4361EE);
+}
+
 /* ── Responsive ── */
 @media (max-width: 768px) {
   .pageContainer {

@@ -97,6 +97,8 @@ const AddProduct = () => {
   const assignAttributes = useProductFormStore(state => state.assignAttributes);
   const unassignAttribute = useProductFormStore(state => state.unassignAttribute);
   const createProduct = useProductFormStore(state => state.createProduct);
+  const homeSections = useProductFormStore(state => state.homeSections);
+  const fetchHomeSections = useProductFormStore(state => state.fetchHomeSections);
 
   // --- Local UI State (Modals, Temporary Inputs, Editing) ---
   const [isMappingModalOpen, setIsMappingModalOpen] = useState(false);
@@ -116,7 +118,8 @@ const AddProduct = () => {
   useEffect(() => {
     fetchCategories();
     fetchGlobalSettings();
-  }, [fetchCategories, fetchGlobalSettings]);
+    fetchHomeSections();
+  }, [fetchCategories, fetchGlobalSettings, fetchHomeSections]);
 
   useEffect(() => {
     fetchSubCategories(productData.category_id);
@@ -327,6 +330,45 @@ const AddProduct = () => {
                     <span className={styles.slider} />
                   </label>
                   <span className={styles.statusText}>{productData.priceIncludesGST ? 'Yes' : 'No'}</span>
+                </div>
+              </div>
+
+              <div className={styles.statusToggleWrap}>
+                <div className={styles.toggleLabel}>
+                  <Star size={14} />
+                  <span>Is Featured?</span>
+                </div>
+                <div className={styles.toggleActions}>
+                  <label className={styles.switch}>
+                    <input type="checkbox" checked={productData.is_featured} onChange={(e) => setProductData({ is_featured: e.target.checked })} />
+                    <span className={styles.slider} />
+                  </label>
+                  <span className={styles.statusText}>{productData.is_featured ? 'Yes' : 'No'}</span>
+                </div>
+              </div>
+
+              <div className={styles.fullWidth} style={{ gridColumn: 'span 4' }}>
+                <div className={styles.labelWrapper}>
+                  <label className={styles.label}>Home Sections</label>
+                  <div className={styles.checkboxGrid} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '0.5rem', marginTop: '0.5rem' }}>
+                    {homeSections.map(section => (
+                      <label key={section.section_id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.85rem' }}>
+                        <input 
+                          type="checkbox" 
+                          checked={(productData.home_sections || []).includes(section.section_id)}
+                          onChange={(e) => {
+                            const current = productData.home_sections || [];
+                            if (e.target.checked) {
+                              setProductData({ home_sections: [...current, section.section_id] });
+                            } else {
+                              setProductData({ home_sections: current.filter(id => id !== section.section_id) });
+                            }
+                          }}
+                        />
+                        {section.title}
+                      </label>
+                    ))}
+                  </div>
                 </div>
               </div>
             </div>

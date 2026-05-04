@@ -9,16 +9,16 @@ const Product = {
             product_id, name, slug, description, sub_category_id, brand, video_url, 
             gstPercent, priceIncludesGST, base_sku, variant_config, meta_title, meta_description,
             badge, tagline, pricing_meta, stock_meta, services, trust_badges, highlights, 
-            care_instructions, additional_info, origin_info, stats
+            care_instructions, additional_info, origin_info, stats, is_featured
         } = productData;
         const sql = `
             INSERT INTO products (
                 product_id, name, slug, description, sub_category_id, brand, video_url, 
                 gstPercent, priceIncludesGST, base_sku, variant_config, meta_title, meta_description,
                 badge, tagline, pricing_meta, stock_meta, services, trust_badges, highlights, 
-                care_instructions, additional_info, origin_info, stats
+                care_instructions, additional_info, origin_info, stats, is_featured
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
         await connection.query(sql, [
             product_id, name, slug, description, sub_category_id, brand,
@@ -34,9 +34,54 @@ const Product = {
             care_instructions ? JSON.stringify(care_instructions) : null,
             additional_info ? JSON.stringify(additional_info) : null,
             origin_info ? JSON.stringify(origin_info) : null,
-            stats ? JSON.stringify(stats) : null
+            stats ? JSON.stringify(stats) : null,
+            is_featured ? 1 : 0
         ]);
         return product_id;
+    },
+
+    getRelatedProducts: async (subCategoryId, categoryId, currentProductId, limit = 4) => {
+        let sql = `
+            SELECT p.product_id, p.name, p.slug,
+                   (SELECT m.url 
+                    FROM product_media pm
+                    JOIN media m ON pm.media_id = m.media_id
+                    WHERE pm.product_id = p.product_id 
+                    ORDER BY pm.is_primary DESC, pm.sort_order ASC 
+                    LIMIT 1) as thumbnail,
+                   (SELECT MIN(COALESCE(NULLIF(finalPrice, 0), NULLIF(sellingPrice, 0), price)) 
+                    FROM product_variants 
+                    WHERE product_id = p.product_id AND status = 1) as starting_price
+            FROM products p
+            WHERE p.sub_category_id = ? AND p.product_id != ? AND p.status = 1
+            LIMIT ?
+        `;
+        let [rows] = await db.query(sql, [subCategoryId, currentProductId, parseInt(limit)]);
+        
+        if (rows.length < limit && categoryId) {
+            const remaining = limit - rows.length;
+            const excludeIds = [currentProductId, ...rows.map(r => r.product_id)];
+            sql = `
+                SELECT p.product_id, p.name, p.slug,
+                       (SELECT m.url 
+                        FROM product_media pm
+                        JOIN media m ON pm.media_id = m.media_id
+                        WHERE pm.product_id = p.product_id 
+                        ORDER BY pm.is_primary DESC, pm.sort_order ASC 
+                        LIMIT 1) as thumbnail,
+                       (SELECT MIN(COALESCE(NULLIF(finalPrice, 0), NULLIF(sellingPrice, 0), price)) 
+                        FROM product_variants 
+                        WHERE product_id = p.product_id AND status = 1) as starting_price
+                FROM products p
+                LEFT JOIN sub_categories sc ON p.sub_category_id = sc.sub_category_id
+                WHERE sc.category_id = ? AND p.product_id NOT IN (${excludeIds.map(() => '?').join(',')}) AND p.status = 1
+                LIMIT ?
+            `;
+            const [moreRows] = await db.query(sql, [categoryId, ...excludeIds, remaining]);
+            rows = [...rows, ...moreRows];
+        }
+        
+        return rows;
     },
 
     findAll: async (limit = 10, offset = 0) => {
@@ -194,14 +239,14 @@ const Product = {
             name, slug, description, sub_category_id, brand, video_url, gstPercent, 
             priceIncludesGST, base_sku, variant_config, meta_title, meta_description,
             badge, tagline, pricing_meta, stock_meta, services, trust_badges, highlights, 
-            care_instructions, additional_info, origin_info, stats
+            care_instructions, additional_info, origin_info, stats, is_featured
         } = productData;
         const sql = `
             UPDATE products 
             SET name = ?, slug = ?, description = ?, sub_category_id = ?, brand = ?, video_url = ?, 
                 gstPercent = ?, priceIncludesGST = ?, base_sku = ?, variant_config = ?, meta_title = ?, meta_description = ?,
                 badge = ?, tagline = ?, pricing_meta = ?, stock_meta = ?, services = ?, trust_badges = ?, highlights = ?, 
-                care_instructions = ?, additional_info = ?, origin_info = ?, stats = ?
+                care_instructions = ?, additional_info = ?, origin_info = ?, stats = ?, is_featured = ?
             WHERE product_id = ?
         `;
         await connection.query(sql, [
@@ -220,8 +265,26 @@ const Product = {
             additional_info ? JSON.stringify(additional_info) : null,
             origin_info ? JSON.stringify(origin_info) : null,
             stats ? JSON.stringify(stats) : null,
+            is_featured ? 1 : 0,
             productId
         ]);
+    },
+
+    // === Home Section Placement ===
+    syncHomeSections: async (productId, sectionIds, connection = db) => {
+        // Remove existing associations for this product
+        await connection.query('DELETE FROM home_section_products WHERE product_id = ?', [productId]);
+        
+        if (!sectionIds || sectionIds.length === 0) return;
+
+        // Add new associations
+        const values = sectionIds.map(sid => [sid, productId, 0]);
+        await connection.query('INSERT INTO home_section_products (section_id, product_id, display_order) VALUES ?', [values]);
+    },
+    
+    getHomeSections: async (productId) => {
+        const [rows] = await db.query('SELECT section_id FROM home_section_products WHERE product_id = ?', [productId]);
+        return rows.map(r => r.section_id);
     },
 
     softDelete: async (productId, connection = db) => {

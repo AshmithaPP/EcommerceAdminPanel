@@ -134,15 +134,29 @@ const productController = {
 
     getProductsFrontend: async (req, res, next) => {
         try {
-            const page = parseInt(req.query.page) || 1;
-            const limit = parseInt(req.query.limit) || 10;
-            const result = await productService.getProductsFrontend(page, limit);
+            const query = {
+                category: req.query.category,
+                page: parseInt(req.query.page) || 1,
+                limit: parseInt(req.query.limit) || 12,
+                min_price: req.query.min_price,
+                max_price: req.query.max_price,
+                rating: req.query.rating,
+                sort: req.query.sort || 'newest',
+                search: req.query.search,
+                // Dynamic attributes
+                color: req.query.color,
+                pattern: req.query.pattern,
+                occasion: req.query.occasion,
+                fabric: req.query.fabric
+            };
+
+            const result = await productService.getProductsFrontend(query);
+            
             res.status(200).json({
                 success: true,
-                data: result.products,
-                total: result.total,
-                page,
-                limit
+                products: result.products,
+                pagination: result.pagination,
+                filters: result.filters
             });
         } catch (error) {
             next(error);

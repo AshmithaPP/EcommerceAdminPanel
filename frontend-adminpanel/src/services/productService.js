@@ -67,5 +67,10 @@ export const productService = {
   deleteProduct: async (productId) => {
     const response = await privateApi.delete(`/products/${productId}`);
     return response.data;
+  },
+
+  toggleFeatured: async (productId) => {
+    const response = await privateApi.patch(`/home/admin/toggle-featured-product/${productId}`);
+    return response.data;
   }
 };

@@ -16,7 +16,14 @@ const categoryService = {
         const connection = await db.getConnection();
         try {
             await connection.beginTransaction();
-            const result = await Category.create({ ...categoryData, name: trimmedName }, createdBy, connection);
+            const slug = categoryData.slug || trimmedName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+            const result = await Category.create({ 
+                ...categoryData, 
+                name: trimmedName,
+                slug: slug,
+                is_featured: !!categoryData.is_featured,
+                image_url: categoryData.image_url || null
+            }, createdBy, connection);
             await connection.commit();
             return result;
         } catch (error) {
@@ -263,9 +270,13 @@ const categoryService = {
         const connection = await db.getConnection();
         try {
             await connection.beginTransaction();
+            const slug = categoryData.slug || (trimmedName ? trimmedName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') : category.slug);
             const result = await Category.update(categoryId, { 
                 ...categoryData, 
                 name: trimmedName || category.name,
+                slug: slug,
+                is_featured: categoryData.is_featured !== undefined ? !!categoryData.is_featured : category.is_featured,
+                image_url: categoryData.image_url !== undefined ? categoryData.image_url : category.image_url,
                 display_order: categoryData.display_order !== undefined ? categoryData.display_order : category.display_order
             }, updatedBy, connection);
             await connection.commit();

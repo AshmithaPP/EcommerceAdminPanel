@@ -168,6 +168,18 @@ const Products = () => {
               }
             },
             {
+              label: 'Featured',
+              key: 'is_featured',
+              width: '100px',
+              align: 'center',
+              render: (row) => (
+                <Toggle
+                  checked={!!row.is_featured}
+                  onChange={() => useProductStore.getState().toggleFeatured(row.product_id)}
+                />
+              )
+            },
+            {
               label: 'Actions',
               key: 'actions',
               align: 'left',

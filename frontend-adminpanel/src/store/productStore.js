@@ -65,8 +65,6 @@ const useProductStore = create((set, get) => ({
   },
 
   toggleAvailability: async (productId) => {
-    // Current backend doesn't have a specific toggle endpoint, 
-    // using local update to match existing UI behavior.
     try {
       set(state => ({
         products: state.products.map(p =>
@@ -76,6 +74,22 @@ const useProductStore = create((set, get) => ({
       showToast.success('Availability updated');
     } catch (err) {
       showToast.error('Failed to update availability');
+    }
+  },
+  
+  toggleFeatured: async (productId) => {
+    try {
+      const response = await productService.toggleFeatured(productId);
+      if (response.success) {
+        set(state => ({
+          products: state.products.map(p =>
+            p.product_id === productId ? { ...p, is_featured: !p.is_featured } : p
+          )
+        }));
+        showToast.success('Featured status updated');
+      }
+    } catch (err) {
+      showToast.error('Failed to update featured status');
     }
   }
 }));

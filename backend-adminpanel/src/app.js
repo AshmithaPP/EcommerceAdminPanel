@@ -16,9 +16,13 @@ const shipmentRoutes = require('./routes/shipmentRoutes');
 const uploadRoutes = require('./routes/uploadRoutes');
 const analyticsRoutes = require('./routes/analyticsRoutes');
 const settingsRoutes = require('./routes/settingsRoutes');
+const blogRoutes = require('./routes/blogRoutes');
 const path = require('path');
 const paymentController = require('./controllers/paymentController');
 const { protect, authorize } = require('./middlewares/authMiddleware');
+const homeRoutes = require('./routes/homeRoutes');
+const cartRoutes = require('./routes/cartRoutes');
+const wishlistRoutes = require('./routes/wishlistRoutes');
 
 const app = express();
 
@@ -52,7 +56,7 @@ app.use(cors({
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization']
+    allowedHeaders: ['Content-Type', 'Authorization', 'x-guest-id']
 }));
 
 // Routes
@@ -70,6 +74,10 @@ app.use('/api/shipments', shipmentRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/settings', settingsRoutes);
+app.use('/api/blogs', blogRoutes);
+app.use('/api/home', homeRoutes);
+app.use('/api/cart', cartRoutes);
+app.use('/api/wishlist', wishlistRoutes);
 
 // Admin Payments List
 app.get('/api/admin/payments', protect, authorize('admin', 'superadmin'), paymentController.getAllPayments);

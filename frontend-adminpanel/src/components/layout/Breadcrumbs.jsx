@@ -14,6 +14,8 @@ const routeMap = {
   '/payments': { parent: 'PAYMENTS', current: 'OVERVIEW' },
   '/shipping': { parent: 'SHIPPING', current: 'SHIPPING & DELIVERY' },
   '/admins': { parent: 'ADMINS', current: 'MANAGEMENT' },
+  '/homepage-management': { parent: 'HOME', current: 'MANAGEMENT' },
+  '/blogs': { parent: 'CMS', current: 'BLOG MANAGEMENT' },
 };
 
 const Breadcrumbs = () => {

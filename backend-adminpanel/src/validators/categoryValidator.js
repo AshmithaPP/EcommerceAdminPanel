@@ -2,12 +2,18 @@ const Joi = require('joi');
 
 const categorySchema = Joi.object({
     name: Joi.string().min(2).max(255).required(),
-    display_order: Joi.number().integer().min(0).optional()
+    display_order: Joi.number().integer().min(0).optional(),
+    slug: Joi.string().max(255).optional(),
+    image_url: Joi.string().allow('', null).optional(),
+    is_featured: Joi.boolean().optional()
 });
 
 const updateCategorySchema = Joi.object({
     name: Joi.string().min(2).max(255).optional(),
-    display_order: Joi.number().integer().min(0).optional()
+    display_order: Joi.number().integer().min(0).optional(),
+    slug: Joi.string().max(255).optional(),
+    image_url: Joi.string().allow('', null).optional(),
+    is_featured: Joi.boolean().optional()
 });
 
 const subCategorySchema = Joi.object({

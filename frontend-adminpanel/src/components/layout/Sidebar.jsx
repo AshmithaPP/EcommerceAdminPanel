@@ -5,15 +5,18 @@ import styles from './Sidebar.module.css';
 
 const menuItems = [
   { name: 'Dashboard', icon: 'dashboard', path: '/dashboard' },
+  { name: 'Home Management', icon: 'home', path: '/homepage-management' },
   { name: 'Analytics', icon: 'bar_chart', path: '/analytics' },
   { name: 'Products', icon: 'inventory_2', path: '/products' },
   { name: 'Categories', icon: 'category', path: '/categories' },
+  { name: 'Filters', icon: 'filter_alt', path: '/attributes' },
   { name: 'Orders', icon: 'shopping_bag', path: '/orders' },
   { name: 'Customers', icon: 'group', path: '/customers' },
   { name: 'Payments', icon: 'payments', path: '/payments' },
   { name: 'Inventory', icon: 'inventory_2', path: '/inventory' },
   { name: 'Shipping', icon: 'local_shipping', path: '/shipping' },
   { name: 'Coupons', icon: 'auto_awesome', path: '/marketing' },
+  { name: 'Blogs', icon: 'article', path: '/blogs' },
   { name: 'Admins', icon: 'admin_panel_settings', path: '/admins' },
 ];
 

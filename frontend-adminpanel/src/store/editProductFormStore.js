@@ -38,6 +38,8 @@ const useEditProductFormStore = create((set, get) => ({
         trustBadges: [],
         highlights: [],
         careInstructions: [],
+        is_featured: false,
+        home_sections: [],
         additionalInfo: {},
         originInfo: {},
         stats: []
@@ -56,6 +58,7 @@ const useEditProductFormStore = create((set, get) => ({
     allAttributes: [],
     attributeValues: [],
     variantConfig: [],
+    homeSections: [],
 
     // UI Status
     fetching: false,
@@ -95,6 +98,8 @@ const useEditProductFormStore = create((set, get) => ({
                 trustBadges: data.trustBadges || [],
                 highlights: data.highlights || [],
                 careInstructions: data.careInstructions || [],
+                is_featured: !!data.is_featured,
+                home_sections: data.home_sections || [],
                 additionalInfo: data.additionalInfo || {},
                 originInfo: data.originInfo || {},
                 stats: data.stats || []
@@ -154,7 +159,8 @@ const useEditProductFormStore = create((set, get) => ({
                 badge: '', tagline: '', pricingMeta: { taxIncludedText: 'Inclusive of all taxes' },
                 stockMeta: { lowStockText: '', urgencyText: '', viewCount: 0 },
                 services: [], trustBadges: [], highlights: [],
-                careInstructions: [], additionalInfo: {}, originInfo: {},
+                careInstructions: [], is_featured: false, home_sections: [],
+                additionalInfo: {}, originInfo: {},
                 stats: []
             },
             baseSku: '', variants: [], productImages: [], productVideo: null,
@@ -234,6 +240,15 @@ const useEditProductFormStore = create((set, get) => ({
             set({ attributeValues: data.data.items });
         } catch (error) {
             showToast.error('Failed to load values');
+        }
+    },
+
+    fetchHomeSections: async () => {
+        try {
+            const { data } = await privateApi.get('/home/admin/sections');
+            if (data.success) set({ homeSections: data.data });
+        } catch (err) {
+            console.error('Failed to load home sections', err);
         }
     },
 

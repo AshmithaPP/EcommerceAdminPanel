@@ -2,13 +2,10 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Save, 
   Store, 
-  Image as ImageIcon, 
-  Flag, 
   Upload, 
   Loader2,
   Percent,
   Package,
-  Calendar,
   Edit2
 } from 'lucide-react';
 import useSettingsStore from '../../store/settingsStore';
@@ -33,8 +30,6 @@ const Settings = () => {
   const {
     siteInfo,
     storeSettings,
-    heroSettings,
-    bannerSettings,
     initialLoading,
     saving,
     uploading,
@@ -43,8 +38,6 @@ const Settings = () => {
     saveAllSettings,
     uploadAsset,
     updateStoreSettings,
-    updateHeroSettings,
-    updateBannerSettings,
     setSiteInfo,
     resetStore
   } = useSettingsStore();
@@ -53,8 +46,6 @@ const Settings = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [tempSiteInfo, setTempSiteInfo] = useState({});
   const [tempStoreSettings, setTempStoreSettings] = useState({});
-  const [tempHeroSettings, setTempHeroSettings] = useState({});
-  const [tempBannerSettings, setTempBannerSettings] = useState({});
 
   useEffect(() => {
     fetchSettings();
@@ -71,16 +62,12 @@ const Settings = () => {
   const handleEditAllSettings = () => {
     setTempSiteInfo({ ...siteInfo });
     setTempStoreSettings({ ...storeSettings });
-    setTempHeroSettings({ ...heroSettings });
-    setTempBannerSettings({ ...bannerSettings });
     setIsModalOpen(true);
   };
 
   const handleModalSave = () => {
     setSiteInfo(tempSiteInfo);
     updateStoreSettings(tempStoreSettings);
-    updateHeroSettings(tempHeroSettings);
-    updateBannerSettings(tempBannerSettings);
     setIsModalOpen(false);
   };
 
@@ -98,24 +85,6 @@ const Settings = () => {
     const url = await uploadAsset(file, 'modal');
     if (url) {
       handleTempSiteInfoChange(key, url);
-    }
-  };
-
-  const handleImageUpload = async (e, section) => {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    if (file.size > 2 * 1024 * 1024) {
-      return; // Error toast handled in store via standard if needed, or component if custom
-    }
-
-    const url = await uploadAsset(file, section);
-    if (url) {
-      if (section === 'hero') {
-        updateHeroSettings({ image: url });
-      } else {
-        updateBannerSettings({ image: url });
-      }
     }
   };
 
@@ -155,7 +124,7 @@ const Settings = () => {
       <div className={styles.settingsGrid}>
         
         {/* 1. General Site Settings (DataTable) */}
-        <section className={`${styles.settingsCard} ${styles.bannerSettings}`} style={{ gridColumn: 'span 12' }}>
+        <section className={styles.settingsCard} style={{ gridColumn: 'span 12' }}>
            <DataTable 
               title="End-User Website Settings"
               data={siteInfoArray}
@@ -190,7 +159,7 @@ const Settings = () => {
         </section>
 
         {/* 2. Store Settings */}
-        <section className={`${styles.settingsCard} ${styles.storeSettings}`}>
+        <section className={styles.settingsCard} style={{ gridColumn: 'span 12' }}>
           <header className={styles.sectionHeader}>
             <h2 className={styles.sectionTitle}>
               <Store size={14} /> Store Defaults
@@ -200,7 +169,7 @@ const Settings = () => {
             </button>
           </header>
           <div className={styles.sectionContent}>
-            <div className={styles.inputGroup}>
+            <div className={styles.inputGroup} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '1rem' }}>
               <InputBox 
                 label="Common GST (%)" 
                 type="number" 
@@ -215,125 +184,6 @@ const Settings = () => {
                 onChange={(e) => updateStoreSettings({ default_stock: e.target.value })}
                 Icon={Package}
               />
-            </div>
-          </div>
-        </section>
-
-        {/* 3. Homepage Hero */}
-        <section className={`${styles.settingsCard} ${styles.heroSettings}`}>
-          <header className={styles.sectionHeader}>
-            <h2 className={styles.sectionTitle}>
-              <ImageIcon size={14} /> Homepage Hero Section
-            </h2>
-            <button className={styles.editAllBtn} onClick={handleEditAllSettings}>
-              <Edit2 size={12} /> Edit
-            </button>
-          </header>
-          <div className={styles.sectionContent}>
-            <div className={styles.heroLayout}>
-              <div className={styles.formControls}>
-                <InputBox 
-                  label="Hero Title" 
-                  value={heroSettings?.title || ''} 
-                  onChange={(e) => updateHeroSettings({ title: e.target.value })}
-                />
-                <InputBox 
-                  label="Hero Subtitle" 
-                  value={heroSettings?.subtitle || ''} 
-                  onChange={(e) => updateHeroSettings({ subtitle: e.target.value })}
-                />
-                <div className={styles.rowInputs}>
-                  <InputBox 
-                    label="Button Text" 
-                    value={heroSettings?.buttonText || ''} 
-                    onChange={(e) => updateHeroSettings({ buttonText: e.target.value })}
-                  />
-                  <InputBox 
-                    label="Button Link" 
-                    value={heroSettings?.buttonLink || ''} 
-                    onChange={(e) => updateHeroSettings({ buttonLink: e.target.value })}
-                  />
-                </div>
-                <div className={styles.imageUploadWrap}>
-                  <label className={styles.uploadTrigger}>
-                    {uploading.hero ? <Loader2 size={18} className="animate-spin" /> : <Upload size={18} />}
-                    {heroSettings.image ? 'Change Hero Image' : 'Upload Hero Image'}
-                    <input type="file" hidden onChange={(e) => handleImageUpload(e, 'hero')} accept="image/*" />
-                  </label>
-                </div>
-              </div>
-
-              <div className={styles.previewContainer}>
-                <span className={styles.previewLabel}>Live Preview</span>
-                <div className={styles.heroPreview}>
-                  <img src={getImageUrl(heroSettings.image)} alt="Hero" />
-                  <div className={styles.heroOverlay}>
-                    <div className={styles.heroPreviewTitle}>{heroSettings.title || 'Collection Title'}</div>
-                    <div className={styles.heroPreviewSubtitle}>{heroSettings.subtitle || 'Subtitle goes here'}</div>
-                    <div className={styles.heroPreviewBtn}>{heroSettings.buttonText || 'Shop Now'}</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* 4. Seasonal Banner */}
-        <section className={`${styles.settingsCard} ${styles.bannerSettings}`}>
-          <header className={styles.sectionHeader}>
-            <h2 className={styles.sectionTitle}>
-              <Flag size={14} /> Seasonal Campaign Banner
-            </h2>
-            <button className={styles.editAllBtn} onClick={handleEditAllSettings}>
-              <Edit2 size={12} /> Edit
-            </button>
-          </header>
-          <div className={styles.sectionContent}>
-            <div className={styles.bannerLayout}>
-              <div className={styles.formControls}>
-                <label className={styles.toggleLabel}>
-                  <span>Enable Banner</span>
-                  <input 
-                    type="checkbox" 
-                    checked={bannerSettings.enabled} 
-                    onChange={(e) => updateBannerSettings({ enabled: e.target.checked })} 
-                  />
-                </label>
-                <div className={`${styles.formControls} ${!bannerSettings.enabled ? styles.disabled : ''}`}>
-                  <InputBox 
-                    label="Banner Title" 
-                    value={bannerSettings.title} 
-                    onChange={(e) => updateBannerSettings({ title: e.target.value })}
-                  />
-                  <InputBox 
-                    label="Banner Description" 
-                    value={bannerSettings.description} 
-                    onChange={(e) => updateBannerSettings({ description: e.target.value })}
-                  />
-                  <div className={styles.rowInputs}>
-                    <InputBox label="Start Date" type="date" value={bannerSettings.startDate} onChange={(e) => updateBannerSettings({ startDate: e.target.value })} Icon={Calendar} />
-                    <InputBox label="End Date" type="date" value={bannerSettings.endDate} onChange={(e) => updateBannerSettings({ endDate: e.target.value })} Icon={Calendar} />
-                  </div>
-                  <div className={styles.imageUploadWrap}>
-                    <label className={styles.uploadTrigger}>
-                      {uploading.banner ? <Loader2 size={18} className="animate-spin" /> : <Upload size={18} />}
-                      {bannerSettings.image ? 'Change Banner Image' : 'Upload Banner Image'}
-                      <input type="file" hidden onChange={(e) => handleImageUpload(e, 'banner')} accept="image/*" />
-                    </label>
-                  </div>
-                </div>
-              </div>
-
-              <div className={styles.previewContainer}>
-                <span className={styles.previewLabel}>Live Preview</span>
-                <div className={`${styles.bannerPreview} ${!bannerSettings.enabled ? styles.bannerPreviewDisabled : ''}`}>
-                  <div className={styles.bannerInfo}>
-                    <div className={styles.bannerPreviewTitle}>{bannerSettings.title || 'Campaign Name'}</div>
-                    <div className={styles.bannerPreviewDesc}>{bannerSettings.description || 'Campaign details...'}</div>
-                  </div>
-                  <img src={getImageUrl(bannerSettings.image)} className={styles.bannerPreviewImg} alt="Banner" />
-                </div>
-              </div>
             </div>
           </div>
         </section>
@@ -414,110 +264,6 @@ const Settings = () => {
                 onChange={(e) => setTempStoreSettings(prev => ({ ...prev, default_stock: e.target.value }))}
                 Icon={Package}
               />
-            </div>
-
-            {/* --- Hero Section --- */}
-            <div className={styles.modalSectionDivider}></div>
-            <div className={styles.modalSectionTitle}>Homepage Hero</div>
-            <div className={styles.modalFullField}>
-              <InputBox 
-                label="Hero Title" 
-                value={tempHeroSettings.title || ''} 
-                onChange={(e) => setTempHeroSettings(prev => ({ ...prev, title: e.target.value }))}
-              />
-            </div>
-            <div className={styles.modalFullField}>
-              <InputBox 
-                label="Hero Subtitle" 
-                value={tempHeroSettings.subtitle || ''} 
-                onChange={(e) => setTempHeroSettings(prev => ({ ...prev, subtitle: e.target.value }))}
-              />
-            </div>
-            <div className={styles.modalHalfField}>
-              <InputBox 
-                label="Button Text" 
-                value={tempHeroSettings.buttonText || ''} 
-                onChange={(e) => setTempHeroSettings(prev => ({ ...prev, buttonText: e.target.value }))}
-              />
-            </div>
-            <div className={styles.modalHalfField}>
-              <InputBox 
-                label="Button Link" 
-                value={tempHeroSettings.buttonLink || ''} 
-                onChange={(e) => setTempHeroSettings(prev => ({ ...prev, buttonLink: e.target.value }))}
-              />
-            </div>
-            <div className={styles.modalFullField}>
-               <div className={styles.modalImageField}>
-                  <label className={styles.fieldLabel}>Hero Image</label>
-                  <div className={styles.modalImageRow}>
-                    <img src={getImageUrl(tempHeroSettings.image)} alt="Hero" className={styles.modalImgMini} />
-                    <label className={styles.modalUploadIcon}>
-                      {uploading.hero ? <Loader2 className="animate-spin" size={16} /> : <Upload size={16} />}
-                      Change Hero Image
-                      <input type="file" hidden onChange={async (e) => {
-                        const file = e.target.files[0];
-                        if (file) {
-                          const url = await uploadAsset(file, 'hero');
-                          if (url) setTempHeroSettings(prev => ({ ...prev, image: url }));
-                        }
-                      }} accept="image/*" />
-                    </label>
-                  </div>
-               </div>
-            </div>
-
-            {/* --- Banner Section --- */}
-            <div className={styles.modalSectionDivider}></div>
-            <div className={styles.modalSectionTitle}>Campaign Banner</div>
-            <div className={styles.modalFullField}>
-              <label className={styles.toggleLabel}>
-                <span>Enable Banner</span>
-                <input 
-                  type="checkbox" 
-                  checked={tempBannerSettings.enabled} 
-                  onChange={(e) => setTempBannerSettings(prev => ({ ...prev, enabled: e.target.checked }))} 
-                />
-              </label>
-            </div>
-            <div className={styles.modalFullField}>
-              <InputBox 
-                label="Banner Title" 
-                value={tempBannerSettings.title || ''} 
-                onChange={(e) => setTempBannerSettings(prev => ({ ...prev, title: e.target.value }))}
-              />
-            </div>
-            <div className={styles.modalFullField}>
-              <InputBox 
-                label="Banner Description" 
-                value={tempBannerSettings.description || ''} 
-                onChange={(e) => setTempBannerSettings(prev => ({ ...prev, description: e.target.value }))}
-              />
-            </div>
-            <div className={styles.modalHalfField}>
-              <InputBox label="Start Date" type="date" value={tempBannerSettings.startDate || ''} onChange={(e) => setTempBannerSettings(prev => ({ ...prev, startDate: e.target.value }))} Icon={Calendar} />
-            </div>
-            <div className={styles.modalHalfField}>
-              <InputBox label="End Date" type="date" value={tempBannerSettings.endDate || ''} onChange={(e) => setTempBannerSettings(prev => ({ ...prev, endDate: e.target.value }))} Icon={Calendar} />
-            </div>
-            <div className={styles.modalFullField}>
-               <div className={styles.modalImageField}>
-                  <label className={styles.fieldLabel}>Banner Image</label>
-                  <div className={styles.modalImageRow}>
-                    <img src={getImageUrl(tempBannerSettings.image)} alt="Banner" className={styles.modalImgMini} />
-                    <label className={styles.modalUploadIcon}>
-                      {uploading.banner ? <Loader2 className="animate-spin" size={16} /> : <Upload size={16} />}
-                      Change Banner Image
-                      <input type="file" hidden onChange={async (e) => {
-                        const file = e.target.files[0];
-                        if (file) {
-                          const url = await uploadAsset(file, 'banner');
-                          if (url) setTempBannerSettings(prev => ({ ...prev, image: url }));
-                        }
-                      }} accept="image/*" />
-                    </label>
-                  </div>
-               </div>
             </div>
           </div>
         </div>

@@ -4,6 +4,7 @@ import styles from './CategoryManagement.module.css';
 import Modal from '../../components/common/Modal';
 import Button from '../../components/ui/Button';
 import useCategoryStore from '../../store/categoryStore';
+import Toggle from '../../components/ui/Toggle';
 
 const CategoryManagement = () => {
   // ---------- Store ----------
@@ -36,8 +37,13 @@ const CategoryManagement = () => {
   const [newCategoryName, setNewCategoryName] = useState('');
   const [deleteId, setDeleteId] = useState(null);
   const [editingCategory, setEditingCategory] = useState(null);
-  const [editName, setEditName] = useState('');
-  const [editOrder, setEditOrder] = useState(0);
+  const [editForm, setEditForm] = useState({
+    name: '',
+    slug: '',
+    image_url: '',
+    display_order: 0,
+    is_featured: false
+  });
 
   // ---------- Derived Data ----------
   const filteredCategories = getFilteredCategories();
@@ -66,17 +72,25 @@ const CategoryManagement = () => {
   const handleEditCategory = (e, node) => {
     e.stopPropagation();
     setEditingCategory(node);
-    setEditName(node.name);
-    setEditOrder(node.display_order || 0);
+    setEditForm({
+      name: node.name || '',
+      slug: node.slug || '',
+      image_url: node.image_url || '',
+      badge: node.badge || '',
+      display_order: node.display_order || 0,
+      is_featured: !!node.is_featured
+    });
   };
 
   const submitEditCategory = () => {
-    if (editName.trim() && editingCategory) {
-      updateCategory(editingCategory, { name: editName.trim(), display_order: parseInt(editOrder) || 0 });
+    if (editForm.name.trim() && editingCategory) {
+      updateCategory(editingCategory, { 
+        ...editForm,
+        name: editForm.name.trim(),
+        display_order: parseInt(editForm.display_order) || 0
+      });
     }
     setEditingCategory(null);
-    setEditName('');
-    setEditOrder(0);
   };
 
   const handleDelete = (e, node) => { e.stopPropagation(); setDeleteId(node); };
@@ -141,37 +155,9 @@ const CategoryManagement = () => {
             </span>
 
             {/* Name / Edit inline */}
-            {isEditing ? (
-              <div className={styles.inlineEditGroup} onClick={e => e.stopPropagation()}>
-                <input
-                  autoFocus
-                  value={editName}
-                  onChange={(e) => setEditName(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && submitEditCategory()}
-                  className={styles.inlineEditInput}
-                  placeholder="Category name"
-                />
-                <input
-                  type="number"
-                  value={editOrder}
-                  onChange={(e) => setEditOrder(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && submitEditCategory()}
-                  className={styles.inlineOrderInput}
-                  placeholder="Order"
-                  title="Display Order"
-                />
-                <button className={styles.confirmBtn} onClick={submitEditCategory} title="Save">
-                  <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>done</span>
-                </button>
-                <button className={styles.cancelBtn} onClick={() => setEditingCategory(null)} title="Cancel">
-                  <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>close</span>
-                </button>
-              </div>
-            ) : (
-              <span className={`${styles.nodeName} ${level === 1 ? styles.rootName : styles.childName}`}>
-                {node.name}
-              </span>
-            )}
+            <span className={`${styles.nodeName} ${level === 1 ? styles.rootName : styles.childName}`}>
+              {node.name}
+            </span>
 
             {/* Badge: child count */}
             {hasChildren && !isEditing && (
@@ -221,6 +207,7 @@ const CategoryManagement = () => {
               <th>Category Name</th>
               <th className={styles.thCenter}>Display Order</th>
               <th className={styles.thCenter}>Identifier</th>
+              <th className={styles.thCenter}>Featured</th>
               <th className={styles.thRight}>Actions</th>
             </tr>
           </thead>
@@ -239,21 +226,19 @@ const CategoryManagement = () => {
                     onClick={() => setSelectedCategory(cat)}
                   >
                     <td>
-                      {isEditing ? (
-                        <div className={styles.tableEditGroup}>
-                          <input value={editName} onChange={(e) => setEditName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && submitEditCategory()} autoFocus className={styles.tableEditInput} />
-                          <input type="number" value={editOrder} onChange={(e) => setEditOrder(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && submitEditCategory()} className={styles.tableOrderInput} />
-                          <button className={styles.confirmBtn} onClick={submitEditCategory}><span className="material-symbols-outlined" style={{ fontSize: '16px' }}>done</span></button>
-                        </div>
-                      ) : (
-                        <span className={styles.catName}>{cat.name}</span>
-                      )}
+                      <span className={styles.catName}>{cat.name}</span>
                     </td>
                     <td className={styles.tdCenter}>
                       <span className={styles.orderPill}>{cat.display_order ?? 0}</span>
                     </td>
                     <td className={styles.tdCenter}>
                       <code className={styles.idCode}>#CAT-{cat.category_id}</code>
+                    </td>
+                    <td className={styles.tdCenter}>
+                      <Toggle 
+                        checked={!!cat.is_featured} 
+                        onChange={() => useCategoryStore.getState().toggleFeatured(cat)} 
+                      />
                     </td>
                     <td className={styles.tdRight}>
                       <div className={styles.tableActions}>
@@ -393,6 +378,75 @@ const CategoryManagement = () => {
           </div>
         )}
       </div>
+
+      {/* ── Edit Category Modal ── */}
+      <Modal
+        isOpen={!!editingCategory}
+        onClose={() => setEditingCategory(null)}
+        title="Edit Category"
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setEditingCategory(null)}>Cancel</Button>
+            <Button onClick={submitEditCategory}>Save Changes</Button>
+          </>
+        }
+      >
+        <div className={styles.modalForm}>
+          <div className={styles.formGroup}>
+            <label>Category Name</label>
+            <input 
+              className={styles.modalInput}
+              value={editForm.name}
+              onChange={(e) => setEditForm({...editForm, name: e.target.value})}
+            />
+          </div>
+          <div className={styles.formRow}>
+            <div className={styles.formGroup}>
+              <label>Slug</label>
+              <input 
+                className={styles.modalInput}
+                value={editForm.slug}
+                onChange={(e) => setEditForm({...editForm, slug: e.target.value})}
+                placeholder="auto-generated-if-empty"
+              />
+            </div>
+            <div className={styles.formGroup}>
+              <label>Display Order</label>
+              <input 
+                type="number"
+                className={styles.modalInput}
+                value={editForm.display_order}
+                onChange={(e) => setEditForm({...editForm, display_order: e.target.value})}
+              />
+            </div>
+          </div>
+          <div className={styles.formGroup}>
+            <label>Image URL</label>
+            <input 
+              className={styles.modalInput}
+              value={editForm.image_url}
+              onChange={(e) => setEditForm({...editForm, image_url: e.target.value})}
+              placeholder="https://..."
+            />
+          </div>
+          <div className={styles.formGroup}>
+            <label>Badge / Subtitle (e.g. 320+ Designs)</label>
+            <input 
+              className={styles.modalInput}
+              value={editForm.badge}
+              onChange={(e) => setEditForm({...editForm, badge: e.target.value})}
+              placeholder="320+ Designs"
+            />
+          </div>
+          <div className={styles.featuredToggle}>
+            <label>Featured on Homepage</label>
+            <Toggle 
+              checked={editForm.is_featured}
+              onChange={() => setEditForm({...editForm, is_featured: !editForm.is_featured})}
+            />
+          </div>
+        </div>
+      </Modal>
 
       {/* ── Delete Confirm Modal ── */}
       <Modal

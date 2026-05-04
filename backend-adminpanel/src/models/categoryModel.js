@@ -3,12 +3,12 @@ const { v4: uuidv4 } = require('uuid');
 
 const Category = {
     create: async (categoryData, createdBy) => {
-        const { name, display_order } = categoryData;
+        const { name, display_order, slug, image_url, is_featured } = categoryData;
         const categoryId = uuidv4();
         
         await db.query(
-            'INSERT INTO categories (category_id, name, display_order, created_by) VALUES (?, ?, ?, ?)',
-            [categoryId, name, display_order || 0, createdBy]
+            'INSERT INTO categories (category_id, name, slug, image_url, is_featured, display_order, created_by) VALUES (?, ?, ?, ?, ?, ?, ?)',
+            [categoryId, name, slug || null, image_url || null, is_featured ? 1 : 0, display_order || 0, createdBy]
         );
         
         return { category_id: categoryId, name, display_order };
@@ -47,11 +47,11 @@ const Category = {
     },
 
     update: async (categoryId, categoryData, updatedBy) => {
-        const { name, display_order } = categoryData;
+        const { name, display_order, slug, image_url, is_featured } = categoryData;
         
         await db.query(
-            'UPDATE categories SET name = ?, display_order = ?, updated_by = ? WHERE category_id = ?',
-            [name, display_order || 0, updatedBy, categoryId]
+            'UPDATE categories SET name = ?, slug = ?, image_url = ?, is_featured = ?, display_order = ?, updated_by = ? WHERE category_id = ?',
+            [name, slug || null, image_url || null, is_featured ? 1 : 0, display_order || 0, updatedBy, categoryId]
         );
         
         return { category_id: categoryId, name, display_order };

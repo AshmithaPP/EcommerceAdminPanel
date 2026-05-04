@@ -142,6 +142,17 @@ const useCategoryStore = create((set, get) => ({
         }
     },
 
+    toggleFeatured: async (node) => {
+        try {
+            const id = node.category_id || node.sub_category_id;
+            await privateApi.patch(`/home/admin/toggle-featured-category/${id}`);
+            toast.success('Category featured status updated');
+            await get().fetchCategories();
+        } catch (error) {
+            toast.error('Failed to update featured status');
+        }
+    },
+
     // ---------- Computed Helpers (Internal logic for component consumption) ----------
     getFilteredCategories: () => {
         const { categories, searchQuery, viewMode } = get();

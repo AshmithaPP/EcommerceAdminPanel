@@ -17,6 +17,9 @@ import MarketingStudio from '../pages/coupon/CouponManagement';
 import AdminManagement from '../pages/Admins/AdminManagement';
 import Settings from '../pages/Settings/Settings';
 import ResetPassword from '../pages/Auth/ResetPassword';
+import HomepageManagement from '../pages/HomepageManagement/HomepageManagement';
+import BlogManagement from '../pages/Blogs/BlogManagement';
+import AttributeManagement from '../pages/Attributes/AttributeManagement';
 
 const AppRoutes = () => {
   return (
@@ -38,6 +41,9 @@ const AppRoutes = () => {
       <Route path="/marketing" element={<MarketingStudio />} />
       <Route path="/admins" element={<AdminManagement />} />
       <Route path="/settings" element={<Settings />} />
+      <Route path="/homepage-management" element={<HomepageManagement />} />
+      <Route path="/blogs" element={<BlogManagement />} />
+      <Route path="/attributes" element={<AttributeManagement />} />
       <Route path="/reset-password" element={<ResetPassword />} />
       {/* 404 Route */}
       <Route path="*" element={<div className="text-center mt-5"><h4>Page Not Found</h4></div>} />

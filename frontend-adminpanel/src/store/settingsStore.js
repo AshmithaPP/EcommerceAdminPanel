@@ -7,13 +7,11 @@ const initialState = {
   // Settings Blocks
   siteInfo: {}, // Normalized: { [id]: { name, value, type } }
   storeSettings: { gst: 5, default_stock: 10 },
-  heroSettings: { image: '', title: '', subtitle: '', buttonText: '', buttonLink: '' },
-  bannerSettings: { enabled: false, title: '', description: '', image: '', startDate: '', endDate: '' },
 
   // Tracking
   initialLoading: true,
   saving: false,
-  uploading: { hero: false, banner: false, modal: false },
+  uploading: { modal: false },
   hasChanges: false,
 
   // Errors
@@ -37,8 +35,6 @@ const useSettingsStore = create((set, get) => ({
         set({
           siteInfo: data.site_info || {},
           storeSettings: { ...initialState.storeSettings, ...data.store_settings },
-          heroSettings: { ...initialState.heroSettings, ...data.hero_settings },
-          bannerSettings: { ...initialState.bannerSettings, ...data.banner_settings },
           hasChanges: false
         });
       }
@@ -58,9 +54,7 @@ const useSettingsStore = create((set, get) => ({
     try {
       const payload = {
         site_info: state.siteInfo,
-        store_settings: state.storeSettings,
-        hero_settings: state.heroSettings,
-        banner_settings: state.bannerSettings
+        store_settings: state.storeSettings
       };
 
       const res = await settingsService.updateSettings(payload);
@@ -108,20 +102,6 @@ const useSettingsStore = create((set, get) => ({
   updateStoreSettings: (partial) => {
     set(state => ({
       storeSettings: { ...state.storeSettings, ...partial },
-      hasChanges: true
-    }));
-  },
-
-  updateHeroSettings: (partial) => {
-    set(state => ({
-      heroSettings: { ...state.heroSettings, ...partial },
-      hasChanges: true
-    }));
-  },
-
-  updateBannerSettings: (partial) => {
-    set(state => ({
-      bannerSettings: { ...state.bannerSettings, ...partial },
       hasChanges: true
     }));
   },

@@ -176,8 +176,14 @@ const productService = {
                 care_instructions,
                 additional_info,
                 origin_info,
-                stats
+                stats,
+                is_featured: productData.is_featured
             }, connection);
+
+            // 1.1 Sync Home Sections
+            if (productData.home_sections) {
+                await Product.syncHomeSections(productId, productData.home_sections, connection);
+            }
 
             // 2. Insert Variants
             for (const variantData of variants) {
@@ -250,16 +256,266 @@ const productService = {
             error.statusCode = 404;
             throw error;
         }
+        product.home_sections = await Product.getHomeSections(productId);
         return product;
     },
 
-    getProductsFrontend: async (page = 1, limit = 10) => {
+    getProductsFrontend: async (query) => {
+        const {
+            category,
+            page = 1,
+            limit = 12,
+            min_price,
+            max_price,
+            rating,
+            sort = 'newest',
+            search,
+            color,
+            pattern,
+            occasion,
+            fabric,
+            stock_status // 'in_stock' or null
+        } = query;
+
         const offset = (page - 1) * limit;
-        const result = await Product.findAll(limit, offset);
+        const params = [];
+        let whereClauses = ['p.status = 1'];
+
+        // 1. Category Filter (Multi-select Slug or ID support)
+        if (category) {
+            const catSlugs = category.split(',').map(s => s.trim());
+            whereClauses.push(`(
+                c.slug IN (${catSlugs.map(() => '?').join(',')}) OR 
+                c.category_id IN (${catSlugs.map(() => '?').join(',')}) OR 
+                sc.slug IN (${catSlugs.map(() => '?').join(',')}) OR 
+                sc.sub_category_id IN (${catSlugs.map(() => '?').join(',')})
+            )`);
+            params.push(...catSlugs, ...catSlugs, ...catSlugs, ...catSlugs);
+        }
+
+        // 2. Search Filter
+        if (search) {
+            whereClauses.push('(p.name LIKE ? OR p.description LIKE ?)');
+            params.push(`%${search}%`, `%${search}%`);
+        }
+
+        // 3. Dynamic Attribute Filters (Slug-based, AND logic between attributes)
+        const attrFilters = { color, pattern, occasion, fabric };
+        Object.keys(attrFilters).forEach(key => {
+            if (attrFilters[key]) {
+                const slugs = attrFilters[key].split(',').map(s => s.trim().toLowerCase());
+                whereClauses.push(`(
+                    p.product_id IN (
+                        SELECT pav.product_id 
+                        FROM product_attribute_values pav
+                        JOIN attributes a ON pav.attribute_id = a.attribute_id
+                        JOIN attribute_values av ON pav.attribute_value_id = av.attribute_value_id
+                        WHERE a.name = ? AND av.slug IN (${slugs.map(() => '?').join(',')})
+                    ) OR p.product_id IN (
+                        SELECT pv2.product_id 
+                        FROM product_variants pv2
+                        JOIN variant_attributes va ON pv2.variant_id = va.variant_id
+                        JOIN attributes a ON va.attribute_id = a.attribute_id
+                        JOIN attribute_values av ON va.attribute_value_id = av.attribute_value_id
+                        WHERE a.name = ? AND av.slug IN (${slugs.map(() => '?').join(',')})
+                    )
+                )`);
+                params.push(key, ...slugs, key, ...slugs);
+            }
+        });
+
+        const whereSql = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';
+
+        // 4. Subquery for Prices and Stock
+        const priceJoinSql = `
+            JOIN (
+                SELECT 
+                    product_id, 
+                    MIN(COALESCE(NULLIF(finalPrice, 0), NULLIF(sellingPrice, 0), price)) as starting_price, 
+                    MAX(mrp) as max_mrp,
+                    SUM(COALESCE((SELECT quantity FROM inventory_levels WHERE variant_id = pv_inner.variant_id), 0)) as total_stock
+                FROM product_variants pv_inner
+                WHERE status = 1
+                GROUP BY product_id
+            ) pp ON p.product_id = pp.product_id
+        `;
+
+        // Add secondary filters (Price, Rating, Stock)
+        let finalWhereSql = whereSql;
+        if (min_price || max_price || rating || stock_status === 'in_stock') {
+            const extraClauses = [];
+            if (min_price) { extraClauses.push('pp.starting_price >= ?'); params.push(parseFloat(min_price)); }
+            if (max_price) { extraClauses.push('pp.starting_price <= ?'); params.push(parseFloat(max_price)); }
+            if (rating) { extraClauses.push('(SELECT AVG(rating) FROM product_reviews WHERE product_id = p.product_id AND status = 1) >= ?'); params.push(parseFloat(rating)); }
+            if (stock_status === 'in_stock') { extraClauses.push('pp.total_stock > 0'); }
+            
+            finalWhereSql += (finalWhereSql ? ' AND ' : 'WHERE ') + extraClauses.join(' AND ');
+        }
+
+        // Sorting
+        let orderBy = 'p.created_at DESC';
+        if (sort === 'price_low_to_high') orderBy = 'pp.starting_price ASC';
+        else if (sort === 'price_high_to_low') orderBy = 'pp.starting_price DESC';
+        else if (sort === 'popularity') {
+            // Popularity = (Avg Rating * 10) + (Review Count * 2) + (0.5 * Stock level)
+            orderBy = `(
+                COALESCE((SELECT AVG(rating) FROM product_reviews WHERE product_id = p.product_id AND status = 1), 0) * 10 + 
+                COALESCE((SELECT COUNT(*) FROM product_reviews WHERE product_id = p.product_id AND status = 1), 0) * 2
+            ) DESC`;
+        }
+
+        // 5. Execute Count Query
+        const countSql = `SELECT COUNT(DISTINCT p.product_id) as total FROM products p 
+                          LEFT JOIN sub_categories sc ON p.sub_category_id = sc.sub_category_id
+                          LEFT JOIN categories c ON sc.category_id = c.category_id
+                          ${priceJoinSql} ${finalWhereSql}`;
+        const [[{ total }]] = await db.query(countSql, params);
+
+        // 6. Execute Main Query
+        const productsSql = `
+            SELECT p.*, c.name as category_name, pp.starting_price, pp.total_stock,
+                   (SELECT m.url FROM product_media pm JOIN media m ON pm.media_id = m.media_id WHERE pm.product_id = p.product_id ORDER BY pm.is_primary DESC LIMIT 1) as image_url,
+                   (SELECT AVG(rating) FROM product_reviews WHERE product_id = p.product_id AND status = 1) as rating,
+                   (SELECT COUNT(*) FROM product_reviews WHERE product_id = p.product_id AND status = 1) as rating_count
+            FROM products p
+            LEFT JOIN sub_categories sc ON p.sub_category_id = sc.sub_category_id
+            LEFT JOIN categories c ON sc.category_id = c.category_id
+            ${priceJoinSql}
+            ${finalWhereSql}
+            ORDER BY ${orderBy}
+            LIMIT ? OFFSET ?
+        `;
+        
+        const [rows] = await db.query(productsSql, [...params, parseInt(limit), parseInt(offset)]);
+
+        // 7. Fetch Dynamic Filters (Amazon/Flipkart Style - Multi-select safe)
+        // We calculate each facet by ignoring its own active filter but respecting others.
+        
+        const getFacetWhere = (ignoreKey) => {
+            let clauses = ['p.status = 1'];
+            let facetParams = [];
+            
+            if (category) {
+                clauses.push('(c.slug = ? OR c.category_id = ? OR sc.slug = ? OR sc.sub_category_id = ?)');
+                facetParams.push(category, category, category, category);
+            }
+            if (search) {
+                clauses.push('(p.name LIKE ? OR p.description LIKE ?)');
+                facetParams.push(`%${search}%`, `%${search}%`);
+            }
+
+            Object.keys(attrFilters).forEach(key => {
+                if (attrFilters[key] && key !== ignoreKey) {
+                    const slugs = attrFilters[key].split(',').map(s => s.trim().toLowerCase());
+                    clauses.push(`(
+                        p.product_id IN (
+                            SELECT pav.product_id FROM product_attribute_values pav
+                            JOIN attributes a ON pav.attribute_id = a.attribute_id
+                            JOIN attribute_values av ON pav.attribute_value_id = av.attribute_value_id
+                            WHERE a.name = ? AND av.slug IN (${slugs.map(() => '?').join(',')})
+                        ) OR p.product_id IN (
+                            SELECT pv2.product_id FROM product_variants pv2
+                            JOIN variant_attributes va ON pv2.variant_id = va.variant_id
+                            JOIN attributes a ON va.attribute_id = a.attribute_id
+                            JOIN attribute_values av ON va.attribute_value_id = av.attribute_value_id
+                            WHERE a.name = ? AND av.slug IN (${slugs.map(() => '?').join(',')})
+                        )
+                    )`);
+                    facetParams.push(key, ...slugs, key, ...slugs);
+                }
+            });
+            return { sql: clauses.length > 0 ? `WHERE ${clauses.join(' AND ')}` : '', params: facetParams };
+        };
+
+        const fetchFacet = async (attrName) => {
+            const { sql: fWhere, params: fParams } = getFacetWhere(attrName);
+            const [results] = await db.query(`
+                SELECT attr_value, attr_slug, COUNT(DISTINCT product_id) as count
+                FROM (
+                    SELECT av.value as attr_value, av.slug as attr_slug, p.product_id
+                    FROM products p
+                    LEFT JOIN sub_categories sc ON p.sub_category_id = sc.sub_category_id
+                    LEFT JOIN categories c ON sc.category_id = c.category_id
+                    JOIN product_attribute_values pav ON p.product_id = pav.product_id
+                    JOIN attributes a ON pav.attribute_id = a.attribute_id
+                    JOIN attribute_values av ON pav.attribute_value_id = av.attribute_value_id
+                    ${fWhere} AND a.name = ?
+                    UNION
+                    SELECT av.value as attr_value, av.slug as attr_slug, p.product_id
+                    FROM products p
+                    LEFT JOIN sub_categories sc ON p.sub_category_id = sc.sub_category_id
+                    LEFT JOIN categories c ON sc.category_id = c.category_id
+                    JOIN product_variants pv ON p.product_id = pv.product_id
+                    JOIN variant_attributes va ON pv.variant_id = va.variant_id
+                    JOIN attributes a ON va.attribute_id = a.attribute_id
+                    JOIN attribute_values av ON va.attribute_value_id = av.attribute_value_id
+                    ${fWhere} AND a.name = ?
+                ) as combined_attrs
+                GROUP BY attr_value, attr_slug
+                ORDER BY count DESC
+            `, [...fParams, attrName, ...fParams, attrName]);
+            return results.map(r => ({ name: r.attr_value, slug: r.attr_slug, count: r.count }));
+        };
+
+        const fetchFacetCategories = async () => {
+            const { sql: fWhere, params: fParams } = getFacetWhere('category');
+            const [results] = await db.query(`
+                SELECT c.name as cat_name, c.slug as cat_slug, COUNT(DISTINCT p.product_id) as count
+                FROM products p
+                LEFT JOIN sub_categories sc ON p.sub_category_id = sc.sub_category_id
+                LEFT JOIN categories c ON sc.category_id = c.category_id
+                ${fWhere}
+                GROUP BY c.name, c.slug
+                HAVING count > 0
+                ORDER BY count DESC
+            `, fParams);
+            return results.map(r => ({ name: r.cat_name, slug: r.cat_slug, count: r.count }));
+        };
+
+        // Price bounds (respects category and search only, or all attributes? Usually category+search)
+        const { sql: pWhere, params: pParams } = getFacetWhere('price');
+        const [[priceBounds]] = await db.query(`
+            SELECT MIN(pp.starting_price) as min, MAX(pp.starting_price) as max
+            FROM products p
+            LEFT JOIN sub_categories sc ON p.sub_category_id = sc.sub_category_id
+            LEFT JOIN categories c ON sc.category_id = c.category_id
+            ${priceJoinSql}
+            ${pWhere}
+        `, pParams);
+
+        const [categories, colors, patterns, occasions, fabrics] = await Promise.all([
+            fetchFacetCategories(),
+            fetchFacet('color'),
+            fetchFacet('pattern'),
+            fetchFacet('occasion'),
+            fetchFacet('fabric')
+        ]);
 
         return {
-            products: result.products.map(p => formatProductList(p)),
-            total: result.total
+            products: rows.map(p => ({
+                product_id: p.product_id,
+                product_name: p.name,
+                slug: p.slug,
+                price: p.starting_price,
+                original_price: p.starting_price * 1.2,
+                rating: p.rating || 0,
+                reviews_count: p.rating_count || 0,
+                image_url: p.image_url,
+                stock_status: p.total_stock > 0 ? 'in_stock' : 'out_of_stock'
+            })),
+            pagination: {
+                current_page: parseInt(page),
+                total_pages: Math.ceil(total / limit),
+                total_products: total
+            },
+            filters: {
+                price_range: priceBounds || { min: 0, max: 0 },
+                categories,
+                colors,
+                patterns,
+                occasions,
+                fabrics
+            }
         };
     },
 
@@ -274,7 +530,12 @@ const productService = {
         // Get subcategory attribute mapping to distinguish variant vs specification
         const subCategoryAttributes = await SubCategory.getAttributesFlat(product.sub_category_id);
 
-        return formatProductDetail(product, product.variants, subCategoryAttributes);
+        // Fetch related products (with category-level fallback)
+        const relatedProducts = await Product.getRelatedProducts(product.sub_category_id, product.category_id, product.product_id);
+
+        const home_sections = await Product.getHomeSections(product.product_id);
+
+        return formatProductDetail({ ...product, home_sections }, product.variants, subCategoryAttributes, relatedProducts);
     },
 
     updateProduct: async (productId, productData) => {
@@ -362,8 +623,14 @@ const productService = {
                 care_instructions,
                 additional_info,
                 origin_info,
-                stats
+                stats,
+                is_featured: productData.is_featured !== undefined ? productData.is_featured : existing.is_featured
             }, connection);
+
+            // 1.1 Sync Home Sections
+            if (productData.home_sections !== undefined) {
+                await Product.syncHomeSections(productId, productData.home_sections, connection);
+            }
 
             // 2. Sync Variants (if provided)
             const resolvedGstPercent = gstPercent !== undefined ? gstPercent : existing.gstPercent;

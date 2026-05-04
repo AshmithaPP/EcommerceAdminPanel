@@ -37,6 +37,8 @@ const useProductFormStore = create((set, get) => ({
         trustBadges: [],
         highlights: [],
         careInstructions: [],
+        is_featured: false,
+        home_sections: [],
         additionalInfo: {},
         originInfo: {},
         stats: []
@@ -54,6 +56,7 @@ const useProductFormStore = create((set, get) => ({
     allAttributes: [],
     attributeValues: [],
     variantConfig: [],
+    homeSections: [],
 
     // UI Status
     loading: false,
@@ -138,6 +141,15 @@ const useProductFormStore = create((set, get) => ({
             set({ attributeValues: data.data.items });
         } catch (error) {
             showToast.error('Failed to load values');
+        }
+    },
+
+    fetchHomeSections: async () => {
+        try {
+            const { data } = await privateApi.get('/home/admin/sections');
+            if (data.success) set({ homeSections: data.data });
+        } catch (err) {
+            console.error('Failed to load home sections', err);
         }
     },
 
