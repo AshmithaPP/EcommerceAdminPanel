@@ -12,8 +12,9 @@ router.use(protect);
 router.post('/', authorize('admin'), validate(createCouponSchema), couponController.createCoupon);
 router.get('/', authorize('admin'), couponController.listCoupons);
 
-// User route
+// User routes
 router.post('/validate', validate(validateCouponSchema), couponController.validateCoupon);
+router.get('/active', couponController.listActiveCoupons);
 
 // Admin coupon management routes by ID
 router.put('/:couponId', authorize('admin'), validate(updateCouponSchema), couponController.updateCoupon);

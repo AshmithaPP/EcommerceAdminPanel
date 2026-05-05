@@ -68,7 +68,7 @@ const TrendChart = ({ title, subtitle, mainValue, growth, data, timeframe = 'Mon
         </div>
 
         <div className={styles.chartArea}>
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
             <BarChart 
               data={data} 
               margin={{ top: 10, right: 0, left: -5, bottom: 25 }}

@@ -32,12 +32,19 @@ const cartService = {
         }));
 
         const subtotal = formattedItems.reduce((sum, item) => sum + item.total, 0);
-        // Add logic for discount/delivery if needed
+        
+        // --- Perfect Calculation Logic ---
+        const discount = 0; // Future coupon logic
+        const delivery = subtotal > 500 ? 0 : 50;
+        const tax = Math.round(subtotal * 0.12); // 12% GST included or added (here we treat as included breakdown)
+        const total = subtotal + delivery - discount;
+
         const summary = {
             subtotal,
-            discount: 0,
-            delivery: subtotal > 500 ? 0 : 50,
-            total: subtotal + (subtotal > 500 ? 0 : 50)
+            discount,
+            delivery,
+            tax,
+            total
         };
 
         return {

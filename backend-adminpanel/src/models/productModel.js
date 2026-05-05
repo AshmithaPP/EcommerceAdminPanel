@@ -161,6 +161,12 @@ const Product = {
                    (SELECT MIN(COALESCE(NULLIF(finalPrice, 0), NULLIF(sellingPrice, 0), price)) 
                     FROM product_variants 
                     WHERE product_id = p.product_id AND status = 1) as starting_price,
+                   (SELECT m.url 
+                    FROM product_media pm
+                    JOIN media m ON pm.media_id = m.media_id
+                    WHERE pm.product_id = p.product_id 
+                    ORDER BY pm.is_primary DESC, pm.sort_order ASC 
+                    LIMIT 1) as image_url,
                    (SELECT AVG(rating) FROM product_reviews WHERE product_id = p.product_id AND status = 1) as avg_rating,
                    (SELECT COUNT(*) FROM product_reviews WHERE product_id = p.product_id AND status = 1) as rating_count
             FROM products p

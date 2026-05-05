@@ -2,50 +2,54 @@ const db = require('../config/database');
 const { v4: uuidv4 } = require('uuid');
 
 const Payment = {
-    create: async (paymentData) => {
-        const { order_id, razorpay_order_id, amount, currency = 'INR' } = paymentData;
-        const payment_id = uuidv4();
+    create: async (data) => {
+        const paymentId = uuidv4();
+        const { order_id, gateway, gateway_order_id, amount, status } = data;
         
-        const query = `
-            INSERT INTO payments (payment_id, order_id, razorpay_order_id, amount, currency, status)
-            VALUES (?, ?, ?, ?, ?, 'pending')
+        const sql = `
+            INSERT INTO payments (
+                payment_id, order_id, gateway, gateway_order_id, amount, status
+            ) VALUES (?, ?, ?, ?, ?, ?)
         `;
-        
-        await db.query(query, [payment_id, order_id, razorpay_order_id, amount, currency]);
-        return { payment_id, ...paymentData, status: 'pending' };
+        await db.query(sql, [paymentId, order_id, gateway || 'razorpay', gateway_order_id, amount, status || 'pending']);
+        return paymentId;
     },
 
-    updateStatus: async (razorpayOrderId, status, razorpayPaymentId = null, razorpaySignature = null) => {
-        const query = `
-            UPDATE payments 
-            SET status = ?, razorpay_payment_id = ?, razorpay_signature = ?, updated_at = CURRENT_TIMESTAMP
-            WHERE razorpay_order_id = ?
-        `;
-        const [result] = await db.query(query, [status, razorpayPaymentId, razorpaySignature, razorpayOrderId]);
-        return result.affectedRows > 0;
+    updateByGatewayOrderId: async (gatewayOrderId, data) => {
+        const fields = [];
+        const values = [];
+        
+        Object.keys(data).forEach(key => {
+            fields.push(`${key} = ?`);
+            values.push(data[key]);
+        });
+        
+        values.push(gatewayOrderId);
+        const sql = `UPDATE payments SET ${fields.join(', ')} WHERE gateway_order_id = ?`;
+        await db.query(sql, values);
     },
 
-    findByRazorpayOrderId: async (razorpayOrderId) => {
-        const query = `SELECT * FROM payments WHERE razorpay_order_id = ?`;
-        const [rows] = await db.query(query, [razorpayOrderId]);
+    findByOrderId: async (orderId) => {
+        const [rows] = await db.query('SELECT * FROM payments WHERE order_id = ?', [orderId]);
         return rows[0];
     },
 
-    findAll: async ({ limit = 10, offset = 0 } = {}) => {
-        const query = `
-            SELECT p.*, o.order_number, o.payment_method, u.name as customer_name, u.email as customer_email
-            FROM payments p
-            JOIN orders o ON p.order_id = o.order_id
-            JOIN users u ON o.user_id = u.user_id
-            ORDER BY p.created_at DESC
-            LIMIT ? OFFSET ?
-        `;
-        const [rows] = await db.query(query, [parseInt(limit), parseInt(offset)]);
+    findByGatewayOrderId: async (gatewayOrderId) => {
+        const [rows] = await db.query('SELECT * FROM payments WHERE gateway_order_id = ?', [gatewayOrderId]);
+        return rows[0];
+    },
+
+    findAll: async ({ limit = 10, offset = 0 }) => {
+        const [payments] = await db.query(
+            'SELECT * FROM payments ORDER BY created_at DESC LIMIT ? OFFSET ?',
+            [parseInt(limit), parseInt(offset)]
+        );
+        const [countRows] = await db.query('SELECT COUNT(*) as total FROM payments');
         
-        const countQuery = `SELECT COUNT(*) as total FROM payments`;
-        const [countResult] = await db.query(countQuery);
-        
-        return { payments: rows, total: countResult[0].total };
+        return {
+            payments,
+            total: countRows[0].total
+        };
     }
 };
 

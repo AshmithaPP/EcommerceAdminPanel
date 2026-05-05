@@ -1,6 +1,6 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { User, MapPin, CreditCard, Package, Clock, CheckCircle } from 'lucide-react';
+import { User, MapPin, CreditCard, Package, Clock, CheckCircle, Truck, AlertCircle, ExternalLink } from 'lucide-react';
 import styles from './OrderDetails.module.css';
 import DataTable from '../../components/ui/DataTable';
 import StatCard from '../../components/ui/StatCard';
@@ -20,28 +20,22 @@ const formatDate = (dateString, withTime = false) => {
 };
 
 const STATUS_MAP = {
-  pending: { label: 'Pending', cls: 'pending' },
-  Pending: { label: 'Pending', cls: 'pending' },
-  confirmed: { label: 'Confirmed', cls: 'confirmed' },
-  Confirmed: { label: 'Confirmed', cls: 'confirmed' },
-  processing: { label: 'Processing', cls: 'confirmed' },
-  Processing: { label: 'Processing', cls: 'confirmed' },
-  shipped: { label: 'Shipped', cls: 'shipped' },
-  Shipped: { label: 'Shipped', cls: 'shipped' },
-  delivered: { label: 'Delivered', cls: 'delivered' },
-  Delivered: { label: 'Delivered', cls: 'delivered' },
-  cancelled: { label: 'Cancelled', cls: 'cancelled' },
-  Cancelled: { label: 'Cancelled', cls: 'cancelled' },
+  pending: { label: 'Pending', cls: 'pending', color: '#64748b' },
+  paid: { label: 'Paid', cls: 'confirmed', color: '#0ea5e9' },
+  processing: { label: 'Processing', cls: 'confirmed', color: '#8b5cf6' },
+  shipped: { label: 'Shipped', cls: 'shipped', color: '#f59e0b' },
+  delivered: { label: 'Delivered', cls: 'delivered', color: '#10b981' },
+  cancelled: { label: 'Cancelled', cls: 'cancelled', color: '#ef4444' },
 };
 
 const StatusBadge = ({ status }) => {
-  const s = STATUS_MAP[status] || { label: status, cls: 'pending' };
+  const s = STATUS_MAP[status?.toLowerCase()] || { label: status, cls: 'pending' };
   return <span className={`${styles.badge} ${styles[`badge_${s.cls}`]}`}>{s.label}</span>;
 };
 
 const PaymentBadge = ({ status }) => {
-  const cls = status === 'Paid' ? 'paid' : status === 'Pending' ? 'pending' : 'unpaid';
-  return <span className={`${styles.badge} ${styles[`badge_${cls}`]}`}>{status}</span>;
+  const cls = status === 'success' || status === 'paid' ? 'delivered' : status === 'pending' ? 'pending' : 'cancelled';
+  return <span className={`${styles.badge} ${styles[`badge_${cls}`]}`}>{status || 'pending'}</span>;
 };
 
 // ── Component ─────────────────────────────────────────
@@ -53,19 +47,43 @@ const OrderDetails = () => {
     actionLoading,
     fetchOrderDetails,
     updateOrderStatus,
+    updateShippingDetails,
     resetOrderState
   } = useOrderStore();
 
+  const [shippingForm, setShippingForm] = useState({
+    tracking_id: '',
+    courier_name: '',
+    estimated_delivery_date: ''
+  });
+
   useEffect(() => {
     fetchOrderDetails(id);
-    return () => resetOrderState(); // Clean up state when leaving page
+    return () => resetOrderState();
   }, [id, fetchOrderDetails, resetOrderState]);
 
-  const handleUpdateStatus = (newStatus, comment) => {
-    updateOrderStatus(id, { status: newStatus, comment });
+  useEffect(() => {
+    if (order) {
+      setShippingForm({
+        tracking_id: order.tracking_id || '',
+        courier_name: order.courier_name || '',
+        estimated_delivery_date: order.estimated_delivery_date ? new Date(order.estimated_delivery_date).toISOString().split('T')[0] : ''
+      });
+    }
+  }, [order]);
+
+  const handleStatusChange = (e) => {
+    const newStatus = e.target.value;
+    if (window.confirm(`Are you sure you want to change status to ${newStatus}?`)) {
+        updateOrderStatus(id, { status: newStatus });
+    }
   };
 
-  // ── Loading ──
+  const handleShippingSubmit = (e) => {
+    e.preventDefault();
+    updateShippingDetails(id, shippingForm);
+  };
+
   if (loading) {
     return (
       <div className={styles.pageContainer}>
@@ -89,19 +107,26 @@ const OrderDetails = () => {
     );
   }
 
+  const address = typeof order.shipping_address === 'string' ? JSON.parse(order.shipping_address) : order.shipping_address;
+
   // ── Items table columns ──
   const itemColumns = [
     {
       label: 'Product',
-      key: 'product_name',
+      key: 'name',
       width: 'auto',
       render: (row) => (
         <div className={styles.productCell}>
           <div className={styles.productThumb}>
-            <Package size={16} style={{ opacity: 0.3 }} />
+            {row.image_url ? (
+                <img src={row.image_url.startsWith('http') ? row.image_url : `http://localhost:5000${row.image_url}`} alt="" className={styles.thumbImg} />
+            ) : (
+                <Package size={16} style={{ opacity: 0.3 }} />
+            )}
           </div>
           <div>
-            <div className={styles.productName}>{row.product_name}</div>
+            <div className={styles.productName}>{row.name}</div>
+            <div className={styles.productVariant}>{row.variant_name}</div>
             <div className={styles.productSku}>SKU: {row.variant_sku}</div>
           </div>
         </div>
@@ -138,76 +163,38 @@ const OrderDetails = () => {
       {/* ── Top Bar ── */}
       <div className={styles.topBar}>
         <div className={styles.topBarLeft}>
-          <span className={styles.orderNum}>#{order.order_number}</span>
+          <span className={styles.orderNum}>Order #{order.order_number}</span>
+          <div className={styles.badgeContainer}>
+            <StatusBadge status={order.status} />
+            <PaymentBadge status={order.payment_status} />
+          </div>
         </div>
         <div className={styles.topBarRight}>
-          {/* Status action buttons */}
-          {order.status === 'Pending' && (
-            <button className={`${styles.actionBtn} ${styles.confirmBtn}`}
-              onClick={() => handleUpdateStatus('Confirmed', 'Order confirmed by administrator')}
-              disabled={actionLoading}>
-              {actionLoading ? 'Updating…' : 'Confirm Order'}
-            </button>
-          )}
-          {['Confirmed', 'Processing', 'processing', 'confirmed'].includes(order.status) && (
-            <button className={`${styles.actionBtn} ${styles.shipBtn}`}
-              onClick={() => handleUpdateStatus('Shipped', 'Order marked as shipped')}
-              disabled={actionLoading}>
-              {actionLoading ? 'Updating…' : 'Mark Shipped'}
-            </button>
-          )}
-          {!['Cancelled', 'Delivered', 'cancelled', 'delivered'].includes(order.status) && (
-            <button className={`${styles.actionBtn} ${styles.cancelBtn}`}
-              onClick={() => handleUpdateStatus('Cancelled', 'Order cancelled by administrator')}
-              disabled={actionLoading}>
-              Cancel Order
-            </button>
-          )}
+           <div className={styles.statusDropdownContainer}>
+                <label className={styles.dropdownLabel}>Change Status:</label>
+                <select 
+                    className={styles.statusSelect} 
+                    value={order.status} 
+                    onChange={handleStatusChange}
+                    disabled={actionLoading}
+                >
+                    <option value="pending">Pending</option>
+                    <option value="paid">Paid</option>
+                    <option value="processing">Processing</option>
+                    <option value="shipped">Shipped</option>
+                    <option value="delivered">Delivered</option>
+                    <option value="cancelled">Cancelled</option>
+                </select>
+           </div>
         </div>
-      </div>
-
-      {/* ── Order Meta Row ── */}
-      <div className={styles.metaRow}>
-        <div className={styles.metaLeft}>
-          <StatusBadge status={order.status} />
-          <PaymentBadge status={order.payment_status} />
-          <span className={styles.metaDate}>
-            <Clock size={12} style={{ marginRight: 4 }} />
-            Placed {formatDate(order.created_at)}
-          </span>
-        </div>
-      </div>
-
-      {/* ── Stat Cards ── */}
-      <div className={styles.statsGrid}>
-        <StatCard
-          label="Order Total"
-          value={formatCurrency(order.total_amount)}
-          icon={<CreditCard size={14} />}
-        />
-        <StatCard
-          label="Subtotal"
-          value={formatCurrency(order.subtotal)}
-          icon={<Package size={14} />}
-        />
-        <StatCard
-          label="Shipping"
-          value={formatCurrency(order.shipping_charge)}
-          icon={<MapPin size={14} />}
-        />
-        <StatCard
-          label="Discount"
-          value={`-${formatCurrency(order.discount_amount)}`}
-          icon={<CheckCircle size={14} />}
-        />
       </div>
 
       {/* ── Main Grid ── */}
       <div className={styles.mainGrid}>
 
-        {/* LEFT — Items + Customer + Address */}
+        {/* LEFT COLUMN */}
         <div className={styles.leftCol}>
-
+          
           {/* Ordered Items */}
           <DataTable
             title="Ordered Items"
@@ -216,162 +203,172 @@ const OrderDetails = () => {
             emptyMessage="No items found."
           />
 
-          {/* Customer + Address row */}
+          {/* Customer & Shipping Details */}
           <div className={styles.infoRow}>
-
+            
             {/* Customer Info */}
             <div className={styles.infoCard}>
               <div className={styles.infoCardHeader}>
                 <span className={styles.infoCardTitle}>CUSTOMER INFO</span>
-                <User size={13} style={{ color: 'var(--primary, #4361EE)', opacity: 0.7 }} />
+                <User size={14} className={styles.headerIcon} />
               </div>
               <div className={styles.infoCardBody}>
                 <div className={styles.infoItem}>
                   <span className={styles.infoLabel}>Name</span>
-                  <span className={styles.infoValue}>{order.customer_name}</span>
+                  <span className={styles.infoValue}>{order.customer?.name || 'N/A'}</span>
                 </div>
                 <div className={styles.infoItem}>
                   <span className={styles.infoLabel}>Email</span>
-                  <span className={styles.infoValue}>{order.customer_email}</span>
+                  <span className={styles.infoValue}>{order.customer?.email || 'N/A'}</span>
                 </div>
                 <div className={styles.infoItem}>
                   <span className={styles.infoLabel}>Phone</span>
-                  <span className={styles.infoValue}>{order.customer_phone}</span>
+                  <span className={styles.infoValue}>{order.customer?.phone || 'N/A'}</span>
                 </div>
               </div>
             </div>
 
-            {/* Delivery Address */}
+            {/* Shipping Address */}
             <div className={styles.infoCard}>
               <div className={styles.infoCardHeader}>
                 <span className={styles.infoCardTitle}>DELIVERY ADDRESS</span>
-                <MapPin size={13} style={{ color: 'var(--primary, #4361EE)', opacity: 0.7 }} />
+                <MapPin size={14} className={styles.headerIcon} />
               </div>
               <div className={styles.infoCardBody}>
-                {order.delivery_address ? (
+                {address ? (
                   <>
                     <div className={styles.infoItem}>
                       <span className={styles.infoLabel}>Recipient</span>
-                      <span className={styles.infoValue}>{order.delivery_address.name}</span>
+                      <span className={styles.infoValue}>{address.full_name}</span>
                     </div>
                     <div className={styles.infoItem}>
                       <span className={styles.infoLabel}>Address</span>
                       <span className={styles.infoValue}>
-                        {order.delivery_address.address_line1}
-                        {order.delivery_address.address_line2 && `, ${order.delivery_address.address_line2}`}
-                      </span>
-                    </div>
-                    <div className={styles.infoItem}>
-                      <span className={styles.infoLabel}>City</span>
-                      <span className={styles.infoValue}>
-                        {order.delivery_address.city}, {order.delivery_address.state} {order.delivery_address.zip_code}
+                        {address.address_line1}, {address.address_line2 && `${address.address_line2}, `}
+                        {address.city}, {address.state} - {address.postal_code}
                       </span>
                     </div>
                     <div className={styles.infoItem}>
                       <span className={styles.infoLabel}>Country</span>
-                      <span className={styles.infoValue}>{order.delivery_address.country}</span>
+                      <span className={styles.infoValue}>{address.country}</span>
                     </div>
                     <div className={styles.infoItem}>
                       <span className={styles.infoLabel}>Phone</span>
-                      <span className={styles.infoValue}>{order.delivery_address.phone}</span>
+                      <span className={styles.infoValue}>{address.phone}</span>
                     </div>
                   </>
                 ) : (
-                  <p className={styles.noData}>No address provided</p>
+                  <p className={styles.noData}>No address found</p>
                 )}
               </div>
             </div>
           </div>
+
+          {/* Shipping Management Form */}
+          <div className={styles.infoCard}>
+            <div className={styles.infoCardHeader}>
+              <span className={styles.infoCardTitle}>SHIPPING & TRACKING</span>
+              <Truck size={14} className={styles.headerIcon} />
+            </div>
+            <div className={styles.infoCardBody}>
+              <form onSubmit={handleShippingSubmit} className={styles.shippingForm}>
+                <div className={styles.formGrid}>
+                  <div className={styles.formGroup}>
+                    <label>Courier Name</label>
+                    <input 
+                        type="text" 
+                        placeholder="e.g. Delhivery, BlueDart"
+                        value={shippingForm.courier_name}
+                        onChange={(e) => setShippingForm({...shippingForm, courier_name: e.target.value})}
+                    />
+                  </div>
+                  <div className={styles.formGroup}>
+                    <label>Tracking ID</label>
+                    <input 
+                        type="text" 
+                        placeholder="e.g. TRK12345678"
+                        value={shippingForm.tracking_id}
+                        onChange={(e) => setShippingForm({...shippingForm, tracking_id: e.target.value})}
+                    />
+                  </div>
+                  <div className={styles.formGroup}>
+                    <label>Est. Delivery Date</label>
+                    <input 
+                        type="date"
+                        value={shippingForm.estimated_delivery_date}
+                        onChange={(e) => setShippingForm({...shippingForm, estimated_delivery_date: e.target.value})}
+                    />
+                  </div>
+                </div>
+                <button type="submit" className={styles.saveBtn} disabled={actionLoading}>
+                  {actionLoading ? 'Updating...' : 'Update Shipping & Mark Shipped'}
+                </button>
+              </form>
+            </div>
+          </div>
+
         </div>
 
-        {/* RIGHT — Payment + Summary + Timeline */}
+        {/* RIGHT COLUMN */}
         <div className={styles.rightCol}>
 
-          {/* Payment Info */}
+          {/* Payment Section */}
           <div className={styles.infoCard}>
             <div className={styles.infoCardHeader}>
-              <span className={styles.infoCardTitle}>PAYMENT INFO</span>
-              <CreditCard size={13} style={{ color: 'var(--primary, #4361EE)', opacity: 0.7 }} />
+              <span className={styles.infoCardTitle}>PAYMENT</span>
+              <CreditCard size={14} className={styles.headerIcon} />
             </div>
             <div className={styles.infoCardBody}>
-              <div className={styles.infoItem}>
-                <span className={styles.infoLabel}>Method</span>
-                <span className={styles.infoValue} style={{ textTransform: 'capitalize' }}>
-                  {order.payment_method?.replace('_', ' ') || 'N/A'}
-                </span>
+              <div className={styles.summaryRow}>
+                <span>Method</span>
+                <span className={styles.valText}>{order.payment_method?.toUpperCase()}</span>
               </div>
-              <div className={styles.infoItem}>
-                <span className={styles.infoLabel}>Status</span>
+              <div className={styles.summaryRow}>
+                <span>Status</span>
                 <PaymentBadge status={order.payment_status} />
               </div>
-              <div className={styles.infoItem}>
-                <span className={styles.infoLabel}>Transaction ID</span>
-                <code className={styles.txnId}>{order.transaction_id || 'N/A'}</code>
-              </div>
-              {order.payment_gateway && (
-                <div className={styles.infoItem}>
-                  <span className={styles.infoLabel}>Gateway</span>
-                  <span className={styles.infoValue}>{order.payment_gateway}</span>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Order Summary */}
-          <div className={styles.infoCard}>
-            <div className={styles.infoCardHeader}>
-              <span className={styles.infoCardTitle}>ORDER SUMMARY</span>
-              <Package size={13} style={{ color: 'var(--primary, #4361EE)', opacity: 0.7 }} />
-            </div>
-            <div className={styles.infoCardBody}>
               <div className={styles.summaryRow}>
-                <span className={styles.summaryLabel}>Subtotal</span>
-                <span className={styles.summaryVal}>{formatCurrency(order.subtotal)}</span>
+                <span>Transaction ID</span>
+                <span className={styles.valText}>{order.transaction_id || 'N/A'}</span>
               </div>
-              <div className={styles.summaryRow}>
-                <span className={styles.summaryLabel}>Shipping</span>
-                <span className={styles.summaryVal}>{formatCurrency(order.shipping_charge)}</span>
-              </div>
-              {parseFloat(order.discount_amount) > 0 && (
-                <div className={styles.summaryRow}>
-                  <span className={styles.summaryLabel}>
-                    Discount {order.coupon_code ? `(${order.coupon_code})` : ''}
-                  </span>
-                  <span className={`${styles.summaryVal} ${styles.discountVal}`}>
-                    −{formatCurrency(order.discount_amount)}
-                  </span>
-                </div>
-              )}
               <div className={styles.summaryDivider} />
-              <div className={`${styles.summaryRow} ${styles.summaryTotal}`}>
-                <span className={styles.summaryTotalLabel}>Total</span>
-                <span className={styles.summaryTotalVal}>{formatCurrency(order.total_amount)}</span>
+              <div className={styles.summaryRow}>
+                <span>Subtotal</span>
+                <span>{formatCurrency(order.subtotal)}</span>
+              </div>
+              <div className={styles.summaryRow}>
+                <span>Discount</span>
+                <span className={styles.discountVal}>-{formatCurrency(order.discount)}</span>
+              </div>
+              <div className={styles.summaryRow}>
+                <span>Shipping</span>
+                <span>{formatCurrency(order.delivery_fee)}</span>
+              </div>
+              <div className={`${styles.summaryRow} ${styles.totalRow}`}>
+                <span>Total Amount</span>
+                <span className={styles.totalValue}>{formatCurrency(order.total_amount)}</span>
               </div>
             </div>
           </div>
 
-          {/* Status Timeline */}
+          {/* Order Timeline */}
           <div className={styles.infoCard}>
             <div className={styles.infoCardHeader}>
               <span className={styles.infoCardTitle}>ORDER TIMELINE</span>
-              <Clock size={13} style={{ color: 'var(--primary, #4361EE)', opacity: 0.7 }} />
+              <Clock size={14} className={styles.headerIcon} />
             </div>
             <div className={styles.infoCardBody}>
               <div className={styles.timeline}>
-                {order.status_timeline?.map((step, idx) => (
-                  <div key={step.history_id || idx} className={styles.timelineItem}>
-                    <div className={styles.timelineLeft}>
-                      <div className={`${styles.timelineDot} ${idx === 0 ? styles.dotLatest : ''}`} />
-                      {idx < (order.status_timeline.length - 1) && <div className={styles.timelineLine} />}
+                {order.timeline?.map((step, idx) => (
+                  <div key={idx} className={styles.timelineItem}>
+                    <div className={styles.timelinePoint}>
+                      <div className={`${styles.dot} ${idx === order.timeline.length - 1 ? styles.dotPulse : ''}`} />
+                      {idx !== order.timeline.length - 1 && <div className={styles.line} />}
                     </div>
                     <div className={styles.timelineContent}>
-                      <div className={styles.timelineStatus}>
-                        <StatusBadge status={step.status} />
-                      </div>
-                      <div className={styles.timelineDate}>{formatDate(step.created_at, true)}</div>
-                      {step.comment && (
-                        <div className={styles.timelineComment}>{step.comment}</div>
-                      )}
+                      <div className={styles.timelineStatus}>{step.status}</div>
+                      <div className={styles.timelineMsg}>{step.message}</div>
+                      <div className={styles.timelineTime}>{formatDate(step.created_at, true)}</div>
                     </div>
                   </div>
                 ))}
@@ -380,6 +377,7 @@ const OrderDetails = () => {
           </div>
 
         </div>
+
       </div>
     </div>
   );

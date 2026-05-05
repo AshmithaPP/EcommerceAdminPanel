@@ -146,6 +146,16 @@ const couponService = {
 
     getCouponUsageHistory: async (couponId) => {
         return await Coupon.getUsageHistory(couponId);
+    },
+
+    listActiveCoupons: async () => {
+        const { coupons } = await Coupon.list(100, 0, null);
+        // Filter active and non-expired coupons
+        const now = new Date();
+        return coupons.filter(c => 
+            c.is_active && 
+            (!c.expiry_date || new Date(c.expiry_date) > now)
+        );
     }
 };
 

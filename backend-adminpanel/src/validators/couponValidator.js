@@ -26,7 +26,7 @@ const updateCouponSchema = Joi.object({
 
 const validateCouponSchema = Joi.object({
     code: Joi.string().trim().uppercase().required(),
-    orderAmount: Joi.number().precision(2).positive().required()
+    orderAmount: Joi.number().precision(2).min(0).required()
 });
 
 module.exports = { createCouponSchema, updateCouponSchema, validateCouponSchema };

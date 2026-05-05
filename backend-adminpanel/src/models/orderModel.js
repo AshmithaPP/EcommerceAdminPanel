@@ -2,157 +2,186 @@ const db = require('../config/database');
 const { v4: uuidv4 } = require('uuid');
 
 const Order = {
-    findAll: async ({ search, status, payment_status, startDate, endDate, limit = 10, offset = 0 }) => {
-        let query = `
-            SELECT o.*, u.name as customer_name, u.email as customer_email, u.phone as customer_phone
-            FROM orders o
-            JOIN users u ON o.user_id = u.user_id
-            WHERE 1=1
-        `;
-        const params = [];
+    create: async (orderData, items) => {
+        const connection = await db.getConnection();
+        await connection.beginTransaction();
 
-        if (search) {
-            query += ` AND (o.order_number LIKE ? OR u.name LIKE ? OR u.phone LIKE ?)`;
-            const searchPattern = `%${search}%`;
-            params.push(searchPattern, searchPattern, searchPattern);
+        try {
+            const orderId = uuidv4();
+            const { 
+                user_id, address_id, subtotal, discount, 
+                delivery_fee, total_amount, payment_method, shipping_address, coupon_id
+            } = orderData;
+
+            // 1. Insert Order
+            const orderNumber = `ORD${Date.now().toString().slice(-8)}${Math.floor(100 + Math.random() * 900)}`;
+            const orderSql = `
+                INSERT INTO orders (
+                    order_id, order_number, user_id, address_id, subtotal, discount, 
+                    delivery_fee, total_amount, payment_method, shipping_address, coupon_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            `;
+            await connection.query(orderSql, [
+                orderId, orderNumber, user_id, address_id, subtotal, discount, 
+                delivery_fee, total_amount, payment_method, JSON.stringify(shipping_address), coupon_id || null
+            ]);
+
+            // 2. Insert Order Items
+            for (const item of items) {
+                const orderItemId = uuidv4();
+                const itemSql = `
+                    INSERT INTO order_items (
+                        order_item_id, order_id, product_id, variant_id, 
+                        product_name, variant_name, variant_sku, quantity, price, image_url
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                `;
+                await connection.query(itemSql, [
+                    orderItemId, orderId, item.product_id, 
+                    item.variant_id || null, item.product_name, 
+                    item.variant_name || null, item.variant_sku || null, 
+                    item.quantity, item.price, item.image_url || null
+                ]);
+
+                // 3. Update Inventory (Deduct Stock)
+                if (item.variant_id) {
+                    await connection.query(
+                        'UPDATE inventory_levels SET quantity = quantity - ? WHERE variant_id = ?',
+                        [item.quantity, item.variant_id]
+                    );
+                } else {
+                    // Fallback for base products if they have inventory entries directly
+                    await connection.query(
+                        'UPDATE inventory_levels SET quantity = quantity - ? WHERE product_id = ? AND variant_id IS NULL',
+                        [item.quantity, item.product_id]
+                    );
+                }
+            }
+
+            await connection.commit();
+            
+            // 4. Initial Timeline Event
+            const timelineId = uuidv4();
+            await db.query(
+                'INSERT INTO order_timeline (timeline_id, order_id, status, message) VALUES (?, ?, ?, ?)',
+                [timelineId, orderId, 'pending', 'Order placed successfully']
+            );
+
+            return { order_id: orderId };
+        } catch (error) {
+            await connection.rollback();
+            throw error;
+        } finally {
+            connection.release();
         }
-
-        if (status) {
-            query += ` AND o.status = ?`;
-            params.push(status);
-        }
-
-        if (payment_status) {
-            query += ` AND o.payment_status = ?`;
-            params.push(payment_status);
-        }
-
-        if (startDate && endDate) {
-            query += ` AND DATE(o.created_at) BETWEEN ? AND ?`;
-            params.push(startDate, endDate);
-        }
-
-        // Get total count for pagination
-        const countQuery = `SELECT COUNT(*) as total FROM (${query}) as subquery`;
-        const [countResult] = await db.query(countQuery, params);
-        const total = countResult[0].total;
-
-        query += ` ORDER BY o.created_at DESC LIMIT ? OFFSET ?`;
-        params.push(parseInt(limit), parseInt(offset));
-
-        const [rows] = await db.query(query, params);
-        return { orders: rows, total };
     },
 
-    // ... rest of your model methods remain the same
     findById: async (orderId) => {
-        const orderQuery = `
-            SELECT o.*, u.user_id, u.name as customer_name, u.email as customer_email, u.phone as customer_phone
-            FROM orders o
-            JOIN users u ON o.user_id = u.user_id
-            WHERE o.order_id = ?
-        `;
-        const [orderRows] = await db.query(orderQuery, [orderId]);
-        const order = orderRows[0];
-
-        if (!order) return null;
-
-        // Fetch Items
-        const itemsQuery = `SELECT * FROM order_items WHERE order_id = ?`;
-        const [items] = await db.query(itemsQuery, [orderId]);
-        order.items = items;
-
-        // Fetch Address
-        const addressQuery = `SELECT * FROM order_addresses WHERE order_id = ?`;
-        const [addressRows] = await db.query(addressQuery, [orderId]);
-        order.delivery_address = addressRows[0];
-
-        // Fetch History
-        const historyQuery = `SELECT * FROM order_status_history WHERE order_id = ? ORDER BY created_at ASC`;
-        const [history] = await db.query(historyQuery, [orderId]);
-        order.status_timeline = history;
-
+        const [orders] = await db.query(`
+            SELECT o.*, 
+            (SELECT JSON_ARRAYAGG(
+                JSON_OBJECT(
+                    'product_id', oi.product_id,
+                    'variant_id', oi.variant_id,
+                    'quantity', oi.quantity,
+                    'price', oi.price,
+                    'name', oi.product_name,
+                    'variant_name', oi.variant_name,
+                    'image_url', oi.image_url
+                )
+            ) FROM order_items oi 
+            WHERE oi.order_id = o.order_id) as items,
+            (SELECT JSON_ARRAYAGG(
+                JSON_OBJECT(
+                    'status', ot.status,
+                    'message', ot.message,
+                    'created_at', ot.created_at
+                )
+            ) FROM order_timeline ot 
+            WHERE ot.order_id = o.order_id ORDER BY ot.created_at ASC) as timeline
+            FROM orders o WHERE o.order_id = ?
+        `, [orderId]);
+        
+        const order = orders[0];
+        if (order) {
+            if (typeof order.items === 'string') order.items = JSON.parse(order.items);
+            if (typeof order.timeline === 'string') order.timeline = JSON.parse(order.timeline);
+            if (typeof order.shipping_address === 'string') order.shipping_address = JSON.parse(order.shipping_address);
+        }
+        
         return order;
     },
 
-    create: async (orderData, connection) => {
-        const { order_id, order_number, user_id, subtotal, discount_amount, coupon_id, coupon_code, shipping_charge, total_amount, payment_method } = orderData;
-        const query = `
-            INSERT INTO orders (
-                order_id, order_number, user_id, subtotal, discount_amount,
-                coupon_id, coupon_code, shipping_charge, total_amount, payment_method
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    updateStatus: async (orderId, status, paymentStatus) => {
+        const sql = 'UPDATE orders SET status = ?, payment_status = ? WHERE order_id = ?';
+        await db.query(sql, [status, paymentStatus, orderId]);
+    },
+
+    findAllByUserId: async (userId, page = 1, limit = 10) => {
+        const offset = (page - 1) * limit;
+        const [rows] = await db.query(
+            `SELECT o.*, 
+            (SELECT JSON_ARRAYAGG(JSON_OBJECT('name', oi.product_name))
+             FROM order_items oi 
+             WHERE oi.order_id = o.order_id LIMIT 3) as items_preview
+             FROM orders o WHERE user_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?`,
+            [userId, parseInt(limit), parseInt(offset)]
+        );
+        return rows;
+    },
+
+    cancelOrder: async (orderId, userId) => {
+        const [result] = await db.query(
+            `UPDATE orders SET status = 'cancelled', cancelled_at = CURRENT_TIMESTAMP 
+             WHERE order_id = ? AND user_id = ? AND status IN ('pending', 'paid', 'processing')`,
+            [orderId, userId]
+        );
+        return result.affectedRows > 0;
+    },
+
+    adminUpdateStatus: async (orderId, data) => {
+        const { status, tracking_id, courier_name, estimated_delivery_date, message } = data;
+        const sql = `
+            UPDATE orders SET 
+                status = ?, 
+                tracking_id = ?, 
+                courier_name = ?, 
+                estimated_delivery_date = ? 
+            WHERE order_id = ?
         `;
-        const [result] = await connection.query(query, [
-            order_id,
-            order_number,
-            user_id,
-            subtotal,
-            discount_amount,
-            coupon_id,
-            coupon_code,
-            shipping_charge,
-            total_amount,
-            payment_method
+        await db.query(sql, [
+            status, 
+            tracking_id || null, 
+            courier_name || null, 
+            estimated_delivery_date || null, 
+            orderId
         ]);
-        return result.affectedRows > 0;
+
+        // Add timeline event
+        const timelineId = uuidv4();
+        await db.query(
+            'INSERT INTO order_timeline (timeline_id, order_id, status, message) VALUES (?, ?, ?, ?)',
+            [timelineId, orderId, status, message || `Order status updated to ${status}`]
+        );
     },
 
-    addItem: async (itemData, connection) => {
-        const { order_item_id, order_id, product_id, variant_id, product_name, variant_sku, attributes_json, quantity, price } = itemData;
-        const query = `
-            INSERT INTO order_items (order_item_id, order_id, product_id, variant_id, product_name, variant_sku, attributes_json, quantity, price)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    updateShipping: async (orderId, shippingData) => {
+        const { tracking_id, courier_name, estimated_delivery_date } = shippingData;
+        const sql = `
+            UPDATE orders SET 
+                tracking_id = ?, 
+                courier_name = ?, 
+                estimated_delivery_date = ?,
+                status = 'shipped'
+            WHERE order_id = ?
         `;
-        const [result] = await connection.query(query, [order_item_id, order_id, product_id, variant_id, product_name, variant_sku, JSON.stringify(attributes_json), quantity, price]);
-        return result.affectedRows > 0;
-    },
+        await db.query(sql, [tracking_id, courier_name, estimated_delivery_date, orderId]);
 
-    addAddress: async (addressData, connection) => {
-        const { order_address_id, order_id, name, phone, email, address_line1, address_line2, city, state, zip_code, country } = addressData;
-        const query = `
-            INSERT INTO order_addresses (order_address_id, order_id, name, phone, email, address_line1, address_line2, city, state, zip_code, country)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `;
-        const [result] = await connection.query(query, [order_address_id, order_id, name, phone, email, address_line1, address_line2, city, state, zip_code, country]);
-        return result.affectedRows > 0;
-    },
-
-    addHistory: async (historyData, connection) => {
-        const { history_id, order_id, status, comment } = historyData;
-        const query = `INSERT INTO order_status_history (history_id, order_id, status, comment) VALUES (?, ?, ?, ?)`;
-        const executor = connection || db;
-        const [result] = await executor.query(query, [history_id, order_id, status, comment]);
-        return result.affectedRows > 0;
-    },
-
-    updateStatus: async (orderId, status, comment, connection = null) => {
-        const executor = connection || await db.getConnection();
-        const shouldManageTransaction = !connection;
-
-        try {
-            if (shouldManageTransaction) await executor.beginTransaction();
-            
-            const query = `UPDATE orders SET status = ? WHERE order_id = ?`;
-            await executor.query(query, [status, orderId]);
-
-            const historyId = uuidv4();
-            await Order.addHistory({ history_id: historyId, order_id: orderId, status, comment }, executor);
-
-            if (shouldManageTransaction) await executor.commit();
-            return true;
-        } catch (error) {
-            if (shouldManageTransaction) await executor.rollback();
-            throw error;
-        } finally {
-            if (shouldManageTransaction) executor.release();
-        }
-    },
-
-    updatePaymentStatus: async (orderId, paymentStatus, transactionId) => {
-        const query = `UPDATE orders SET payment_status = ?, transaction_id = COALESCE(?, transaction_id) WHERE order_id = ?`;
-        const [result] = await db.query(query, [paymentStatus, transactionId, orderId]);
-        return result.affectedRows > 0;
+        // Add timeline event
+        const timelineId = uuidv4();
+        await db.query(
+            'INSERT INTO order_timeline (timeline_id, order_id, status, message) VALUES (?, ?, ?, ?)',
+            [timelineId, orderId, 'shipped', `Order shipped via ${courier_name}. Tracking ID: ${tracking_id}`]
+        );
     }
 };
 

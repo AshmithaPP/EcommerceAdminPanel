@@ -63,7 +63,7 @@ const DataTable = ({
             </tr>
           </thead>
           <tbody>
-            {data.length > 0 ? (
+            {(data && data.length > 0) ? (
               data.map((row, rowIdx) => (
                 <tr key={rowIdx} className={rowIdx % 2 === 1 ? styles.stripedRow : ''}>
                   {columns.map((col, colIdx) => (

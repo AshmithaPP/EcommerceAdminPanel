@@ -4,17 +4,18 @@ const { v4: uuidv4 } = require('uuid');
 const Cart = {
     // Find cart by user_id or guest_id
     findCart: async (userId, guestId) => {
-        let sql = 'SELECT * FROM carts WHERE ';
-        let params = [];
-        if (userId) {
-            sql += 'user_id = ?';
-            params.push(userId);
-        } else {
-            sql += 'guest_id = ?';
-            params.push(guestId);
-        }
-        const [rows] = await db.query(sql, params);
-        return rows[0];
+        // Find all potential carts for this session
+        const [carts] = await db.query(`
+            SELECT c.*, (SELECT COUNT(*) FROM cart_items WHERE cart_id = c.cart_id) as item_count
+            FROM carts c
+            WHERE c.user_id = ? OR c.guest_id = ?
+            ORDER BY item_count DESC, c.updated_at DESC
+        `, [userId || null, guestId || null]);
+
+        console.log('🔍 FindCart Result:', carts.length > 0 ? { id: carts[0].cart_id, items: carts[0].item_count } : 'No Cart Found');
+
+        // Return the first cart (prioritizes the one with most items, then most recently updated)
+        return carts[0] || null;
     },
 
     createCart: async (userId, guestId) => {

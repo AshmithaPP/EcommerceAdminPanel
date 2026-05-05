@@ -25,9 +25,9 @@ const PaymentService = {
             // Store initial payment record
             await Payment.create({
                 order_id: orderId,
-                razorpay_order_id: razorpayOrder.id,
+                gateway_order_id: razorpayOrder.id,
                 amount: amount,
-                currency: 'INR'
+                status: 'pending'
             });
 
             return razorpayOrder;
@@ -44,19 +44,24 @@ const PaymentService = {
 
         if (generatedSignature !== razorpaySignature) {
             // Mark payment as failed in DB
-            await Payment.updateStatus(razorpayOrderId, 'failed', razorpayPaymentId, razorpaySignature);
+            await Payment.updateByGatewayOrderId(razorpayOrderId, {
+                gateway_payment_id: razorpayPaymentId,
+                status: 'failed'
+            });
             throw new Error('Invalid payment signature');
         }
 
         // 1. Update Payment record to success
-        await Payment.updateStatus(razorpayOrderId, 'success', razorpayPaymentId, razorpaySignature);
+        await Payment.updateByGatewayOrderId(razorpayOrderId, {
+            gateway_payment_id: razorpayPaymentId,
+            status: 'success'
+        });
 
         // 2. Update related Order status
-        const paymentRecord = await Payment.findByRazorpayOrderId(razorpayOrderId);
+        const paymentRecord = await Payment.findByGatewayOrderId(razorpayOrderId);
         if (paymentRecord) {
-            await Order.updatePaymentStatus(paymentRecord.order_id, 'Paid', razorpayPaymentId);
-            // Also update main status to 'Confirmed'
-            await Order.updateStatus(paymentRecord.order_id, 'Confirmed', 'Payment received via Razorpay');
+            // Update order to 'paid' status and 'success' payment status
+            await Order.updateStatus(paymentRecord.order_id, 'paid', 'success');
 
             // 3. Deduct stock permanently from inventory
             const orderDetails = await Order.findById(paymentRecord.order_id);
