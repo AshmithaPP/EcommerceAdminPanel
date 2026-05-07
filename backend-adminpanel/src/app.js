@@ -194,6 +194,14 @@ const db = require('./config/database');
         `);
         console.log('✅ Order timeline table check complete');
 
+        // --- Migration: Database Optimization Indexes ---
+        try {
+            await db.query('CREATE INDEX idx_orders_created_at ON orders(created_at)');
+            await db.query('CREATE INDEX idx_orders_payment_status ON orders(payment_status)');
+            await db.query('CREATE INDEX idx_order_items_product_id ON order_items(product_id)');
+            console.log('✅ Performance indexes created');
+        } catch (e) {}
+
     } catch (err) {
         console.error('❌ Migration failed:', err);
     }
@@ -229,7 +237,7 @@ app.use(cors({
         return callback(null, true);
     },
     credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'x-guest-id']
 }));
 
@@ -270,5 +278,7 @@ app.get('/', (req, res) => {
 
 // Centralized Error Handler
 app.use(errorHandler);
+
+app.set('version', 'v1.0.DEBUG_LOGGING_ACTIVE');
 
 module.exports = app;

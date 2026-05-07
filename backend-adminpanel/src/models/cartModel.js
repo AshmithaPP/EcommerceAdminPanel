@@ -4,13 +4,17 @@ const { v4: uuidv4 } = require('uuid');
 const Cart = {
     // Find cart by user_id or guest_id
     findCart: async (userId, guestId) => {
+        console.log(`🔎 findCart Parameters - User: ${userId}, Guest: ${guestId}`);
         // Find all potential carts for this session
         const [carts] = await db.query(`
             SELECT c.*, (SELECT COUNT(*) FROM cart_items WHERE cart_id = c.cart_id) as item_count
             FROM carts c
-            WHERE c.user_id = ? OR c.guest_id = ?
-            ORDER BY item_count DESC, c.updated_at DESC
-        `, [userId || null, guestId || null]);
+            WHERE (c.user_id IS NOT NULL AND c.user_id = ?) OR (c.guest_id IS NOT NULL AND c.guest_id = ?)
+            ORDER BY 
+                (CASE WHEN c.user_id = ? THEN 1 ELSE 0 END) DESC,
+                item_count DESC, 
+                c.updated_at DESC
+        `, [userId || '___NONE___', guestId || '___NONE___', userId || '___NONE___']);
 
         console.log('🔍 FindCart Result:', carts.length > 0 ? { id: carts[0].cart_id, items: carts[0].item_count } : 'No Cart Found');
 

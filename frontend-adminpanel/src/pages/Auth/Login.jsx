@@ -69,14 +69,14 @@ const Login = () => {
   return (
     <div className={styles.loginWrapper}>
       <main className={styles.mainContainer}>
-        {/* Top Branding Anchor */}
+        {/* Top Branding */}
         <div className={styles.brandingHeader}>
-          <h1 className={styles.brandTitle}>The Silk Curator</h1>
+          <h1 className={styles.brandTitle}>Silk Curator</h1>
         </div>
 
         {/* Login Card */}
         <div className={styles.loginCard}>
-          {/* Brand Logo/Icon */}
+          {/* Brand Logo */}
           <div className={styles.iconWrapper}>
             <div className={styles.logoCircle}>
               <span className={styles.logoText}>SC</span>
@@ -84,34 +84,31 @@ const Login = () => {
           </div>
 
           <div className={styles.headerText}>
-            <h2 className={styles.headline}>Log In to your account</h2>
+            <h2 className={styles.headline}>Welcome Back</h2>
+            <p className={styles.subHeadline}>Please enter your details to sign in</p>
+            
             {error && (
-              <div style={{ marginTop: '10px' }}>
-                <p style={{ color: '#ff4d4f', textAlign: 'center', marginBottom: '5px' }}>{error}</p>
+              <div className={styles.errorText}>
+                {error}
                 {blockedUserId && (
-                  <button 
-                    onClick={handleForceLogout}
-                    style={{ 
-                      background: 'none', 
-                      border: 'none', 
-                      color: '#c9a84c', 
-                      textDecoration: 'underline', 
-                      cursor: 'pointer',
-                      fontSize: '14px'
-                    }}
-                  >
-                    Logout?
-                  </button>
+                  <div style={{ marginTop: '4px' }}>
+                    <button 
+                      onClick={handleForceLogout}
+                      className={styles.forceLogoutBtn}
+                    >
+                      Click here to clear other sessions
+                    </button>
+                  </div>
                 )}
               </div>
             )}
-            {success && <p style={{ color: '#52c41a', textAlign: 'center', marginTop: '10px' }}>{success}</p>}
+            {success && <div className={styles.successText}>{success}</div>}
           </div>
 
           <form className={styles.form} onSubmit={handleSubmit}>
             {/* Email Field */}
             <div className={styles.fieldContainer}>
-              <label className={styles.fieldLabel} htmlFor="email">Email</label>
+              <label className={styles.fieldLabel} htmlFor="email">Email Address</label>
               <input 
                 className={styles.input} 
                 id="email" 
@@ -119,14 +116,17 @@ const Login = () => {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="Enter your email"
+                placeholder="name@example.com"
                 required
               />
             </div>
 
             {/* Password Field */}
             <div className={styles.fieldContainer}>
-              <label className={styles.fieldLabel} htmlFor="password">Password</label>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <label className={styles.fieldLabel} htmlFor="password">Password</label>
+                <Link className={styles.forgotLink} to="/reset-password">Forgot password?</Link>
+              </div>
               <div className={styles.passwordWrapper}>
                 <input 
                   className={styles.input} 
@@ -135,19 +135,17 @@ const Login = () => {
                   type={showPassword ? "text" : "password"}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Enter your password"
+                  placeholder="••••••••"
                   required
                 />
                 <button 
                   className={styles.visibilityBtn} 
                   type="button"
                   onClick={togglePasswordVisibility}
+                  aria-label={showPassword ? "Hide password" : "Show password"}
                 >
-                  {showPassword ? <Eye size={20} /> : <EyeOff size={20} />}
+                  {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
                 </button>
-              </div>
-              <div className={styles.forgotPassWrapper}>
-                <Link className={styles.forgotLink} to="/reset-password">Forgot password?</Link>
               </div>
             </div>
 
@@ -156,9 +154,9 @@ const Login = () => {
               <Button 
                 type="submit" 
                 className={styles.submitBtn}
-                disabled={isSubmitting}
+                isLoading={isSubmitting}
               >
-                {isSubmitting ? "Logging in..." : "Log In"}
+                Sign In
               </Button>
             </div>
           </form>
@@ -167,7 +165,7 @@ const Login = () => {
 
       {/* Global Footer */}
       <footer className={styles.globalFooter}>
-        <span className={styles.copyright}>© 2024 The Silk Curator. All rights reserved.</span>
+        <span className={styles.copyright}>© 2024 Silk Curator Dashboard. All rights reserved.</span>
       </footer>
     </div>
   );

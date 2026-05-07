@@ -34,6 +34,7 @@ import analyticsService from '../../services/analyticsService';
 import StatCard from '../../components/ui/StatCard1';
 import ExportManager from '../../utils/ExportManager';
 import DataTable from '../../components/ui/DataTable';
+import toast from 'react-hot-toast';
 
 // --- Helpers ---
 const CustomTooltip = ({ active, payload, label, prefix = '' }) => {
@@ -132,8 +133,17 @@ const Analytics = () => {
   const [error, setError] = useState(null);
 
   const handleExport = () => {
-    if (trendData.length > 0) {
-      ExportManager.exportToCSV(trendData, `SilkCurator_Analytics_${activeTab}`);
+    console.log('Export requested. TrendData:', trendData);
+    if (!trendData || trendData.length === 0) {
+      toast.error('No data available to export');
+      return;
+    }
+    try {
+      const title = `Analytics Report - ${activeTab.toUpperCase()} (${timeRange})`;
+      ExportManager.exportToPDF(trendData, title, `SilkCurator_${activeTab}_Report`);
+    } catch (err) {
+      console.error('Export failed:', err);
+      toast.error('PDF generation failed. Check console for details.');
     }
   };
 
@@ -171,6 +181,11 @@ const Analytics = () => {
     );
   }
 
+  const rangeTotals = trendData.reduce((acc, curr) => ({
+    revenue: acc.revenue + (parseFloat(curr.revenue) || 0),
+    orders: acc.orders + (parseInt(curr.orders) || 0)
+  }), { revenue: 0, orders: 0 });
+
   return (
     <div className="page-container">
       <header className={styles.header}>
@@ -193,12 +208,11 @@ const Analytics = () => {
         </div>
       </header>
 
-      {/* Dashboard Hero: KPI Column + Revenue Chart */}
       <div className={styles.dashboardHero}>
         <div className={styles.kpiColumn}>
           <StatCard 
-            label="Revenue" 
-            value={formatCurrency(summary?.today?.revenue)} 
+            label={`${timeRange} Revenue`} 
+            value={formatCurrency(rangeTotals.revenue)} 
             trend={summary?.growth?.revenue >= 0 ? "up" : "down"}
             icon={<IndianRupee size={20} />}
             gradient={["#4F7CFF", "#8B5CF6"]}
@@ -207,8 +221,8 @@ const Analytics = () => {
             sparklineData={trendData.length > 0 ? trendData.map(d => d.revenue) : [0, 5, 2, 8, 4, 10, 6]}
           />
           <StatCard 
-            label="Orders" 
-            value={(summary?.today?.orders || 0).toString()} 
+            label={`${timeRange} Orders`} 
+            value={rangeTotals.orders.toString()} 
             trend={summary?.growth?.orders >= 0 ? "up" : "down"}
             icon={<ShoppingBag size={20} />}
             gradient={["#EC4899", "#F43F5E"]}
@@ -217,7 +231,7 @@ const Analytics = () => {
             sparklineData={trendData.length > 0 ? trendData.map(d => d.orders) : [2, 4, 3, 7, 5, 8, 6]}
           />
           <StatCard 
-            label="New Users" 
+            label="Active Customers" 
             value={(summary?.today?.customers || 0).toString()} 
             trend="up"
             icon={<Users size={20} />}

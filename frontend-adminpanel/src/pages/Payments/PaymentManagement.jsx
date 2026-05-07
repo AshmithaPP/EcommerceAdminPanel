@@ -218,8 +218,18 @@ const PaymentManagement = () => {
                 </div>
 
                 <div className={styles.detailItem}>
-                  <span className={styles.detailLabel}>Order ID</span>
-                  <code className={styles.txnId}>{selectedTx.razorpay_order_id || 'N/A'}</code>
+                  <span className={styles.detailLabel}>Order Number</span>
+                  <code className={styles.txnId}>#{selectedTx.order_number}</code>
+                </div>
+
+                <div className={styles.detailItem}>
+                  <span className={styles.detailLabel}>Razorpay Order</span>
+                  <code className={styles.txnId}>{selectedTx.gateway_order_id || 'N/A'}</code>
+                </div>
+
+                <div className={styles.detailItem}>
+                  <span className={styles.detailLabel}>Razorpay Payment</span>
+                  <code className={styles.txnId}>{selectedTx.gateway_payment_id || 'N/A'}</code>
                 </div>
 
                 <div className={styles.detailItem}>

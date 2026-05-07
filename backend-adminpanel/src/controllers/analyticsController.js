@@ -40,7 +40,7 @@ const analyticsController = {
                     SUM(oi.quantity * oi.price) as revenue
                 FROM order_items oi
                 JOIN orders o ON oi.order_id = o.order_id
-                WHERE o.payment_status = 'Paid'
+                WHERE o.payment_status IN ('Paid', 'success', 'Completed')
                 GROUP BY oi.product_id, oi.product_name
                 ORDER BY unitsSold DESC
                 LIMIT 10
@@ -55,7 +55,7 @@ const analyticsController = {
                 JOIN sub_categories sc ON p.sub_category_id = sc.sub_category_id
                 JOIN categories c ON sc.category_id = c.category_id
                 JOIN orders o ON oi.order_id = o.order_id
-                WHERE o.payment_status = 'Paid'
+                WHERE o.payment_status IN ('Paid', 'success', 'Completed')
                 GROUP BY c.name
             `;
             const [categories] = await require('../config/database').query(categorySql);
@@ -80,7 +80,7 @@ const analyticsController = {
                 SELECT u.name, u.email, COUNT(o.order_id) as totalOrders, SUM(o.total_amount) as totalSpent
                 FROM users u
                 JOIN orders o ON u.user_id = o.user_id
-                WHERE o.payment_status = 'Paid'
+                WHERE o.payment_status IN ('Paid', 'success', 'Completed')
                 GROUP BY u.user_id
                 ORDER BY totalSpent DESC
                 LIMIT 10

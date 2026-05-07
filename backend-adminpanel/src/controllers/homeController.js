@@ -61,13 +61,16 @@ const getHomeData = async (req, res) => {
 
         // 8. Fetch Dynamic Trending Picks
         const [trending] = await db.query(
-            'SELECT id as category_id, name, slug FROM home_trending_picks ORDER BY display_order ASC'
+            'SELECT id as category_id, name, slug, image_url, display_order FROM home_trending_picks ORDER BY display_order ASC'
         );
 
         // 9. Fetch Dynamic Price Filters
         const [prices] = await db.query(
-            'SELECT label, min_price, max_price FROM home_price_filters ORDER BY display_order ASC'
+            'SELECT id, label, min_price, max_price, image_url, display_order FROM home_price_filters ORDER BY display_order ASC'
         );
+
+        // 10. Fetch Newsletter
+        const [newsletter] = await db.query('SELECT * FROM home_newsletter LIMIT 1');
 
         res.status(200).json({
             success: true,
@@ -127,9 +130,12 @@ const getHomeData = async (req, res) => {
 
                 testimonials: testimonials,
                 blogs: blogs,
-                newsletter: {
+                newsletter: newsletter[0] || {
                     title: "Enter The World Of Timeless Sarees",
-                    subtitle: "Be the first to discover our latest collections"
+                    subtitle: "Be the first to discover our latest collections",
+                    email_placeholder: "Enter Your Email Address",
+                    button_text: "Stay Connected",
+                    image_url: ""
                 }
             }
         });
@@ -224,6 +230,30 @@ const createTestimonial = async (req, res) => {
     }
 };
 
+const updateTestimonial = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { customer_name, designation, rating, comment, image_url, is_active } = req.body;
+        await db.query(
+            'UPDATE testimonials SET customer_name = ?, designation = ?, rating = ?, comment = ?, image_url = ?, is_active = ? WHERE testimonial_id = ?',
+            [customer_name, designation, rating, comment, image_url, is_active === undefined ? 1 : is_active, id]
+        );
+        res.status(200).json({ success: true, message: 'Testimonial updated successfully' });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+const deleteTestimonial = async (req, res) => {
+    try {
+        const { id } = req.params;
+        await db.query('DELETE FROM testimonials WHERE testimonial_id = ?', [id]);
+        res.status(200).json({ success: true, message: 'Testimonial deleted successfully' });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
 // Generic Toggle helper
 const toggleFeaturedProduct = async (req, res) => {
     try {
@@ -240,6 +270,17 @@ const toggleFeaturedCategory = async (req, res) => {
         const { id } = req.params;
         await db.query('UPDATE categories SET is_featured = NOT is_featured WHERE category_id = ?', [id]);
         res.status(200).json({ success: true, message: 'Featured status updated' });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+const updateCategoryImage = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { image_url } = req.body;
+        await db.query('UPDATE categories SET image_url = ? WHERE category_id = ?', [image_url, id]);
+        res.status(200).json({ success: true, message: 'Category image updated' });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
     }
@@ -299,16 +340,16 @@ const getTrendingPicks = async (req, res) => {
 const updateTrendingPick = async (req, res) => {
     try {
         const { id } = req.params;
-        const { name, slug, display_order } = req.body;
+        const { name, slug, image_url, display_order } = req.body;
         if (id === 'new') {
             await db.query(
-                'INSERT INTO home_trending_picks (name, slug, display_order) VALUES (?, ?, ?)',
-                [name, slug, display_order || 0]
+                'INSERT INTO home_trending_picks (name, slug, image_url, display_order) VALUES (?, ?, ?, ?)',
+                [name, slug, image_url, display_order || 0]
             );
         } else {
             await db.query(
-                'UPDATE home_trending_picks SET name = ?, slug = ?, display_order = ? WHERE id = ?',
-                [name, slug, display_order, id]
+                'UPDATE home_trending_picks SET name = ?, slug = ?, image_url = ?, display_order = ? WHERE id = ?',
+                [name, slug, image_url, display_order, id]
             );
         }
         res.status(200).json({ success: true, message: 'Trending pick saved successfully' });
@@ -340,16 +381,16 @@ const getPriceFilters = async (req, res) => {
 const updatePriceFilter = async (req, res) => {
     try {
         const { id } = req.params;
-        const { label, min_price, max_price, display_order } = req.body;
+        const { label, min_price, max_price, image_url, display_order } = req.body;
         if (id === 'new') {
             await db.query(
-                'INSERT INTO home_price_filters (label, min_price, max_price, display_order) VALUES (?, ?, ?, ?)',
-                [label, min_price, max_price, display_order || 0]
+                'INSERT INTO home_price_filters (label, min_price, max_price, image_url, display_order) VALUES (?, ?, ?, ?, ?)',
+                [label, min_price, max_price, image_url, display_order || 0]
             );
         } else {
             await db.query(
-                'UPDATE home_price_filters SET label = ?, min_price = ?, max_price = ?, display_order = ? WHERE id = ?',
-                [label, min_price, max_price, display_order, id]
+                'UPDATE home_price_filters SET label = ?, min_price = ?, max_price = ?, image_url = ?, display_order = ? WHERE id = ?',
+                [label, min_price, max_price, image_url, display_order, id]
             );
         }
         res.status(200).json({ success: true, message: 'Price filter saved successfully' });
@@ -368,6 +409,38 @@ const deletePriceFilter = async (req, res) => {
     }
 };
 
+// Newsletter
+const getNewsletter = async (req, res) => {
+    try {
+        const [rows] = await db.query('SELECT * FROM home_newsletter LIMIT 1');
+        res.status(200).json({ success: true, data: rows[0] });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+const updateNewsletter = async (req, res) => {
+    try {
+        const { title, subtitle, email_placeholder, button_text, image_url } = req.body;
+        const [rows] = await db.query('SELECT id FROM home_newsletter LIMIT 1');
+        
+        if (rows.length === 0) {
+            await db.query(
+                'INSERT INTO home_newsletter (title, subtitle, email_placeholder, button_text, image_url) VALUES (?, ?, ?, ?, ?)',
+                [title, subtitle, email_placeholder, button_text, image_url]
+            );
+        } else {
+            await db.query(
+                'UPDATE home_newsletter SET title = ?, subtitle = ?, email_placeholder = ?, button_text = ?, image_url = ? WHERE id = ?',
+                [title, subtitle, email_placeholder, button_text, image_url, rows[0].id]
+            );
+        }
+        res.status(200).json({ success: true, message: 'Newsletter updated successfully' });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
 module.exports = {
     getHomeData,
     getHero,
@@ -376,8 +449,11 @@ module.exports = {
     createSection,
     getTestimonials,
     createTestimonial,
+    updateTestimonial,
+    deleteTestimonial,
     toggleFeaturedProduct,
     toggleFeaturedCategory,
+    updateCategoryImage,
     // New dynamic section methods
     getOccasions,
     updateOccasion,
@@ -387,5 +463,7 @@ module.exports = {
     deleteTrendingPick,
     getPriceFilters,
     updatePriceFilter,
-    deletePriceFilter
+    deletePriceFilter,
+    getNewsletter,
+    updateNewsletter
 };

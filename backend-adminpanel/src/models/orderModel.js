@@ -182,6 +182,34 @@ const Order = {
             'INSERT INTO order_timeline (timeline_id, order_id, status, message) VALUES (?, ?, ?, ?)',
             [timelineId, orderId, 'shipped', `Order shipped via ${courier_name}. Tracking ID: ${tracking_id}`]
         );
+
+        // CREATE SHIPMENT RECORD (Sync with Shipping Module)
+        try {
+            const Shipment = require('./shipmentModel');
+            // Check if shipment already exists
+            const existing = await Shipment.findByOrderId(orderId);
+            if (existing.length === 0) {
+                console.log(`📦 Creating shipment record for Order: ${orderId}`);
+                await Shipment.create({
+                    order_id: orderId,
+                    courier_name: courier_name,
+                    tracking_number: tracking_id
+                });
+                
+                // Automatically advance to 'Shipped' status in shipment model
+                const newShipment = await Shipment.findByOrderId(orderId);
+                if (newShipment.length > 0) {
+                    await Shipment.updateStatus(newShipment[0].shipment_id, 'Shipped', { 
+                        location: 'Warehouse', 
+                        comment: 'Order marked as shipped from order management.' 
+                    });
+                }
+            }
+        } catch (err) {
+            console.error('❌ Failed to create shipment record:', err.message);
+            // Don't fail the whole request if shipment record creation fails, 
+            // but log it for debugging.
+        }
     }
 };
 

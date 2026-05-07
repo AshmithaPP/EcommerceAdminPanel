@@ -3,6 +3,7 @@ import shippingService from '../services/shippingService';
 import { showToast } from '../utils/toast';
 
 export const STATUS_TABS = [
+  { id: 'ALL', label: 'All Shipments' },
   { id: 'PACKED', label: 'Packed' },
   { id: 'SHIPPED', label: 'Shipped' },
   { id: 'OFD', label: 'Out for Delivery' },
@@ -25,7 +26,7 @@ const initialState = {
   total: 0,
 
   // Filters
-  activeTab: 'PACKED',
+  activeTab: 'ALL',
 
   // States
   loading: false,
@@ -60,7 +61,7 @@ const useShippingStore = create((set, get) => ({
     set({ loading: true, listError: null });
 
     try {
-      const status = statusMap[activeTab];
+      const status = activeTab === 'ALL' ? null : statusMap[activeTab];
       const response = await shippingService.getShipments({ 
         status, 
         page, 
@@ -69,7 +70,7 @@ const useShippingStore = create((set, get) => ({
 
       set({
         shipments: response.data || [],
-        total: response.pagination?.total_items || response.data?.length || 0
+        total: response.pagination?.total || response.data?.length || 0
       });
     } catch (error) {
       const msg = error.response?.data?.message || 'Error fetching shipments';

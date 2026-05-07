@@ -41,7 +41,16 @@ const Payment = {
 
     findAll: async ({ limit = 10, offset = 0 }) => {
         const [payments] = await db.query(
-            'SELECT * FROM payments ORDER BY created_at DESC LIMIT ? OFFSET ?',
+            `SELECT 
+                p.*, 
+                o.order_number, 
+                u.name as customer_name, 
+                u.email as customer_email
+             FROM payments p
+             JOIN orders o ON p.order_id = o.order_id
+             JOIN users u ON o.user_id = u.user_id
+             ORDER BY p.created_at DESC 
+             LIMIT ? OFFSET ?`,
             [parseInt(limit), parseInt(offset)]
         );
         const [countRows] = await db.query('SELECT COUNT(*) as total FROM payments');

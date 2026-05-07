@@ -2,6 +2,7 @@ const Order = require('../models/orderModel');
 const cartService = require('../services/cartService');
 const Address = require('../models/addressModel');
 const Product = require('../models/productModel');
+const db = require('../config/database');
 
 const orderController = {
     createOrder: async (req, res, next) => {
@@ -10,25 +11,57 @@ const orderController = {
             const guestId = req.headers['x-guest-id'];
             const { address_id, payment_method, address: guestAddress } = req.body;
 
-            console.log('📦 Create Order Debug:', { userId, guestId, address_id });
+            console.log('📦 Create Order Request:', { 
+                userId, 
+                guestId, 
+                hasAddress: !!(address_id || guestAddress),
+                paymentMethod: payment_method 
+            });
             
-            // Failsafe: Merge cart if both IDs are present to ensure items are associated with user
+            // 1. Failsafe: Merge guest items into user account if both exist
             if (userId && guestId) {
-                console.log('🔄 Failsafe: Merging guest cart into user cart...');
-                await cartService.mergeCart(userId, guestId);
+                try {
+                    console.log(`🔄 Attempting failsafe merge for User: ${userId}, Guest: ${guestId}`);
+                    await cartService.mergeCart(userId, guestId);
+                } catch (mergeErr) {
+                    console.error('❌ Failsafe merge failed:', mergeErr.message);
+                    // Continue anyway, maybe user already has items in their account
+                }
             }
 
-            // 1. Get Cart Items
-            const cart = await cartService.getCart(userId, guestId);
-            console.log('🛒 Cart Found:', { 
+            // 2. Fetch Cart (Try multiple strategies to find items)
+            let cart = await cartService.getCart(userId, guestId);
+            
+            // Last resort: If cart is empty but we have a userId, try fetching ONLY by userId
+            if ((!cart || !cart.items || cart.items.length === 0) && userId) {
+                console.log('🔍 Cart empty with GuestID, retrying with UserID only...');
+                cart = await cartService.getCart(userId, null);
+            }
+
+            console.log('🛒 Final Cart Check:', { 
                 cartId: cart?.cart_id, 
-                itemCount: cart?.items?.length,
-                items: cart?.items?.map(i => ({ id: i.product_id, qty: i.quantity }))
+                itemCount: cart?.items?.length || 0
             });
 
             if (!cart || !cart.items || cart.items.length === 0) {
-                console.warn('⚠️ Order creation blocked: Cart is empty for user:', userId, 'guest:', guestId);
-                return res.status(400).json({ success: false, message: 'Cart is empty' });
+                console.warn('🛑 Order creation blocked: No items found in any cart for User:', userId);
+                
+                // --- DEEP DEBUG DATA ---
+                const [dbCarts] = await db.query('SELECT * FROM carts WHERE user_id = ? OR guest_id = ?', [userId, guestId]);
+                const [dbItems] = await db.query(`
+                    SELECT ci.* FROM cart_items ci 
+                    JOIN carts c ON ci.cart_id = c.cart_id 
+                    WHERE c.user_id = ? OR c.guest_id = ?
+                `, [userId, guestId]);
+
+                // Sanity check: Are there ANY carts? Does the user exist?
+                const [allCarts] = await db.query('SELECT cart_id, user_id, guest_id FROM carts LIMIT 5');
+                const [userCheck] = await db.query('SELECT user_id FROM users WHERE user_id = ?', [userId]);
+
+                return res.status(400).json({ 
+                    success: false, 
+                    message: 'Cart is empty'
+                });
             }
 
             // 2. Validate Stock & Prepare Items
@@ -129,8 +162,13 @@ const orderController = {
                 shipping_address: finalAddress
             }, items);
 
-            // 6. Clear Cart
-            await cartService.clearCart(userId, guestId);
+            // 6. Clear Cart (Only for COD/Direct. For Razorpay, we clear after verification)
+            if (payment_method !== 'razorpay') {
+                console.log('🧹 Clearing cart for direct payment order...');
+                await cartService.clearCart(userId, guestId);
+            } else {
+                console.log('⏳ Skipping cart clear: Waiting for Razorpay verification...');
+            }
 
             res.status(201).json({
                 success: true,

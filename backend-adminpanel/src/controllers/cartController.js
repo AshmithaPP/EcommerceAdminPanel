@@ -1,10 +1,13 @@
 const cartService = require('../services/cartService');
+const db = require('../config/database');
 
 const cartController = {
     getCart: async (req, res, next) => {
         try {
             const userId = req.user ? req.user.user_id : null;
             const guestId = req.headers['x-guest-id'] || req.query.guest_id;
+            
+            console.log(`🛒 GET CART Request - User: ${userId || 'GUEST'}, Guest: ${guestId || 'NONE'}`);
             
             const result = await cartService.getCart(userId, guestId);
             res.status(200).json({ success: true, ...result });
@@ -18,12 +21,26 @@ const cartController = {
             const userId = req.user ? req.user.user_id : null;
             const guestId = req.headers['x-guest-id'] || req.body.guest_id;
             
+            console.log(`➕ ADD TO CART Request - User: ${userId || 'GUEST'}, Guest: ${guestId || 'NONE'}`);
+            
             if (!userId && !guestId) {
                 return res.status(400).json({ success: false, message: 'User ID or Guest ID is required' });
             }
 
             const result = await cartService.addToCart(userId, guestId, req.body);
-            res.status(200).json({ success: true, data: result });
+            
+            // Check state immediately after add
+            const [countCheck] = await db.query('SELECT COUNT(*) as count FROM carts');
+            
+            res.status(200).json({ 
+                success: true, 
+                message: 'Added to cart',
+                state: {
+                    userId,
+                    guestId,
+                    totalCarts: countCheck[0].count
+                }
+            });
         } catch (error) {
             next(error);
         }

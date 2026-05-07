@@ -22,7 +22,6 @@ import {
   Area
 } from 'recharts';
 import styles from './Dashboard.module.css';
-import dashboardService from '../../services/dashboardService';
 import StatCard from '../../components/ui/StatCard1';
 import TrendChart from '../../components/ui/TrendChart';
 import DataTable from '../../components/ui/DataTable';
@@ -31,57 +30,43 @@ import InfoCard from '../../components/ui/InfoCard';
 import useDashboardStore from '../../store/dashboardStore';
 
 const Dashboard = () => {
-  const [activeToggle, setActiveToggle] = useState('daily');
-
   // Store Selectors
   const loading = useDashboardStore(state => state.loading);
+  const chartsLoading = useDashboardStore(state => state.chartsLoading);
   const error = useDashboardStore(state => state.error);
   const summary = useDashboardStore(state => state.summary);
   const salesTrend = useDashboardStore(state => state.salesTrend);
   const topProducts = useDashboardStore(state => state.topProducts);
   const recentOrders = useDashboardStore(state => state.recentOrders);
   const alerts = useDashboardStore(state => state.alerts);
-  const comparativeAnalytics = useDashboardStore(state => state.comparativeAnalytics);
-  const orderStatusAnalytics = useDashboardStore(state => state.orderStatusAnalytics);
-  const isExporting = useDashboardStore(state => state.isExporting);
+  const orderStatusBreakdown = useDashboardStore(state => state.orderStatusBreakdown);
 
   // Store Actions
-  const fetchDashboardData = useDashboardStore(state => state.fetchDashboardData);
-  const exportReport = useDashboardStore(state => state.exportReport);
+  const fetchInitialData = useDashboardStore(state => state.fetchInitialData);
 
   useEffect(() => {
-    fetchDashboardData();
-  }, [fetchDashboardData]);
+    fetchInitialData();
+  }, [fetchInitialData]);
 
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('en-IN', {
       style: 'currency',
       currency: 'INR',
       maximumFractionDigits: 0
-    }).format(amount);
+    }).format(amount || 0);
   };
 
   const formatShortCurrency = (amount) => {
-    if (amount >= 10000000) return `₹${(amount / 10000000).toFixed(1)}Cr`;
-    if (amount >= 100000) return `₹${(amount / 100000).toFixed(1)}L`;
-    if (amount >= 1000) return `₹${(amount / 1000).toFixed(1)}K`;
-    return formatCurrency(amount);
+    const val = parseFloat(amount || 0);
+    if (val >= 10000000) return `₹${(val / 10000000).toFixed(1)}Cr`;
+    if (val >= 100000) return `₹${(val / 100000).toFixed(1)}L`;
+    if (val >= 1000) return `₹${(val / 1000).toFixed(1)}K`;
+    return formatCurrency(val);
   };
 
   const formatDate = (dateString) => {
     const date = new Date(dateString);
     return date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' });
-  };
-
-  const handleExport = async () => {
-    const end = new Date();
-    const start = new Date();
-    start.setDate(end.getDate() - 30);
-
-    const startDate = start.toISOString().split('T')[0];
-    const endDate = end.toISOString().split('T')[0];
-
-    await exportReport(startDate, endDate);
   };
 
   if (loading) {
@@ -99,7 +84,7 @@ const Dashboard = () => {
         <AlertTriangle size={48} color="#E24B4A" />
         <h3>Error Loading Dashboard</h3>
         <p>{error}</p>
-        <button onClick={() => fetchDashboardData()} className={styles.retryBtn}>Retry</button>
+        <button onClick={() => fetchInitialData()} className={styles.retryBtn}>Retry</button>
       </div>
     );
   }
@@ -114,23 +99,27 @@ const Dashboard = () => {
     const dateStr = d.toISOString().split('T')[0];
     const name = formatDate(dateStr);
 
-    const existingData = salesTrend.trend.find(item => item.date === dateStr);
+    const existingData = salesTrend.trend.find(item => {
+        const itemDate = new Date(item.date).toISOString().split('T')[0];
+        return itemDate === dateStr;
+    });
+    
     chartData.push({
       name,
-      revenue: existingData ? existingData.revenue : 0
+      revenue: existingData ? parseFloat(existingData.revenue) : 0
     });
   }
 
   const orderColumns = [
     {
       label: 'Order #',
-      key: 'orderNumber',
-      render: (row) => <span className={styles.monoCell}>{row.orderNumber}</span>
+      key: 'order_number',
+      render: (row) => <span className={styles.monoCell}>{row.order_number}</span>
     },
     {
       label: 'Customer',
-      key: 'customerName',
-      render: (row) => <p className={styles.customerName}>{row.customerName}</p>
+      key: 'customer_name',
+      render: (row) => <p className={styles.customerName}>{row.customer_name || 'Guest'}</p>
     },
     {
       label: 'Amount',
@@ -141,42 +130,33 @@ const Dashboard = () => {
       label: 'Status',
       key: 'status',
       render: (row) => (
-        <span className={`status-badge ${row.status === 'Delivered' ? 'status-delivered' :
-            row.status === 'Cancelled' ? 'status-cancelled' :
-              'status-processing'
-          }`}>
+        <span className={`status-badge status-${row.status?.toLowerCase()}`}>
           {row.status}
         </span>
       )
     },
     {
       label: 'Date',
-      key: 'createdAt',
-      render: (row) => <span className={styles.dateCell}>{formatDate(row.createdAt)}</span>
+      key: 'created_at',
+      render: (row) => <span className={styles.dateCell}>{formatDate(row.created_at)}</span>
     }
   ];
 
-
-  const orderStatusData = orderStatusAnalytics ? [
-    { status: 'Pending', count: orderStatusAnalytics.Pending, color: 'var(--status-warning)' },
-    { status: 'Processing', count: orderStatusAnalytics.Processing, color: 'var(--status-info)' },
-    { status: 'Shipped', count: orderStatusAnalytics.Shipped, color: 'var(--status-info)' },
-    { status: 'Delivered', count: orderStatusAnalytics.Delivered, color: 'var(--status-success)' },
-    { status: 'Cancelled', count: orderStatusAnalytics.Cancelled, color: 'var(--status-danger)' }
-  ] : [];
+  const orderStatusData = [
+    { status: 'Pending', count: orderStatusBreakdown.pending, color: '#f59e0b' },
+    { status: 'Processing', count: orderStatusBreakdown.processing, color: '#8b5cf6' },
+    { status: 'Shipped', count: orderStatusBreakdown.shipped, color: '#3b82f6' },
+    { status: 'Delivered', count: orderStatusBreakdown.delivered, color: '#10b981' },
+    { status: 'Cancelled', count: orderStatusBreakdown.cancelled, color: '#ef4444' }
+  ];
 
   return (
     <div className="page-container">
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h1 className={styles.title}>Dashboard</h1>
-        <button
-          onClick={handleExport}
-          disabled={isExporting}
-          style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem 1rem', borderRadius: '6px', backgroundColor: 'var(--primary)', color: 'white', border: 'none', cursor: 'pointer', fontSize: '0.875rem', fontWeight: 600 }}
-        >
-          {isExporting ? <Loader2 size={16} className={styles.spinner} color="white" /> : <Download size={16} />}
-          {isExporting ? 'Exporting...' : 'Export PDF Report'}
-        </button>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+        <div>
+            <h1 className={styles.title}>Dashboard Overview</h1>
+        </div>
+       
       </div>
 
       {/* Row 1: KPI Grid + Chart */}
@@ -188,34 +168,34 @@ const Dashboard = () => {
 
               <StatCard
                 label="Total Revenue"
-                value={formatShortCurrency(summary.totalRevenue)}
+                value={formatShortCurrency(summary.total_revenue)}
                 gradient={["#5e35b0", "#7e57c2"]}
                 icon={<CreditCard size={20} />}
-                trend={comparativeAnalytics?.growth.revenue >= 0 ? "up" : "down"}
+                trend={salesTrend.comparison.growth_percentage >= 0 ? "up" : "down"}
                 sparklineData={chartData.slice(-7).map(d => d.revenue)}
               />
 
               <StatCard
                 label="Total Orders"
-                value={summary.totalOrders.toLocaleString()}
+                value={summary.total_orders?.toLocaleString()}
                 gradient={["#5e35b0", "#7e57c2"]}
                 icon={<Package size={20} />}
-                trend={comparativeAnalytics?.growth.orders >= 0 ? "up" : "down"}
-                sparklineData={[30, 45, 35, 50, 42, 60, 55]} // Semi-dummy trend for orders
+                trend="up"
+                sparklineData={[30, 45, 35, 50, 42, 60, 55]} 
               />
 
               <StatCard
                 label="Total Customers"
-                value={summary.totalCustomers.toLocaleString()}
+                value={summary.total_customers?.toLocaleString()}
                 gradient={["#1d89e4", "#3498db"]}
                 icon={<User size={20} />}
-                trend={comparativeAnalytics?.growth.customers >= 0 ? "up" : "down"}
-                sparklineData={[10, 15, 8, 20, 25, 22, 30]} // Semi-dummy trend for customers
+                trend="up"
+                sparklineData={[10, 15, 8, 20, 25, 22, 30]} 
               />
 
               <StatCard
                 label="Active Products"
-                value={summary.totalActiveProducts}
+                value={summary.active_products}
                 gradient={["#1d89e4", "#3498db"]}
                 icon={<Layers size={20} />}
                 trend="up"
@@ -230,10 +210,11 @@ const Dashboard = () => {
             <TrendChart
               title="Revenue Trend"
               subtitle="Daily revenue performance for the current period"
-              mainValue={formatCurrency(salesTrend.comparison.currentRevenue)}
-              growth={salesTrend.comparison.revenueGrowth}
+              mainValue={formatCurrency(salesTrend.comparison.current_revenue)}
+              growth={salesTrend.comparison.growth_percentage}
               data={chartData}
               timeframe="Last 30 Days"
+              loading={chartsLoading}
             />
           </div>
 
@@ -244,20 +225,32 @@ const Dashboard = () => {
 
           {/* Top Products */}
           <div className={styles.productCardWrapper}>
-            <InfoCard title="Top Products">
+            <InfoCard title="Top Performing Products">
               <div className={styles.productList}>
                 {topProducts.length > 0 ? (
                   topProducts.map((product, index) => (
                     <div key={index} className={styles.productRow}>
                       <div className={styles.productPlaceholderImg}>
-                        {product.name.charAt(0)}
+                        {product.product_name?.charAt(0)}
                       </div>
                       <div className={styles.productInfo}>
-                        <p className={styles.productName}>{product.name}</p>
-                        <p className={styles.productStats}>{product.unitsSold} Units Sold</p>
+                        <p className={styles.productName}>{product.product_name}</p>
+                        <p className={styles.productStats}>{product.units_sold} Units Sold</p>
                       </div>
                       <div className={styles.productRevenue}>
-                        {formatCurrency(product.revenue)}
+                        <div style={{ textAlign: 'right' }}>
+                          <p style={{ margin: 0, fontWeight: 700 }}>{formatCurrency(product.revenue)}</p>
+                          {product.discount_amount > 0 && (
+                            <p style={{ margin: 0, fontSize: '0.7rem', color: '#ef4444', fontWeight: 600 }}>
+                              -{formatCurrency(product.discount_amount)} Coupon
+                            </p>
+                          )}
+                          {product.discount_amount > 0 && (
+                            <p style={{ margin: 0, fontSize: '0.65rem', color: '#9ca3af', textDecoration: 'line-through' }}>
+                              {formatCurrency(Number(product.revenue) + Number(product.discount_amount))}
+                            </p>
+                          )}
+                        </div>
                       </div>
                     </div>
                   ))
@@ -311,8 +304,8 @@ const Dashboard = () => {
 
             <div className={`${styles.alertCard} ${styles.alertWarn}`}>
               <div>
-                <p className={styles.alertLabel}>Low Stock</p>
-                <p className={`${styles.alertValue} ${styles.alertValueWarn}`}>{alerts.counts.lowStock || 0}</p>
+                <p className={styles.alertLabel}>Low Stock Items</p>
+                <p className={`${styles.alertValue} ${styles.alertValueWarn}`}>{alerts.low_stock || 0}</p>
               </div>
               <AlertTriangle size={18} className={styles.alertIcon} />
             </div>
@@ -320,7 +313,7 @@ const Dashboard = () => {
             <div className={`${styles.alertCard} ${styles.alertDanger}`}>
               <div>
                 <p className={styles.alertLabel}>Out of Stock</p>
-                <p className={`${styles.alertValue} ${styles.alertValueDanger}`}>{alerts.counts.outOfStock || 0}</p>
+                <p className={`${styles.alertValue} ${styles.alertValueDanger}`}>{alerts.out_of_stock || 0}</p>
               </div>
               <AlertOctagon size={18} className={styles.alertIcon} />
             </div>
@@ -328,7 +321,7 @@ const Dashboard = () => {
             <div className={`${styles.alertCard} ${styles.alertInfo}`}>
               <div>
                 <p className={styles.alertLabel}>Pending Orders</p>
-                <p className={`${styles.alertValue} ${styles.alertValueInfo}`}>{alerts.counts.pendingOrders || 0}</p>
+                <p className={`${styles.alertValue} ${styles.alertValueInfo}`}>{alerts.pending_orders || 0}</p>
               </div>
               <Clock size={18} className={styles.alertIcon} />
             </div>
@@ -336,7 +329,7 @@ const Dashboard = () => {
             <div className={`${styles.alertCard} ${styles.alertDanger}`}>
               <div>
                 <p className={styles.alertLabel}>Failed Payments</p>
-                <p className={`${styles.alertValue} ${styles.alertValueDanger}`}>{alerts.counts.failedPayments || 0}</p>
+                <p className={`${styles.alertValue} ${styles.alertValueDanger}`}>{alerts.failed_payments || 0}</p>
               </div>
               <CreditCard size={18} className={styles.alertIcon} />
             </div>

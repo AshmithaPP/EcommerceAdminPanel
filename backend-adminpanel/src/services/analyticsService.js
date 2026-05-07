@@ -15,10 +15,10 @@ const analyticsService = {
             const sql = `
                 SELECT 
                     COUNT(*) as total_orders,
-                    SUM(CASE WHEN payment_status = 'Paid' THEN total_amount ELSE 0 END) as total_revenue,
+                    SUM(CASE WHEN payment_status IN ('Paid', 'success', 'Completed') THEN total_amount ELSE 0 END) as total_revenue,
                     SUM(CASE WHEN status != 'Cancelled' THEN (SELECT SUM(quantity) FROM order_items WHERE order_id = o.order_id) ELSE 0 END) as total_items_sold,
                     SUM(discount_amount) as total_discount,
-                    (SELECT COUNT(*) FROM users WHERE role = 'user' AND DATE(created_at) = ?) as new_customers
+                    (SELECT COUNT(DISTINCT user_id) FROM orders WHERE DATE(created_at) = ? AND status != 'Cancelled') as new_customers
                 FROM orders o
                 WHERE DATE(o.created_at) = ?
                 AND o.status != 'Cancelled'
@@ -70,8 +70,8 @@ const analyticsService = {
         const liveSql = `
             SELECT 
                 COUNT(*) as orders,
-                SUM(CASE WHEN payment_status = 'Paid' THEN total_amount ELSE 0 END) as revenue,
-                (SELECT COUNT(*) FROM users WHERE role = 'user' AND DATE(created_at) = CURDATE()) as customers
+                SUM(CASE WHEN payment_status IN ('Paid', 'success', 'Completed') THEN total_amount ELSE 0 END) as revenue,
+                (SELECT COUNT(DISTINCT user_id) FROM orders WHERE DATE(created_at) = CURDATE() AND status != 'Cancelled') as customers
             FROM orders o
             WHERE DATE(created_at) = CURDATE()
             AND status != 'Cancelled'
@@ -80,11 +80,29 @@ const analyticsService = {
         const live = liveRows[0];
 
         // Historical Aggregates for comparison
+        let yesterdayStats = {};
         const [historicalRows] = await db.query(`
-            SELECT * FROM daily_stats WHERE date = ? OR date = DATE_SUB(CURDATE(), INTERVAL 7 DAY)
+            SELECT * FROM daily_stats WHERE date = ?
         `, [yesterday]);
         
-        const yesterdayStats = historicalRows.find(r => r.date.toISOString().split('T')[0] === yesterday) || {};
+        if (historicalRows.length > 0) {
+            yesterdayStats = {
+                total_revenue: historicalRows[0].total_revenue,
+                total_orders: historicalRows[0].total_orders
+            };
+        } else {
+            // FALLBACK: Live query for yesterday if stats record is missing
+            const fallbackSql = `
+                SELECT 
+                    COUNT(*) as total_orders,
+                    SUM(CASE WHEN payment_status IN ('Paid', 'success', 'Completed') THEN total_amount ELSE 0 END) as total_revenue
+                FROM orders 
+                WHERE DATE(created_at) = DATE_SUB(CURDATE(), INTERVAL 1 DAY)
+                AND status != 'Cancelled'
+            `;
+            const [fallbackRows] = await db.query(fallbackSql);
+            yesterdayStats = fallbackRows[0];
+        }
         
         const calculateGrowth = (curr, prev) => {
             if (!prev || prev == 0) return curr > 0 ? 100 : 0;
@@ -119,10 +137,35 @@ const analyticsService = {
             ORDER BY date ASC
         `;
         const [rows] = await db.query(sql, [parseInt(days)]);
-        return rows.map(row => ({
+        
+        const trendData = rows.map(row => ({
             ...row,
             date: row.date.toISOString().split('T')[0]
         }));
+
+        const today = new Date().toISOString().split('T')[0];
+        const hasToday = trendData.some(d => d.date === today);
+
+        if (!hasToday) {
+            // Fetch live today stats to complete the chart
+            const liveSql = `
+                SELECT 
+                    SUM(CASE WHEN payment_status IN ('Paid', 'success', 'Completed') THEN total_amount ELSE 0 END) as revenue,
+                    COUNT(CASE WHEN status != 'Cancelled' THEN 1 END) as orders
+                FROM orders
+                WHERE DATE(created_at) = CURDATE()
+            `;
+            const [liveRows] = await db.query(liveSql);
+            if (liveRows[0]) {
+                trendData.push({
+                    date: today,
+                    revenue: parseFloat(liveRows[0].revenue || 0),
+                    orders: parseInt(liveRows[0].orders || 0)
+                });
+            }
+        }
+
+        return trendData;
     },
 
     /**
@@ -147,7 +190,7 @@ const analyticsService = {
             FROM order_items oi
             JOIN orders o ON oi.order_id = o.order_id
             WHERE o.created_at >= DATE_SUB(CURDATE(), INTERVAL 3 DAY)
-            AND o.payment_status = 'Paid'
+            AND o.payment_status IN ('Paid', 'success', 'Completed')
             GROUP BY product_name
             ORDER BY units DESC
             LIMIT 3

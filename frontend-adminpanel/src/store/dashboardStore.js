@@ -3,105 +3,110 @@ import dashboardService from '../services/dashboardService';
 import { showToast } from '../utils/toast';
 
 const useDashboardStore = create((set, get) => ({
-    // Data State
+    // Overview Data
     summary: {
-        totalRevenue: 0,
-        totalOrders: 0,
-        totalCustomers: 0,
-        totalActiveProducts: 0,
-        todayOrders: 0
+        total_revenue: 0,
+        total_orders: 0,
+        today_orders: 0,
+        total_customers: 0,
+        active_products: 0
     },
+    alerts: {
+        low_stock: 0,
+        out_of_stock: 0,
+        pending_orders: 0,
+        failed_payments: 0
+    },
+    recentOrders: [],
+    orderStatusBreakdown: {
+        pending: 0, processing: 0, shipped: 0, delivered: 0, cancelled: 0
+    },
+
+    // Chart Data
     salesTrend: {
         trend: [],
         comparison: {
-            currentRevenue: 0,
-            previousRevenue: 0,
-            revenueGrowth: 0
+            current_revenue: 0,
+            previous_revenue: 0,
+            growth_percentage: 0
         }
     },
     topProducts: [],
-    recentOrders: [],
-    alerts: {
-        counts: {
-            lowStock: 0,
-            outOfStock: 0,
-            pendingOrders: 0,
-            failedPayments: 0
-        },
-        lowStockProducts: []
-    },
-    comparativeAnalytics: null,
-    orderStatusAnalytics: null,
+
+    // Advanced Data
+    revenueBreakdown: null,
+    topCategories: [],
+    customerInsights: null,
+    paymentAnalytics: null,
+    inventoryHealth: null,
 
     // UI State
     loading: true,
+    chartsLoading: false,
     error: null,
-    isExporting: false,
 
     // Actions
-    fetchDashboardData: async () => {
+    fetchInitialData: async () => {
         set({ loading: true, error: null });
         try {
-            const [
-                summaryRes,
-                trendRes,
-                productsRes,
-                alertsRes,
-                ordersRes,
-                comparativeRes,
-                statusRes
-            ] = await Promise.all([
-                dashboardService.getSummary(),
-                dashboardService.getSalesTrend(),
-                dashboardService.getTopProducts(5),
-                dashboardService.getAlerts(),
-                dashboardService.getRecentOrders(),
-                dashboardService.getComparativeAnalytics(),
-                dashboardService.getOrderStatusAnalytics()
+            const overview = await dashboardService.getOverview();
+            
+            set({
+                summary: overview.summary,
+                alerts: overview.alerts,
+                recentOrders: overview.recent_orders,
+                orderStatusBreakdown: overview.order_status,
+                loading: false
+            });
+
+            // After main load, start loading heavy analytics in background
+            get().fetchAnalyticsData();
+        } catch (err) {
+            console.error('Overview load failed:', err);
+            set({ error: err?.message || 'Failed to load dashboard overview', loading: false });
+        }
+    },
+
+    fetchAnalyticsData: async () => {
+        set({ chartsLoading: true });
+        try {
+            const [trendRes, productsRes] = await Promise.all([
+                dashboardService.getSalesTrend('30days'),
+                dashboardService.getTopProducts(5)
             ]);
 
             set({
-                summary: summaryRes.success ? summaryRes.data : get().summary,
-                salesTrend: trendRes.success ? trendRes.data : get().salesTrend,
-                topProducts: productsRes.success ? productsRes.data : get().topProducts,
-                alerts: alertsRes.success ? alertsRes.data : get().alerts,
-                recentOrders: ordersRes.success ? ordersRes.data : get().recentOrders,
-                comparativeAnalytics: comparativeRes.success ? comparativeRes.data : get().comparativeAnalytics,
-                orderStatusAnalytics: statusRes.success ? statusRes.data : get().orderStatusAnalytics,
-                loading: false
+                salesTrend: trendRes,
+                topProducts: productsRes.data,
+                chartsLoading: false
             });
         } catch (err) {
-            console.error('Error fetching dashboard data:', err);
-            const errorMessage = err?.message || 'Failed to load dashboard data. Please try again.';
-            set({ error: errorMessage, loading: false });
-            showToast.error(errorMessage);
+            console.error('Analytics load failed:', err);
+            set({ chartsLoading: false });
         }
     },
 
-    exportReport: async (startDate, endDate) => {
-        set({ isExporting: true });
+    fetchAdvancedAnalytics: async () => {
         try {
-            const blob = await dashboardService.downloadReport(startDate, endDate);
-            
-            // Create download link
-            const url = window.URL.createObjectURL(new Blob([blob]));
-            const link = document.createElement('a');
-            link.href = url;
-            link.setAttribute('download', `Analytics_Report_${startDate}_to_${endDate}.pdf`);
-            document.body.appendChild(link);
-            link.click();
-            link.parentNode.removeChild(link);
-            
-            showToast.success('Report exported successfully!');
-        } catch (err) {
-            console.error('Export failed:', err);
-            showToast.error('Failed to export report. Please try again.');
-        } finally {
-            set({ isExporting: false });
-        }
-    },
+            const [rev, cat, cus, pay, inv] = await Promise.all([
+                dashboardService.getRevenueBreakdown(),
+                dashboardService.getTopCategories(),
+                dashboardService.getCustomerInsights(),
+                dashboardService.getPaymentAnalytics(),
+                dashboardService.getInventoryHealth()
+            ]);
 
-    clearError: () => set({ error: null })
+            set({
+                revenueBreakdown: rev.data,
+                topCategories: cat.data,
+                customerInsights: cus.data,
+                paymentAnalytics: pay.data,
+                inventoryHealth: inv.data
+            });
+        } catch (err) {
+            console.error('Advanced analytics load failed:', err);
+        }
+    }
 }));
 
 export default useDashboardStore;

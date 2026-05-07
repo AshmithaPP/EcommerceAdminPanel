@@ -15,10 +15,13 @@ router.post('/admin/sections', protect, authorize('admin', 'superadmin'), homeCo
 
 router.get('/admin/testimonials', protect, authorize('admin', 'superadmin'), homeController.getTestimonials);
 router.post('/admin/testimonials', protect, authorize('admin', 'superadmin'), homeController.createTestimonial);
+router.put('/admin/testimonials/:id', protect, authorize('admin', 'superadmin'), homeController.updateTestimonial);
+router.delete('/admin/testimonials/:id', protect, authorize('admin', 'superadmin'), homeController.deleteTestimonial);
 
 // Toggle Routes
 router.patch('/admin/toggle-featured-product/:id', protect, authorize('admin', 'superadmin'), homeController.toggleFeaturedProduct);
 router.patch('/admin/toggle-featured-category/:id', protect, authorize('admin', 'superadmin'), homeController.toggleFeaturedCategory);
+router.patch('/admin/category-image/:id', protect, authorize('admin', 'superadmin'), homeController.updateCategoryImage);
 
 // Occasions
 router.get('/admin/occasions', protect, authorize('admin', 'superadmin'), homeController.getOccasions);
@@ -34,5 +37,9 @@ router.delete('/admin/trending-picks/:id', protect, authorize('admin', 'superadm
 router.get('/admin/price-filters', protect, authorize('admin', 'superadmin'), homeController.getPriceFilters);
 router.put('/admin/price-filters/:id', protect, authorize('admin', 'superadmin'), homeController.updatePriceFilter);
 router.delete('/admin/price-filters/:id', protect, authorize('admin', 'superadmin'), homeController.deletePriceFilter);
+
+// Newsletter
+router.get('/admin/newsletter', protect, authorize('admin', 'superadmin'), homeController.getNewsletter);
+router.put('/admin/newsletter', protect, authorize('admin', 'superadmin'), homeController.updateNewsletter);
 
 module.exports = router;

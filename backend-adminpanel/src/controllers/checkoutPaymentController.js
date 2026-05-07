@@ -78,6 +78,14 @@ const paymentController = {
                 const payment = await Payment.findByGatewayOrderId(razorpay_order_id);
                 if (payment) {
                     await Order.updateStatus(payment.order_id, 'paid', 'success');
+                    
+                    // 4. Clear Cart (FINAL STEP)
+                    const cartService = require('../services/cartService');
+                    const order = await Order.findById(payment.order_id);
+                    if (order && order.user_id) {
+                        console.log(`🧹 Payment verified. Clearing cart for user: ${order.user_id}`);
+                        await cartService.clearCart(order.user_id, null);
+                    }
                 }
 
                 res.status(200).json({

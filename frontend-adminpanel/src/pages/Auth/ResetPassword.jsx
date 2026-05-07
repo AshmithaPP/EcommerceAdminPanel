@@ -17,14 +17,14 @@ const ResetPassword = () => {
   return (
     <div className={styles.pageWrapper}>
       <main className={styles.mainContainer}>
-        {/* Top Branding Anchor */}
+        {/* Top Branding */}
         <div className={styles.brandingHeader}>
-          <h1 className={styles.brandTitle}>The Silk Curator</h1>
+          <h1 className={styles.brandTitle}>Silk Curator</h1>
         </div>
 
         {/* Card Container */}
         <div className={styles.card}>
-          {/* Brand Logo/Icon */}
+          {/* Brand Logo */}
           <div className={styles.iconWrapper}>
             <div className={styles.logoCircle}>
               <span className={styles.logoText}>SC</span>
@@ -49,7 +49,7 @@ const ResetPassword = () => {
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder="atelier@silkcurator.com"
+                    placeholder="name@example.com"
                     required 
                   />
                 </div>
@@ -66,7 +66,7 @@ const ResetPassword = () => {
 
               <div className={styles.footerLinkWrapper}>
                 <Link className={styles.backLink} to="/login">
-                  <ArrowLeft size={14} />
+                  <ArrowLeft size={16} />
                   <span>Back to Login</span>
                 </Link>
               </div>
@@ -84,7 +84,7 @@ const ResetPassword = () => {
               
               <div className={styles.footerLinkWrapper}>
                 <Link className={styles.backLink} to="/login">
-                  <ArrowLeft size={14} />
+                  <ArrowLeft size={16} />
                   <span>Back to Login</span>
                 </Link>
               </div>
@@ -95,7 +95,7 @@ const ResetPassword = () => {
 
       {/* Global Footer */}
       <footer className={styles.globalFooter}>
-        <span className={styles.copyright}>© 2024 The Silk Curator. All rights reserved.</span>
+        <span className={styles.copyright}>© 2024 Silk Curator Dashboard. All rights reserved.</span>
       </footer>
     </div>
   );

@@ -1,284 +1,201 @@
 const db = require('../config/database');
 
 const dashboardService = {
-    getSummary: async () => {
-        const query = `
+    getOverview: async () => {
+        // 1. Summary Stats
+        const [summaryRows] = await db.query(`
             SELECT 
-                (SELECT SUM(total_amount) FROM orders WHERE payment_status = 'Paid') as totalRevenue,
-                (SELECT COUNT(*) FROM orders) as totalOrders,
-                (SELECT COUNT(*) FROM orders WHERE DATE(created_at) = CURDATE()) as todayOrders,
-                (SELECT COUNT(*) FROM users WHERE role = 'user') as totalCustomers,
-                (SELECT COUNT(*) FROM products WHERE status = 1) as totalActiveProducts
-        `;
-        const [rows] = await db.query(query);
-        const summary = rows[0];
-        
+                SUM(CASE WHEN payment_status IN ('Paid', 'success', 'Completed') THEN total_amount ELSE 0 END) as total_revenue,
+                COUNT(CASE WHEN status != 'Cancelled' THEN 1 END) as total_orders,
+                COUNT(CASE WHEN DATE(created_at) = CURDATE() AND status != 'Cancelled' THEN 1 END) as today_orders,
+                (SELECT COUNT(*) FROM users WHERE role = 'user') as total_customers,
+                (SELECT COUNT(*) FROM products WHERE status = 1) as active_products
+            FROM orders
+        `);
+
+        // 2. Alerts
+        const [alertRows] = await db.query(`
+            SELECT 
+                (SELECT COUNT(*) FROM inventory_levels WHERE quantity > 0 AND quantity <= 5) as low_stock,
+                (SELECT COUNT(*) FROM inventory_levels WHERE quantity = 0) as out_of_stock,
+                (SELECT COUNT(*) FROM orders WHERE status = 'pending') as pending_orders,
+                (SELECT COUNT(*) FROM payments WHERE status = 'failed') as failed_payments
+        `);
+
+        // 3. Recent Orders
+        const [recentOrders] = await db.query(`
+            SELECT 
+                o.order_id, o.order_number, o.total_amount as amount, o.status, o.created_at,
+                u.name as customer_name
+            FROM orders o
+            LEFT JOIN users u ON o.user_id = u.user_id
+            ORDER BY o.created_at DESC
+            LIMIT 5
+        `);
+
+        // 4. Order Status Breakdown
+        const [statusRows] = await db.query(`
+            SELECT status, COUNT(*) as count
+            FROM orders
+            GROUP BY status
+        `);
+
+        const orderStatus = {
+            pending: 0, processing: 0, shipped: 0, delivered: 0, cancelled: 0
+        };
+        statusRows.forEach(row => {
+            if (orderStatus.hasOwnProperty(row.status)) {
+                orderStatus[row.status] = row.count;
+            }
+        });
+
         return {
-            totalRevenue: parseFloat(summary.totalRevenue || 0),
-            totalOrders: parseInt(summary.totalOrders || 0),
-            todayOrders: parseInt(summary.todayOrders || 0),
-            totalCustomers: parseInt(summary.totalCustomers || 0),
-            totalActiveProducts: parseInt(summary.totalActiveProducts || 0)
+            summary: summaryRows[0],
+            alerts: alertRows[0],
+            recent_orders: recentOrders,
+            order_status: orderStatus
         };
     },
 
-    getSalesTrend: async () => {
-        // Last 30 days
-        const currentPeriodQuery = `
+    getSalesTrend: async (range = '30days') => {
+        let days = 30;
+        if (range === '7days') days = 7;
+        if (range === '90days') days = 90;
+
+        // Trend Data
+        const [trend] = await db.query(`
             SELECT 
-                DATE_FORMAT(created_at, '%Y-%m-%d') as date,
+                DATE(created_at) as date,
                 SUM(total_amount) as revenue,
-                COUNT(*) as orderCount
+                COUNT(*) as orders
             FROM orders
-            WHERE payment_status = 'Paid' 
-            AND created_at >= DATE_SUB(CURDATE(), INTERVAL 29 DAY)
-            GROUP BY date
+            WHERE created_at >= DATE_SUB(CURDATE(), INTERVAL ? DAY)
+              AND payment_status = 'success'
+            GROUP BY DATE(created_at)
             ORDER BY date ASC
-        `;
-        
-        // Previous 30 days for comparison
-        const previousPeriodQuery = `
+        `, [days]);
+
+        // Comparison Data (Current vs Previous Period)
+        const [comparisonRows] = await db.query(`
             SELECT 
-                SUM(total_amount) as revenue,
-                COUNT(*) as orderCount
+                SUM(CASE WHEN created_at >= DATE_SUB(CURDATE(), INTERVAL ? DAY) THEN total_amount ELSE 0 END) as current_revenue,
+                SUM(CASE WHEN created_at >= DATE_SUB(CURDATE(), INTERVAL ? DAY) AND created_at < DATE_SUB(CURDATE(), INTERVAL ? DAY) THEN total_amount ELSE 0 END) as previous_revenue
             FROM orders
-            WHERE payment_status = 'Paid'
-            AND created_at BETWEEN DATE_SUB(CURDATE(), INTERVAL 59 DAY) AND DATE_SUB(CURDATE(), INTERVAL 30 DAY)
-        `;
+            WHERE payment_status = 'success'
+        `, [days, days * 2, days]);
 
-        const [currentRows] = await db.query(currentPeriodQuery);
-        const [previousRows] = await db.query(previousPeriodQuery);
-
-        const currentRevenue = currentRows.reduce((sum, row) => sum + parseFloat(row.revenue), 0);
-        const previousRevenue = parseFloat(previousRows[0].revenue || 0);
-        const revenueGrowth = previousRevenue === 0 ? 100 : ((currentRevenue - previousRevenue) / previousRevenue) * 100;
+        const current_revenue = parseFloat(comparisonRows[0].current_revenue || 0);
+        const previous_revenue = parseFloat(comparisonRows[0].previous_revenue || 0);
+        let growth_percentage = 0;
+        if (previous_revenue > 0) {
+            growth_percentage = ((current_revenue - previous_revenue) / previous_revenue) * 100;
+        }
 
         return {
-            trend: currentRows.map(row => ({
-                date: row.date,
-                revenue: parseFloat(row.revenue),
-                orderCount: parseInt(row.orderCount)
-            })),
+            trend,
             comparison: {
-                currentRevenue,
-                previousRevenue,
-                revenueGrowth: parseFloat(revenueGrowth.toFixed(2))
+                current_revenue,
+                previous_revenue,
+                growth_percentage: parseFloat(growth_percentage.toFixed(2))
             }
         };
     },
 
     getTopProducts: async (limit = 5) => {
-        const query = `
+        const [rows] = await db.query(`
             SELECT 
-                oi.product_name as name,
-                SUM(oi.quantity) as unitsSold,
-                SUM(oi.quantity * oi.price) as revenue
+                oi.product_name,
+                SUM(oi.quantity) as units_sold,
+                CAST(SUM(oi.price * oi.quantity) AS DECIMAL(10,2)) as gross_revenue,
+                CAST(SUM(CASE 
+                    WHEN o.subtotal > 0 THEN (oi.price * oi.quantity / o.subtotal) * o.discount 
+                    ELSE 0 
+                END) AS DECIMAL(10,2)) as discount_amount,
+                CAST(SUM(oi.price * oi.quantity) - SUM(CASE 
+                    WHEN o.subtotal > 0 THEN (oi.price * oi.quantity / o.subtotal) * o.discount 
+                    ELSE 0 
+                END) AS DECIMAL(10,2)) as revenue
             FROM order_items oi
             JOIN orders o ON oi.order_id = o.order_id
-            WHERE o.payment_status = 'Paid'
+            WHERE o.payment_status = 'success'
             GROUP BY oi.product_id, oi.product_name
-            ORDER BY unitsSold DESC
+            ORDER BY units_sold DESC
             LIMIT ?
-        `;
-        const [rows] = await db.query(query, [parseInt(limit)]);
-        return rows.map(row => ({
-            name: row.name,
-            unitsSold: parseInt(row.unitsSold),
-            revenue: parseFloat(row.revenue)
-        }));
+        `, [parseInt(limit)]);
+        return rows;
     },
 
-    getAlerts: async () => {
-        const query = `
-            SELECT
-                (SELECT COUNT(*) FROM inventory_levels WHERE quantity <= low_stock_threshold AND quantity > 0) as lowStockCount,
-                (SELECT COUNT(*) FROM inventory_levels WHERE quantity = 0) as outOfStockCount,
-                (SELECT COUNT(*) FROM orders WHERE status = 'Pending') as pendingOrdersCount,
-                (SELECT COUNT(*) FROM orders WHERE payment_status = 'Failed') as failedPaymentsCount
-        `;
-        const [rows] = await db.query(query);
-        const alerts = rows[0];
-
-        // Fetch actual low stock products details
-        const lowStockQuery = `
-            SELECT p.name, inv.quantity, inv.low_stock_threshold
-            FROM inventory_levels inv
-            JOIN product_variants pv ON inv.variant_id = pv.variant_id
-            JOIN products p ON pv.product_id = p.product_id
-            WHERE inv.quantity <= inv.low_stock_threshold
-            LIMIT 5
-        `;
-        const [lowStockDetails] = await db.query(lowStockQuery);
-
-        return {
-            counts: {
-                lowStock: parseInt(alerts.lowStockCount || 0),
-                outOfStock: parseInt(alerts.outOfStockCount || 0),
-                pendingOrders: parseInt(alerts.pendingOrdersCount || 0),
-                failedPayments: parseInt(alerts.failedPaymentsCount || 0)
-            },
-            lowStockProducts: lowStockDetails
-        };
-    },
-
-    getRecentOrders: async () => {
-        const query = `
+    getRevenueBreakdown: async () => {
+        const [rows] = await db.query(`
             SELECT 
-                o.order_id,
-                o.order_number,
-                o.total_amount as amount,
-                o.status,
-                o.created_at,
-                u.name as customerName
-            FROM orders o
-            JOIN users u ON o.user_id = u.user_id
-            ORDER BY o.created_at DESC
-            LIMIT 10
-        `;
-        const [rows] = await db.query(query);
-        return rows.map(row => ({
-            orderId: row.order_id,
-            orderNumber: row.order_number,
-            customerName: row.customerName,
-            amount: parseFloat(row.amount),
-            status: row.status,
-            createdAt: row.created_at
-        }));
-    },
-    getComparativeAnalytics: async () => {
-        const currentMonthQuery = `
-            SELECT 
-                (SELECT SUM(total_amount) FROM orders WHERE payment_status = 'Paid' AND MONTH(created_at) = MONTH(CURDATE()) AND YEAR(created_at) = YEAR(CURDATE())) as revenue,
-                (SELECT COUNT(*) FROM orders WHERE MONTH(created_at) = MONTH(CURDATE()) AND YEAR(created_at) = YEAR(CURDATE())) as orders,
-                (SELECT COUNT(*) FROM users WHERE role = 'user' AND MONTH(created_at) = MONTH(CURDATE()) AND YEAR(created_at) = YEAR(CURDATE())) as customers
-        `;
-        
-        const lastMonthQuery = `
-            SELECT 
-                (SELECT SUM(total_amount) FROM orders WHERE payment_status = 'Paid' AND MONTH(created_at) = MONTH(CURDATE() - INTERVAL 1 MONTH) AND YEAR(created_at) = YEAR(CURDATE() - INTERVAL 1 MONTH)) as revenue,
-                (SELECT COUNT(*) FROM orders WHERE MONTH(created_at) = MONTH(CURDATE() - INTERVAL 1 MONTH) AND YEAR(created_at) = YEAR(CURDATE() - INTERVAL 1 MONTH)) as orders,
-                (SELECT COUNT(*) FROM users WHERE role = 'user' AND MONTH(created_at) = MONTH(CURDATE() - INTERVAL 1 MONTH) AND YEAR(created_at) = YEAR(CURDATE() - INTERVAL 1 MONTH)) as customers
-        `;
-
-        const [currentRows] = await db.query(currentMonthQuery);
-        const [lastRows] = await db.query(lastMonthQuery);
-
-        const current = {
-            revenue: parseFloat(currentRows[0].revenue || 0),
-            orders: parseInt(currentRows[0].orders || 0),
-            customers: parseInt(currentRows[0].customers || 0)
-        };
-
-        const last = {
-            revenue: parseFloat(lastRows[0].revenue || 0),
-            orders: parseInt(lastRows[0].orders || 0),
-            customers: parseInt(lastRows[0].customers || 0)
-        };
-
-        const calculateGrowth = (curr, prev) => {
-            if (prev === 0) return curr > 0 ? 100 : 0;
-            return parseFloat((((curr - prev) / prev) * 100).toFixed(2));
-        };
-
-        return {
-            thisMonth: current,
-            lastMonth: last,
-            growth: {
-                revenue: calculateGrowth(current.revenue, last.revenue),
-                orders: calculateGrowth(current.orders, last.orders),
-                customers: calculateGrowth(current.customers, last.customers)
-            }
-        };
-    },
-
-    getOrderStatusAnalytics: async () => {
-        const query = `
-            SELECT status, COUNT(*) as count 
-            FROM orders 
-            GROUP BY status
-        `;
-        const [rows] = await db.query(query);
-        
-        const statusCounts = {
-            Pending: 0,
-            Processing: 0,
-            Shipped: 0,
-            Delivered: 0,
-            Cancelled: 0
-        };
-
-        rows.forEach(row => {
-            if (statusCounts.hasOwnProperty(row.status)) {
-                statusCounts[row.status] = parseInt(row.count);
-            } else {
-                statusCounts[row.status] = parseInt(row.count);
-            }
-        });
-
-        return statusCounts;
-    },
-
-    getExportData: async (startDate, endDate) => {
-        const start = startDate + ' 00:00:00';
-        const end = endDate + ' 23:59:59';
-
-        const ordersQuery = `
-            SELECT o.order_id, o.order_number, o.total_amount, o.status, o.created_at, u.name as customer_name
-            FROM orders o
-            LEFT JOIN users u ON o.user_id = u.user_id
-            WHERE o.created_at >= ? AND o.created_at <= ?
-            ORDER BY o.created_at DESC
-        `;
-        const [orders] = await db.query(ordersQuery, [start, end]);
-        
-        const summaryQuery = `
-            SELECT 
-                COUNT(*) as totalOrders,
-                SUM(CASE WHEN payment_status = 'Paid' THEN total_amount ELSE 0 END) as totalRevenue,
-                SUM(CASE WHEN status = 'Delivered' THEN 1 ELSE 0 END) as deliveredCount,
-                SUM(CASE WHEN status = 'Processing' THEN 1 ELSE 0 END) as processingCount,
-                SUM(CASE WHEN status = 'Cancelled' THEN 1 ELSE 0 END) as cancelledCount
+                SUM(CASE WHEN DATE(created_at) = CURDATE() THEN total_amount ELSE 0 END) as daily,
+                SUM(CASE WHEN YEARWEEK(created_at, 1) = YEARWEEK(CURDATE(), 1) THEN total_amount ELSE 0 END) as weekly,
+                SUM(CASE WHEN MONTH(created_at) = MONTH(CURDATE()) AND YEAR(created_at) = YEAR(CURDATE()) THEN total_amount ELSE 0 END) as monthly
             FROM orders
-            WHERE created_at >= ? AND created_at <= ?
-        `;
-        const [summaryRows] = await db.query(summaryQuery, [start, end]);
-        const summary = summaryRows[0];
+            WHERE payment_status = 'success'
+        `);
+        return rows[0];
+    },
 
-        // Top 3 Products in this period
-        const topProductsQuery = `
+    getTopCategories: async () => {
+        const [rows] = await db.query(`
             SELECT 
-                oi.product_name as name,
-                SUM(oi.quantity) as unitsSold
+                c.name as category_name,
+                SUM(oi.quantity) as total_sales
             FROM order_items oi
+            JOIN products p ON oi.product_id = p.product_id
+            JOIN categories c ON p.category_id = c.category_id
             JOIN orders o ON oi.order_id = o.order_id
-            WHERE o.created_at >= ? AND o.created_at <= ?
-            AND o.payment_status = 'Paid'
-            GROUP BY oi.product_name
-            ORDER BY unitsSold DESC
-            LIMIT 3
-        `;
-        const [topProducts] = await db.query(topProductsQuery, [start, end]);
+            WHERE o.payment_status = 'success'
+            GROUP BY c.category_id
+            ORDER BY total_sales DESC
+            LIMIT 5
+        `);
+        return rows;
+    },
 
-        // Customer Growth - Total registered till end date, and new ones in period
-        const customerGrowthQuery = `
-            SELECT
-                (SELECT COUNT(*) FROM users WHERE role = 'user' AND created_at <= ?) as totalCustomers,
-                (SELECT COUNT(*) FROM users WHERE role = 'user' AND created_at >= ? AND created_at <= ?) as newCustomers
-        `;
-        const [growthRows] = await db.query(customerGrowthQuery, [end, start, end]);
-        const growth = growthRows[0];
+    getCustomerInsights: async () => {
+        const [rows] = await db.query(`
+            SELECT 
+                (SELECT COUNT(*) FROM users WHERE role = 'user' AND created_at >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)) as new_customers,
+                (SELECT COUNT(DISTINCT user_id) FROM orders GROUP BY user_id HAVING COUNT(order_id) > 1) as returning_customers_count
+        `);
+        // Returning customers is a bit trickier with nested subqueries in SELECT if not careful.
+        // Let's refine returning customers.
+        const [returningRows] = await db.query(`
+            SELECT COUNT(*) as count FROM (
+                SELECT user_id FROM orders GROUP BY user_id HAVING COUNT(order_id) > 1
+            ) as t
+        `);
 
         return {
-            orders,
-            summary: {
-                ...summary,
-                totalCustomers: parseInt(growth.totalCustomers || 0),
-                newCustomers: parseInt(growth.newCustomers || 0)
-            },
-            topProducts
+            new_customers: rows[0].new_customers,
+            returning_customers: returningRows[0].count
         };
-    }
+    },
 
+    getPaymentAnalytics: async () => {
+        const [rows] = await db.query(`
+            SELECT 
+                SUM(CASE WHEN status = 'success' THEN 1 ELSE 0 END) / COUNT(*) * 100 as razorpay_success_rate,
+                SUM(CASE WHEN payment_method = 'cod' THEN 1 ELSE 0 END) / COUNT(*) * 100 as cod_percentage,
+                SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) as failed_payments
+            FROM payments
+        `);
+        return rows[0];
+    },
+
+    getInventoryHealth: async () => {
+        const [rows] = await db.query(`
+            SELECT 
+                SUM(il.quantity * p.price) as total_stock_value,
+                COUNT(CASE WHEN il.quantity > 0 AND il.quantity <= 5 THEN 1 END) as low_stock_products,
+                COUNT(CASE WHEN il.quantity = 0 THEN 1 END) as out_of_stock_products
+            FROM inventory_levels il
+            JOIN products p ON il.product_id = p.product_id
+        `);
+        return rows[0];
+    }
 };
 
 module.exports = dashboardService;

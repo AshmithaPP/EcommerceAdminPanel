@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { privateApi } from '../../services/api';
-import { Edit2, Trash2, Plus, Star } from 'lucide-react';
+import { Edit2, Trash2, Plus, Star, Upload } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 import Button from '../../components/ui/Button';
@@ -9,25 +8,28 @@ import Toggle from '../../components/ui/Toggle';
 import Modal from '../../components/ui/Modal';
 import InputBox from '../../components/ui/InputBox';
 import SelectBox from '../../components/ui/SelectBox';
-
+import useHomeStore from '../../store/homeStore';
 import styles from './HomepageManagement.module.css';
 
-const HomepageManagement = () => {
-    const [activeTab, setActiveTab] = useState('hero');
-    const [heroData, setHeroData] = useState({
-        title: '',
-        subtitle: '',
-        image_url: '',
-        cta_text: '',
-        redirect_url: ''
-    });
-    const [sections, setSections] = useState([]);
-    const [testimonials, setTestimonials] = useState([]);
-    const [occasions, setOccasions] = useState([]);
-    const [trendingPicks, setTrendingPicks] = useState([]);
-    const [priceFilters, setPriceFilters] = useState([]);
-    const [loading, setLoading] = useState(false);
+const STORAGE_URL = 'http://localhost:5000';
 
+const getImageUrl = (url) => {
+    if (!url) return null;
+    if (url.startsWith('http') || url.startsWith('blob:')) return url;
+    return `${STORAGE_URL}${url}`;
+};
+
+const HomepageManagement = () => {
+    const {
+        heroData, sections, testimonials, occasions, trendingPicks, priceFilters, categories, products, isLoading,
+        fetchHero, updateHero, fetchSections, saveSection, fetchTestimonials, saveTestimonial,
+        fetchOccasions, saveOccasion, deleteOccasion, fetchTrendingPicks, saveTrendingPick, deleteTrendingPick,
+        fetchPriceFilters, savePriceFilter, deletePriceFilter, fetchCategories, toggleCategoryFeatured, updateCategoryImage,
+        fetchProducts, toggleProductFeatured, uploadImage, newsletter, fetchNewsletter, updateNewsletter
+    } = useHomeStore();
+
+    const [activeTab, setActiveTab] = useState('hero');
+    
     // Modals State
     const [showSectionModal, setShowSectionModal] = useState(false);
     const [editingSection, setEditingSection] = useState(null);
@@ -60,6 +62,9 @@ const HomepageManagement = () => {
     const [editingPrice, setEditingPrice] = useState(null);
     const [priceForm, setPriceForm] = useState({ label: '', min_price: 0, max_price: 0, display_order: 0 });
 
+    const [showCatImageModal, setShowCatImageModal] = useState(false);
+    const [selectedCategory, setSelectedCategory] = useState(null);
+
     useEffect(() => {
         fetchHero();
         fetchSections();
@@ -67,201 +72,87 @@ const HomepageManagement = () => {
         fetchOccasions();
         fetchTrendingPicks();
         fetchPriceFilters();
+        fetchCategories();
+        fetchProducts();
+        fetchNewsletter();
     }, []);
 
-    const fetchHero = async () => {
-        try {
-            const { data } = await privateApi.get('/home/admin/hero');
-            if (data.success && data.data) setHeroData(data.data);
-        } catch (err) {
-            console.error('Error fetching hero:', err);
-        }
-    };
-
-    const fetchSections = async () => {
-        try {
-            const { data } = await privateApi.get('/home/admin/sections');
-            if (data.success) setSections(data.data);
-        } catch (err) {
-            console.error('Error fetching sections:', err);
-        }
-    };
-
-    const fetchTestimonials = async () => {
-        try {
-            const { data } = await privateApi.get('/home/admin/testimonials');
-            if (data.success) setTestimonials(data.data);
-        } catch (err) {
-            console.error('Error fetching testimonials:', err);
-        }
-    };
-
-    const fetchOccasions = async () => {
-        try {
-            const { data } = await privateApi.get('/home/admin/occasions');
-            if (data.success) setOccasions(data.data);
-        } catch (err) {
-            console.error('Error fetching occasions:', err);
-        }
-    };
-
-    const fetchTrendingPicks = async () => {
-        try {
-            const { data } = await privateApi.get('/home/admin/trending-picks');
-            if (data.success) setTrendingPicks(data.data);
-        } catch (err) {
-            console.error('Error fetching trending picks:', err);
-        }
-    };
-
-    const fetchPriceFilters = async () => {
-        try {
-            const { data } = await privateApi.get('/home/admin/price-filters');
-            if (data.success) setPriceFilters(data.data);
-        } catch (err) {
-            console.error('Error fetching price filters:', err);
-        }
-    };
-
     const handleHeroUpdate = async (e) => {
-        e.preventDefault();
-        setLoading(true);
-        try {
-            await privateApi.put('/home/admin/hero', heroData);
-            toast.success('Hero section updated successfully');
-        } catch (err) {
-            toast.error('Failed to update hero section');
-        } finally {
-            setLoading(false);
+        if (e) e.preventDefault();
+        updateHero(heroData);
+    };
+
+    const handleHeroImageUpload = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const url = await uploadImage(file);
+        if (url) {
+            updateHero({ ...heroData, image_url: url });
         }
     };
 
-    // Section CRUD
     const handleSaveSection = async (e) => {
-        e.preventDefault();
-        try {
-            if (editingSection) {
-                await privateApi.put(`/home/admin/sections/${editingSection.section_id}`, sectionForm);
-                toast.success('Section updated');
-            } else {
-                await privateApi.post('/home/admin/sections', sectionForm);
-                toast.success('Section created');
-            }
-            setShowSectionModal(false);
-            fetchSections();
-        } catch (err) {
-            toast.error('Operation failed');
-        }
+        if (e) e.preventDefault();
+        const success = await saveSection(sectionForm);
+        if (success) setShowSectionModal(false);
     };
 
-    const handleDeleteSection = async (id) => {
-        if (!window.confirm('Delete this section?')) return;
-        try {
-            await privateApi.delete(`/home/admin/sections/${id}`);
-            toast.success('Section deleted');
-            fetchSections();
-        } catch (err) {
-            toast.error('Delete failed');
-        }
-    };
-
-    // Testimonial CRUD
     const handleSaveTestimonial = async (e) => {
-        e.preventDefault();
-        try {
-            if (editingTestimonial) {
-                await privateApi.put(`/home/admin/testimonials/${editingTestimonial.testimonial_id}`, testimonialForm);
-                toast.success('Testimonial updated');
-            } else {
-                await privateApi.post('/home/admin/testimonials', testimonialForm);
-                toast.success('Testimonial created');
-            }
-            setShowTestimonialModal(false);
-            fetchTestimonials();
-        } catch (err) {
-            toast.error('Operation failed');
-        }
+        if (e) e.preventDefault();
+        const success = await saveTestimonial(editingTestimonial ? editingTestimonial.testimonial_id : 'new', testimonialForm);
+        if (success) setShowTestimonialModal(false);
     };
 
     const handleDeleteTestimonial = async (id) => {
-        if (!window.confirm('Delete this testimonial?')) return;
-        try {
-            await privateApi.delete(`/home/admin/testimonials/${id}`);
-            toast.success('Testimonial deleted');
-            fetchTestimonials();
-        } catch (err) {
-            toast.error('Delete failed');
-        }
+        if (window.confirm('Delete this testimonial?')) deleteTestimonial(id);
     };
 
-    // Occasion CRUD
     const handleSaveOccasion = async (e) => {
-        e.preventDefault();
-        try {
-            const id = editingOccasion ? editingOccasion.id : 'new';
-            await privateApi.put(`/home/admin/occasions/${id}`, occasionForm);
-            toast.success('Occasion saved');
-            setShowOccasionModal(false);
-            fetchOccasions();
-        } catch (err) { toast.error('Operation failed'); }
+        if (e) e.preventDefault();
+        const success = await saveOccasion(editingOccasion ? editingOccasion.id : 'new', occasionForm);
+        if (success) setShowOccasionModal(false);
     };
 
-    const handleDeleteOccasion = async (id) => {
-        if (!window.confirm('Delete this?')) return;
-        try {
-            await privateApi.delete(`/home/admin/occasions/${id}`);
-            toast.success('Deleted');
-            fetchOccasions();
-        } catch (err) { toast.error('Delete failed'); }
-    };
-
-    // Trending CRUD
     const handleSaveTrending = async (e) => {
-        e.preventDefault();
-        try {
-            const id = editingTrending ? editingTrending.id : 'new';
-            await privateApi.put(`/home/admin/trending-picks/${id}`, trendingForm);
-            toast.success('Trending pick saved');
-            setShowTrendingModal(false);
-            fetchTrendingPicks();
-        } catch (err) { toast.error('Operation failed'); }
+        if (e) e.preventDefault();
+        const success = await saveTrendingPick(editingTrending ? editingTrending.id : 'new', trendingForm);
+        if (success) setShowTrendingModal(false);
     };
 
-    const handleDeleteTrending = async (id) => {
-        if (!window.confirm('Delete this?')) return;
-        try {
-            await privateApi.delete(`/home/admin/trending-picks/${id}`);
-            toast.success('Deleted');
-            fetchTrendingPicks();
-        } catch (err) { toast.error('Delete failed'); }
-    };
-
-    // Price Filter CRUD
     const handleSavePrice = async (e) => {
-        e.preventDefault();
-        try {
-            const id = editingPrice ? editingPrice.id : 'new';
-            await privateApi.put(`/home/admin/price-filters/${id}`, priceForm);
-            toast.success('Price filter saved');
-            setShowPriceModal(false);
-            fetchPriceFilters();
-        } catch (err) { toast.error('Operation failed'); }
+        if (e) e.preventDefault();
+        const success = await savePriceFilter(editingPrice ? editingPrice.id : 'new', priceForm);
+        if (success) setShowPriceModal(false);
     };
 
-    const handleDeletePrice = async (id) => {
-        if (!window.confirm('Delete this?')) return;
-        try {
-            await privateApi.delete(`/home/admin/price-filters/${id}`);
-            toast.success('Deleted');
-            fetchPriceFilters();
-        } catch (err) { toast.error('Delete failed'); }
+    const handleDeleteOccasion = (id) => {
+        if (window.confirm('Delete this occasion?')) deleteOccasion(id);
+    };
+
+    const handleDeleteTrending = (id) => {
+        if (window.confirm('Delete this pick?')) deleteTrendingPick(id);
+    };
+
+    const handleDeletePrice = (id) => {
+        if (window.confirm('Delete this price range?')) deletePriceFilter(id);
+    };
+
+    const handleCategoryImageUpload = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const url = await uploadImage(file);
+        if (url) {
+            const success = await updateCategoryImage(selectedCategory.category_id, url);
+            if (success) setShowCatImageModal(false);
+        }
     };
 
     return (
         <div className={styles.pageContainer}>
             <div className={styles.headerRow}>
                 <h2 className={styles.title}>Homepage Management</h2>
-                <Badge variant="inStock">Silk Curator CMS</Badge>
             </div>
 
             <div className={styles.card}>
@@ -290,6 +181,18 @@ const HomepageManagement = () => {
                         className={`${styles.tab} ${activeTab === 'prices' ? styles.activeTab : ''}`}
                         onClick={() => setActiveTab('prices')}
                     >Price Filters</button>
+                    <button 
+                        className={`${styles.tab} ${activeTab === 'collections' ? styles.activeTab : ''}`}
+                        onClick={() => setActiveTab('collections')}
+                    >Home Collections</button>
+                    <button 
+                        className={`${styles.tab} ${activeTab === 'featuredProducts' ? styles.activeTab : ''}`}
+                        onClick={() => setActiveTab('featuredProducts')}
+                    >Featured Products</button>
+                    <button 
+                        className={`${styles.tab} ${activeTab === 'newsletter' ? styles.activeTab : ''}`}
+                        onClick={() => setActiveTab('newsletter')}
+                    >Newsletter</button>
                 </div>
 
                 <div className={styles.tabContent}>
@@ -300,7 +203,7 @@ const HomepageManagement = () => {
                                     <InputBox 
                                         label="Main Title"
                                         value={heroData.title}
-                                        onChange={(e) => setHeroData({...heroData, title: e.target.value})}
+                                        onChange={(e) => useHomeStore.setState({ heroData: { ...heroData, title: e.target.value } })}
                                         placeholder="Enter eye-catching title"
                                     />
                                 </div>
@@ -311,7 +214,7 @@ const HomepageManagement = () => {
                                             className="form-control" 
                                             rows={3} 
                                             value={heroData.subtitle}
-                                            onChange={(e) => setHeroData({...heroData, subtitle: e.target.value})}
+                                            onChange={(e) => useHomeStore.setState({ heroData: { ...heroData, subtitle: e.target.value } })}
                                             style={{width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid #d1d5db'}}
                                         />
                                     </div>
@@ -319,28 +222,61 @@ const HomepageManagement = () => {
                                 <InputBox 
                                     label="CTA Button Text"
                                     value={heroData.cta_text}
-                                    onChange={(e) => setHeroData({...heroData, cta_text: e.target.value})}
+                                    onChange={(e) => useHomeStore.setState({ heroData: { ...heroData, cta_text: e.target.value } })}
                                 />
                                 <InputBox 
                                     label="Redirect URL"
                                     value={heroData.redirect_url}
-                                    onChange={(e) => setHeroData({...heroData, redirect_url: e.target.value})}
+                                    onChange={(e) => useHomeStore.setState({ heroData: { ...heroData, redirect_url: e.target.value } })}
                                 />
                                 <div className={styles.fullWidth}>
-                                    <div className={styles.previewBox}>
-                                        {heroData.image_url && <img src={heroData.image_url} alt="Preview" className={styles.previewImg} />}
-                                        <InputBox 
-                                            label="Image URL"
-                                            value={heroData.image_url}
-                                            onChange={(e) => setHeroData({...heroData, image_url: e.target.value})}
-                                            placeholder="https://example.com/image.jpg"
-                                        />
+                                    <div className={styles.formGroup}>
+                                        <label className={styles.label}>Hero Image</label>
+                                        <div className={styles.previewBox}>
+                                            {heroData.image_url ? (
+                                                <img src={getImageUrl(heroData.image_url)} alt="Preview" className={styles.previewImg} />
+                                            ) : (
+                                                <div className={styles.uploadPlaceholder}>
+                                                    <Upload size={48} color="#9ca3af" />
+                                                    <p>No image uploaded</p>
+                                                </div>
+                                            )}
+                                            
+                                            <div className={styles.uploadActions}>
+                                                <Button 
+                                                    type="button" 
+                                                    variant="secondary" 
+                                                    size="small"
+                                                    onClick={() => document.getElementById('heroImageUpload').click()}
+                                                    disabled={isLoading}
+                                                >
+                                                    <Upload size={16} style={{marginRight: '8px'}} />
+                                                    {isLoading ? 'Uploading...' : 'Upload New Image'}
+                                                </Button>
+                                                <input 
+                                                    id="heroImageUpload"
+                                                    type="file" 
+                                                    accept="image/*" 
+                                                    onChange={handleHeroImageUpload} 
+                                                    style={{display: 'none'}}
+                                                />
+                                            </div>
+
+                                            <div style={{width: '100%', marginTop: '1rem'}}>
+                                                <InputBox 
+                                                    label="Or enter Image URL"
+                                                    value={heroData.image_url}
+                                                    onChange={(e) => useHomeStore.setState({ heroData: { ...heroData, image_url: e.target.value } })}
+                                                    placeholder="https://example.com/image.jpg"
+                                                />
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
                             <div style={{marginTop: '2rem'}}>
-                                <Button type="submit" disabled={loading}>
-                                    {loading ? 'Saving...' : 'Update Hero Section'}
+                                <Button type="submit" disabled={isLoading}>
+                                    {isLoading ? 'Saving...' : 'Update Hero Section'}
                                 </Button>
                             </div>
                         </form>
@@ -411,7 +347,11 @@ const HomepageManagement = () => {
                                     <div key={t.testimonial_id} className={styles.testimonialCard}>
                                         <div className={styles.testimonialHeader}>
                                             <div style={{display: 'flex', alignItems: 'center', gap: '0.75rem'}}>
-                                                <div className={styles.avatar}>{t.customer_name.charAt(0)}</div>
+                                                {t.image_url ? (
+                                                    <img src={getImageUrl(t.image_url)} alt={t.customer_name} className={styles.avatar} style={{objectFit: 'cover'}} />
+                                                ) : (
+                                                    <div className={styles.avatar}>{t.customer_name.charAt(0)}</div>
+                                                )}
                                                 <div>
                                                     <div style={{fontWeight: 600, fontSize: '0.9rem'}}>{t.customer_name}</div>
                                                     <div style={{fontSize: '0.75rem', color: '#6b7280'}}>{t.designation}</div>
@@ -465,7 +405,7 @@ const HomepageManagement = () => {
                                             <td style={{width: '50px'}}>{occ.display_order}</td>
                                             <td>
                                                 <div style={{display: 'flex', alignItems: 'center', gap: '0.75rem'}}>
-                                                    <img src={occ.image_url} style={{width: '32px', height: '32px', borderRadius: '4px', objectFit: 'cover'}} />
+                                                    <img src={getImageUrl(occ.image_url)} style={{width: '32px', height: '32px', borderRadius: '4px', objectFit: 'cover'}} />
                                                     {occ.name}
                                                 </div>
                                             </td>
@@ -501,6 +441,7 @@ const HomepageManagement = () => {
                                 <thead>
                                     <tr>
                                         <th>Order</th>
+                                        <th>Image</th>
                                         <th>Name</th>
                                         <th>Slug</th>
                                         <th style={{textAlign: 'right'}}>Actions</th>
@@ -510,6 +451,9 @@ const HomepageManagement = () => {
                                     {trendingPicks.map(tp => (
                                         <tr key={tp.id}>
                                             <td style={{width: '50px'}}>{tp.display_order}</td>
+                                            <td>
+                                                <img src={getImageUrl(tp.image_url)} alt={tp.name} style={{width: '32px', height: '32px', borderRadius: '4px', objectFit: 'cover'}} />
+                                            </td>
                                             <td>{tp.name}</td>
                                             <td style={{fontSize: '0.8rem', color: '#6b7280'}}>{tp.slug}</td>
                                             <td style={{textAlign: 'right'}}>
@@ -543,6 +487,7 @@ const HomepageManagement = () => {
                                 <thead>
                                     <tr>
                                         <th>Order</th>
+                                        <th>Image</th>
                                         <th>Label</th>
                                         <th>Min (₹)</th>
                                         <th>Max (₹)</th>
@@ -553,6 +498,9 @@ const HomepageManagement = () => {
                                     {priceFilters.map(pf => (
                                         <tr key={pf.id}>
                                             <td style={{width: '50px'}}>{pf.display_order}</td>
+                                            <td>
+                                                <img src={getImageUrl(pf.image_url)} alt={pf.label} style={{width: '32px', height: '32px', borderRadius: '4px', objectFit: 'cover'}} />
+                                            </td>
                                             <td>{pf.label}</td>
                                             <td>{pf.min_price}</td>
                                             <td>{pf.max_price}</td>
@@ -569,6 +517,170 @@ const HomepageManagement = () => {
                                 </tbody>
                             </table>
                         </div>
+                    )}
+
+                    {activeTab === 'collections' && (
+                        <div>
+                           
+                            <p style={{fontSize: '0.8rem', color: '#6b7280', marginBottom: '1.5rem'}}>Categories toggled as 'Featured' will appear in the Collections section of the homepage.</p>
+                            <table className={styles.table}>
+                                <thead>
+                                    <tr>
+                                        <th>Image</th>
+                                        <th>Category Name</th>
+                                        <th>Slug</th>
+                                        <th>Badge/Designs</th>
+                                        <th style={{textAlign: 'right'}}>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {categories.map(cat => (
+                                        <tr key={cat.category_id}>
+                                            <td>
+                                                <div style={{display: 'flex', alignItems: 'center', gap: '0.75rem'}}>
+                                                    <img 
+                                                        src={getImageUrl(cat.image_url)} 
+                                                        alt={cat.name} 
+                                                        style={{width: '40px', height: '40px', borderRadius: '4px', objectFit: 'cover'}}
+                                                    />
+                                                    <button 
+                                                        className={styles.actionBtn}
+                                                        onClick={() => {
+                                                            setSelectedCategory(cat);
+                                                            setShowCatImageModal(true);
+                                                        }}
+                                                        title="Update Image"
+                                                    >
+                                                        <Upload size={14} />
+                                                    </button>
+                                                </div>
+                                            </td>
+                                            <td style={{fontWeight: 600}}>{cat.name}</td>
+                                            <td style={{fontSize: '0.85rem', color: '#6b7280'}}>{cat.slug}</td>
+                                            <td><Badge variant="lowStock">{cat.badge || '0+ Designs'}</Badge></td>
+                                            <td style={{textAlign: 'right'}}>
+                                                <div style={{display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '1rem'}}>
+                                                    <span style={{fontSize: '0.75rem', color: '#6b7280'}}>Show on Home</span>
+                                                    <Toggle 
+                                                        checked={!!cat.is_featured}
+                                                        onChange={() => toggleCategoryFeatured(cat.category_id)}
+                                                    />
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+
+                    {activeTab === 'featuredProducts' && (
+                        <div>
+                            <div className={styles.headerRow}>
+                                <h5 style={{margin: 0}}>Featured Products (Show on Home)</h5>
+                            </div>
+                            <p style={{fontSize: '0.8rem', color: '#6b7280', marginBottom: '1.5rem'}}>Products toggled here will be displayed in the "Featured Products" grid on the homepage.</p>
+                            <table className={styles.table}>
+                                <thead>
+                                    <tr>
+                                        <th>Image</th>
+                                        <th>Product Name</th>
+                                        <th>SKU</th>
+                                        <th>Price</th>
+                                        <th style={{textAlign: 'right'}}>Show on Home</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {products.map(product => (
+                                        <tr key={product.product_id}>
+                                            <td>
+                                                <img 
+                                                    src={getImageUrl(product.image_url)} 
+                                                    alt={product.name} 
+                                                    style={{width: '40px', height: '40px', borderRadius: '4px', objectFit: 'cover'}}
+                                                />
+                                            </td>
+                                            <td style={{fontWeight: 600}}>{product.name}</td>
+                                            <td style={{fontSize: '0.85rem', color: '#6b7280'}}>{product.base_sku}</td>
+                                            <td style={{fontSize: '0.85rem'}}>₹{product.price || 'N/A'}</td>
+                                            <td style={{textAlign: 'right'}}>
+                                                <Toggle 
+                                                    checked={!!product.is_featured}
+                                                    onChange={() => toggleProductFeatured(product.product_id)}
+                                                />
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+                    {activeTab === 'newsletter' && (
+                        <form onSubmit={(e) => { e.preventDefault(); updateNewsletter(newsletter); }}>
+                            <div className={styles.formGrid}>
+                                <div className={styles.fullWidth}>
+                                    <InputBox 
+                                        label="Main Title"
+                                        value={newsletter.title}
+                                        onChange={(e) => useHomeStore.setState({ newsletter: { ...newsletter, title: e.target.value } })}
+                                    />
+                                </div>
+                                <div className={styles.fullWidth}>
+                                    <div className={styles.formGroup}>
+                                        <label className={styles.label}>Subtitle</label>
+                                        <textarea 
+                                            className="form-control" 
+                                            rows={2} 
+                                            value={newsletter.subtitle}
+                                            onChange={(e) => useHomeStore.setState({ newsletter: { ...newsletter, subtitle: e.target.value } })}
+                                            style={{width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid #d1d5db'}}
+                                        />
+                                    </div>
+                                </div>
+                                <InputBox 
+                                    label="Email Placeholder"
+                                    value={newsletter.email_placeholder}
+                                    onChange={(e) => useHomeStore.setState({ newsletter: { ...newsletter, email_placeholder: e.target.value } })}
+                                />
+                                <InputBox 
+                                    label="Button Text"
+                                    value={newsletter.button_text}
+                                    onChange={(e) => useHomeStore.setState({ newsletter: { ...newsletter, button_text: e.target.value } })}
+                                />
+                                <div className={styles.fullWidth}>
+                                    <div className={styles.formGroup}>
+                                        <label className={styles.label}>Newsletter Image</label>
+                                        <div className={styles.previewBox}>
+                                            {newsletter.image_url ? (
+                                                <img src={getImageUrl(newsletter.image_url)} alt="Preview" className={styles.previewImg} style={{maxHeight: '150px'}} />
+                                            ) : (
+                                                <div className={styles.uploadPlaceholder}>
+                                                    <Upload size={32} color="#9ca3af" />
+                                                    <p>No image</p>
+                                                </div>
+                                            )}
+                                            <div className={styles.uploadActions}>
+                                                <Button type="button" variant="secondary" size="small" onClick={() => document.getElementById('newsletterImgUpload').click()} disabled={isLoading}>
+                                                    <Upload size={14} /> {isLoading ? 'Uploading...' : 'Upload'}
+                                                </Button>
+                                                <input id="newsletterImgUpload" type="file" hidden onChange={async (e) => {
+                                                    const file = e.target.files[0];
+                                                    if (file) {
+                                                        const url = await uploadImage(file);
+                                                        if (url) useHomeStore.setState({ newsletter: { ...newsletter, image_url: url } });
+                                                    }
+                                                }} />
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className={styles.fullWidth} style={{marginTop: '1rem'}}>
+                                    <Button type="submit" disabled={isLoading}>
+                                        {isLoading ? 'Saving...' : 'Update Newsletter Settings'}
+                                    </Button>
+                                </div>
+                            </div>
+                        </form>
                     )}
                 </div>
             </div>
@@ -664,6 +776,33 @@ const HomepageManagement = () => {
                     </div>
                     <div className={styles.fullWidth}>
                         <div className={styles.formGroup}>
+                            <label className={styles.label}>Avatar / Image</label>
+                            <div className={styles.previewBox} style={{padding: '0.5rem'}}>
+                                {testimonialForm.image_url && <img src={getImageUrl(testimonialForm.image_url)} alt="Preview" className={styles.previewImg} style={{maxHeight: '100px'}} />}
+                                <div className={styles.uploadActions}>
+                                    <Button type="button" variant="secondary" size="small" onClick={() => document.getElementById('testimonialImgUpload').click()} disabled={isLoading}>
+                                        <Upload size={14} /> {isLoading ? 'Uploading...' : 'Upload'}
+                                    </Button>
+                                    <input id="testimonialImgUpload" type="file" hidden onChange={async (e) => {
+                                        const file = e.target.files[0];
+                                        if (file) {
+                                            const url = await uploadImage(file);
+                                            if (url) setTestimonialForm({ ...testimonialForm, image_url: url });
+                                        }
+                                    }} />
+                                </div>
+                                <div style={{width: '100%', marginTop: '0.5rem'}}>
+                                    <InputBox 
+                                        label="Or URL" 
+                                        value={testimonialForm.image_url} 
+                                        onChange={(e) => setTestimonialForm({...testimonialForm, image_url: e.target.value})} 
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div className={styles.fullWidth}>
+                        <div className={styles.formGroup}>
                             <label className={styles.label}>Comment</label>
                             <textarea 
                                 className="form-control" 
@@ -692,7 +831,29 @@ const HomepageManagement = () => {
             >
                 <div className={styles.formGrid}>
                     <InputBox label="Name" value={occasionForm.name} onChange={(e) => setOccasionForm({...occasionForm, name: e.target.value})} required />
-                    <InputBox label="Image URL" value={occasionForm.image_url} onChange={(e) => setOccasionForm({...occasionForm, image_url: e.target.value})} placeholder="https://..." />
+                    <div className={styles.fullWidth}>
+                        <div className={styles.formGroup}>
+                            <label className={styles.label}>Occasion Image</label>
+                            <div className={styles.previewBox} style={{padding: '0.5rem'}}>
+                                {occasionForm.image_url && <img src={getImageUrl(occasionForm.image_url)} alt="Preview" className={styles.previewImg} style={{maxHeight: '100px'}} />}
+                                <div className={styles.uploadActions}>
+                                    <Button type="button" variant="secondary" size="small" onClick={() => document.getElementById('occImgUpload').click()} disabled={isLoading}>
+                                        <Upload size={14} /> {isLoading ? 'Uploading...' : 'Upload'}
+                                    </Button>
+                                    <input id="occImgUpload" type="file" hidden onChange={async (e) => {
+                                        const file = e.target.files[0];
+                                        if (file) {
+                                            const url = await uploadImage(file);
+                                            if (url) setOccasionForm({ ...occasionForm, image_url: url });
+                                        }
+                                    }} />
+                                </div>
+                                <div style={{width: '100%', marginTop: '0.5rem'}}>
+                                    <InputBox label="Or URL" value={occasionForm.image_url} onChange={(e) => setOccasionForm({...occasionForm, image_url: e.target.value})} placeholder="https://..." />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                     <InputBox label="Redirect URL" value={occasionForm.redirect_url} onChange={(e) => setOccasionForm({...occasionForm, redirect_url: e.target.value})} placeholder="/occasion/wedding" />
                     <InputBox label="Display Order" type="number" value={occasionForm.display_order} onChange={(e) => setOccasionForm({...occasionForm, display_order: e.target.value})} />
                 </div>
@@ -713,6 +874,26 @@ const HomepageManagement = () => {
                 <div className={styles.formGrid}>
                     <InputBox label="Name" value={trendingForm.name} onChange={(e) => setTrendingForm({...trendingForm, name: e.target.value})} required />
                     <InputBox label="Slug / Search Term" value={trendingForm.slug} onChange={(e) => setTrendingForm({...trendingForm, slug: e.target.value})} placeholder="pure-silk" />
+                    <div className={styles.fullWidth}>
+                        <div className={styles.formGroup}>
+                            <label className={styles.label}>Pick Image</label>
+                            <div className={styles.previewBox} style={{padding: '0.5rem'}}>
+                                {trendingForm.image_url && <img src={getImageUrl(trendingForm.image_url)} alt="Preview" className={styles.previewImg} style={{maxHeight: '100px'}} />}
+                                <div className={styles.uploadActions}>
+                                    <Button type="button" variant="secondary" size="small" onClick={() => document.getElementById('trendingImgUpload').click()} disabled={isLoading}>
+                                        <Upload size={14} /> {isLoading ? 'Uploading...' : 'Upload'}
+                                    </Button>
+                                    <input id="trendingImgUpload" type="file" hidden onChange={async (e) => {
+                                        const file = e.target.files[0];
+                                        if (file) {
+                                            const url = await uploadImage(file);
+                                            if (url) setTrendingForm({ ...trendingForm, image_url: url });
+                                        }
+                                    }} />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                     <InputBox label="Display Order" type="number" value={trendingForm.display_order} onChange={(e) => setTrendingForm({...trendingForm, display_order: e.target.value})} />
                 </div>
             </Modal>
@@ -733,9 +914,60 @@ const HomepageManagement = () => {
                     <div className={styles.fullWidth}>
                         <InputBox label="Label" value={priceForm.label} onChange={(e) => setPriceForm({...priceForm, label: e.target.value})} required placeholder="Under ₹5k" />
                     </div>
+                    <div className={styles.fullWidth}>
+                        <div className={styles.formGroup}>
+                            <label className={styles.label}>Background Image</label>
+                            <div className={styles.previewBox} style={{padding: '0.5rem'}}>
+                                {priceForm.image_url && <img src={getImageUrl(priceForm.image_url)} alt="Preview" className={styles.previewImg} style={{maxHeight: '100px'}} />}
+                                <div className={styles.uploadActions}>
+                                    <Button type="button" variant="secondary" size="small" onClick={() => document.getElementById('priceImgUpload').click()} disabled={isLoading}>
+                                        <Upload size={14} /> {isLoading ? 'Uploading...' : 'Upload'}
+                                    </Button>
+                                    <input id="priceImgUpload" type="file" hidden onChange={async (e) => {
+                                        const file = e.target.files[0];
+                                        if (file) {
+                                            const url = await uploadImage(file);
+                                            if (url) setPriceForm({ ...priceForm, image_url: url });
+                                        }
+                                    }} />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                     <InputBox label="Min Price (₹)" type="number" value={priceForm.min_price} onChange={(e) => setPriceForm({...priceForm, min_price: e.target.value})} />
                     <InputBox label="Max Price (₹)" type="number" value={priceForm.max_price} onChange={(e) => setPriceForm({...priceForm, max_price: e.target.value})} />
                     <InputBox label="Display Order" type="number" value={priceForm.display_order} onChange={(e) => setPriceForm({...priceForm, display_order: e.target.value})} />
+                </div>
+            </Modal>
+
+            {/* Category Image Modal */}
+            <Modal
+                isOpen={showCatImageModal}
+                onClose={() => setShowCatImageModal(false)}
+                title="Update Category Image"
+                footer={
+                    <div className={styles.modalFooter}>
+                        <Button variant="ghost" onClick={() => setShowCatImageModal(false)}>Cancel</Button>
+                    </div>
+                }
+            >
+                <div className={styles.previewBox}>
+                    {selectedCategory && (
+                        <>
+                            <p style={{fontSize: '0.9rem', marginBottom: '1rem'}}>Updating image for: <strong>{selectedCategory.name}</strong></p>
+                            <img 
+                                src={getImageUrl(selectedCategory.image_url)} 
+                                alt="Current" 
+                                className={styles.previewImg} 
+                            />
+                            <div className={styles.uploadActions}>
+                                <label className={styles.uploadBtn}>
+                                    <input type="file" onChange={handleCategoryImageUpload} hidden accept="image/*" />
+                                    <Upload size={16} /> Choose New Image
+                                </label>
+                            </div>
+                        </>
+                    )}
                 </div>
             </Modal>
         </div>

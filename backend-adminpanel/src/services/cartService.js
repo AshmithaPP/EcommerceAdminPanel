@@ -76,8 +76,16 @@ const cartService = {
         let cart = await Cart.findCart(userId, guestId);
         let cartId;
         if (!cart) {
-            cartId = await Cart.createCart(userId, guestId);
+            console.log(`🆕 Creating NEW cart for User: ${userId}, Guest: ${guestId}`);
+            try {
+                cartId = await Cart.createCart(userId, guestId);
+                console.log(`✅ Cart created with ID: ${cartId}`);
+            } catch (createErr) {
+                console.error(`❌ FAILED to create cart: ${createErr.message}`);
+                throw createErr;
+            }
         } else {
+            console.log(`🔍 Using existing cart: ${cart.cart_id}`);
             cartId = cart.cart_id;
         }
 

@@ -104,7 +104,7 @@ const Shipment = {
         }
 
         if (status) {
-            sql += ` AND s.status = ?`;
+            sql += ` AND LOWER(s.status) = LOWER(?)`;
             params.push(status);
         }
 
@@ -126,7 +126,7 @@ const Shipment = {
             countParams.push(`%${search}%`, `%${search}%`);
         }
         if (status) {
-            countSql += ` AND s.status = ?`;
+            countSql += ` AND LOWER(s.status) = LOWER(?)`;
             countParams.push(status);
         }
 
