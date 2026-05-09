@@ -21,7 +21,7 @@ const PaymentService = {
 
         try {
             const razorpayOrder = await razorpay.orders.create(options);
-            
+
             // Store initial payment record
             await Payment.create({
                 order_id: orderId,
@@ -60,8 +60,8 @@ const PaymentService = {
         // 2. Update related Order status
         const paymentRecord = await Payment.findByGatewayOrderId(razorpayOrderId);
         if (paymentRecord) {
-            // Update order to 'paid' status and 'success' payment status
-            await Order.updateStatus(paymentRecord.order_id, 'paid', 'success');
+            // Update order to 'paid' status and 'success' payment status, including the transaction ID
+            await Order.updateStatus(paymentRecord.order_id, 'paid', 'success', razorpayPaymentId, 'razorpay');
 
             // 3. Deduct stock permanently from inventory
             const orderDetails = await Order.findById(paymentRecord.order_id);

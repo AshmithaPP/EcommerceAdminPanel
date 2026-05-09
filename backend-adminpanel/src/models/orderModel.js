@@ -8,8 +8,8 @@ const Order = {
 
         try {
             const orderId = uuidv4();
-            const { 
-                user_id, address_id, subtotal, discount, 
+            const {
+                user_id, address_id, subtotal, discount,
                 delivery_fee, total_amount, payment_method, shipping_address, coupon_id
             } = orderData;
 
@@ -22,7 +22,7 @@ const Order = {
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             `;
             await connection.query(orderSql, [
-                orderId, orderNumber, user_id, address_id, subtotal, discount, 
+                orderId, orderNumber, user_id, address_id, subtotal, discount,
                 delivery_fee, total_amount, payment_method, JSON.stringify(shipping_address), coupon_id || null
             ]);
 
@@ -36,9 +36,9 @@ const Order = {
                     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 `;
                 await connection.query(itemSql, [
-                    orderItemId, orderId, item.product_id, 
-                    item.variant_id || null, item.product_name, 
-                    item.variant_name || null, item.variant_sku || null, 
+                    orderItemId, orderId, item.product_id,
+                    item.variant_id || null, item.product_name,
+                    item.variant_name || null, item.variant_sku || null,
                     item.quantity, item.price, item.image_url || null
                 ]);
 
@@ -58,7 +58,7 @@ const Order = {
             }
 
             await connection.commit();
-            
+
             // 4. Initial Timeline Event
             const timelineId = uuidv4();
             await db.query(
@@ -100,20 +100,20 @@ const Order = {
             WHERE ot.order_id = o.order_id ORDER BY ot.created_at ASC) as timeline
             FROM orders o WHERE o.order_id = ?
         `, [orderId]);
-        
+
         const order = orders[0];
         if (order) {
             if (typeof order.items === 'string') order.items = JSON.parse(order.items);
             if (typeof order.timeline === 'string') order.timeline = JSON.parse(order.timeline);
             if (typeof order.shipping_address === 'string') order.shipping_address = JSON.parse(order.shipping_address);
         }
-        
+
         return order;
     },
 
-    updateStatus: async (orderId, status, paymentStatus) => {
-        const sql = 'UPDATE orders SET status = ?, payment_status = ? WHERE order_id = ?';
-        await db.query(sql, [status, paymentStatus, orderId]);
+    updateStatus: async (orderId, status, paymentStatus, transactionId = null, gateway = 'razorpay') => {
+        const sql = 'UPDATE orders SET status = ?, payment_status = ?, transaction_id = ?, payment_gateway = ? WHERE order_id = ?';
+        await db.query(sql, [status, paymentStatus, transactionId, gateway, orderId]);
     },
 
     findAllByUserId: async (userId, page = 1, limit = 10) => {
@@ -149,10 +149,10 @@ const Order = {
             WHERE order_id = ?
         `;
         await db.query(sql, [
-            status, 
-            tracking_id || null, 
-            courier_name || null, 
-            estimated_delivery_date || null, 
+            status,
+            tracking_id || null,
+            courier_name || null,
+            estimated_delivery_date || null,
             orderId
         ]);
 
@@ -195,13 +195,13 @@ const Order = {
                     courier_name: courier_name,
                     tracking_number: tracking_id
                 });
-                
+
                 // Automatically advance to 'Shipped' status in shipment model
                 const newShipment = await Shipment.findByOrderId(orderId);
                 if (newShipment.length > 0) {
-                    await Shipment.updateStatus(newShipment[0].shipment_id, 'Shipped', { 
-                        location: 'Warehouse', 
-                        comment: 'Order marked as shipped from order management.' 
+                    await Shipment.updateStatus(newShipment[0].shipment_id, 'Shipped', {
+                        location: 'Warehouse',
+                        comment: 'Order marked as shipped from order management.'
                     });
                 }
             }

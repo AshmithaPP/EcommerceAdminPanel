@@ -162,7 +162,7 @@ const EditProduct = () => {
     const files = Array.from(e.target.files);
     const updatedVariants = [...variants];
     const currentImgs = updatedVariants[vIdx].images || [];
-    
+
     if (currentImgs.length + files.length > 5) {
       showToast.error('Max 5 images allowed per variant');
       return;
@@ -286,8 +286,8 @@ const EditProduct = () => {
               <InputBox label="Brand" name="brand" value={productData.brand} onChange={handleProductChange} Icon={Tag} />
               <InputBox label="Badge" name="badge" value={productData.badge} onChange={handleProductChange} placeholder="e.g. Bridal Special" Icon={BadgeCheck} />
               <InputBox label="Tagline" name="tagline" value={productData.tagline} onChange={handleProductChange} placeholder="Short subtitle" Icon={Star} />
-              
-             
+
+
 
               <div className={styles.statusToggleWrap}>
                 <div className={styles.toggleLabel}>
@@ -323,8 +323,8 @@ const EditProduct = () => {
                   <div className={styles.checkboxGrid} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '0.5rem', marginTop: '0.5rem' }}>
                     {homeSections.map(section => (
                       <label key={section.section_id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.85rem' }}>
-                        <input 
-                          type="checkbox" 
+                        <input
+                          type="checkbox"
                           checked={(productData.home_sections || []).includes(section.section_id)}
                           onChange={(e) => {
                             const current = productData.home_sections || [];
@@ -372,16 +372,16 @@ const EditProduct = () => {
               <p className={styles.emptyPrompt}>No attributes mapped. Click <strong>Assign to Category</strong> to add some.</p>
             ) : (
               <div className={styles.configGrid}>
-              {Array.isArray(variantConfig) && variantConfig.map((attr, idx) => (
+                {Array.isArray(variantConfig) && variantConfig.map((attr, idx) => (
                   <div key={attr.attribute_id || idx} className={styles.configCard}>
                     <div className={styles.configCardHeader}>
                       <span className={styles.configCardTitle}>{attr.name}</span>
                       <div className={styles.generatorToggle}>
                         <span>Variant Generator?</span>
                         <label className={styles.switchSmall}>
-                          <input 
-                            type="checkbox" 
-                            checked={attr.is_generator} 
+                          <input
+                            type="checkbox"
+                            checked={attr.is_generator}
                             onChange={(e) => {
                               const updated = [...(Array.isArray(variantConfig) ? variantConfig : [])];
                               updated[idx] = { ...updated[idx], is_generator: e.target.checked };
@@ -392,17 +392,17 @@ const EditProduct = () => {
                         </label>
                       </div>
                     </div>
-                    
+
                     <div className={styles.valuePicker}>
                       {categoryAttributes.find(a => String(a.attribute_id) === String(attr.attribute_id))?.values.map(val => {
                         const isSelected = attr.selectedValues.find(v => String(v.id) === String(val.attribute_value_id));
                         const mappedImgs = bulkImages[val.attribute_value_id] || [];
                         const hasBulkImages = mappedImgs.length > 0;
-                        
+
                         return (
                           <div key={val.attribute_value_id} className={styles.valueItemContainer}>
                             <div className={styles.valueItemWrapper}>
-                              <button 
+                              <button
                                 className={`${styles.valueChip} ${isSelected ? styles.active : ''}`}
                                 onClick={() => toggleConfigValue(attr.attribute_id, { id: val.attribute_value_id, name: val.value })}
                               >
@@ -418,7 +418,7 @@ const EditProduct = () => {
                                   <ImageIcon size={14} />
                                   <span>Apply images to all <strong>{val.value}</strong> variants</span>
                                 </div>
-                                
+
                                 <div className={styles.bulkImageActions}>
                                   <div className={styles.bulkThumbnails}>
                                     {mappedImgs.map((img, i) => (
@@ -426,7 +426,7 @@ const EditProduct = () => {
                                         <img src={getImageUrl(img)} alt="" />
                                       </div>
                                     ))}
-                                    <button 
+                                    <button
                                       className={styles.addBulkImgBtn}
                                       onClick={() => document.getElementById(`bulk-img-${val.attribute_value_id}`).click()}
                                       title="Add images for this value"
@@ -434,7 +434,7 @@ const EditProduct = () => {
                                       <PlusCircle size={14} />
                                     </button>
                                   </div>
-                                  
+
                                   {hasBulkImages && (
                                     <button className={styles.clearBulkBtn} onClick={() => clearBulkImages(val.attribute_value_id)}>
                                       Clear
@@ -442,12 +442,12 @@ const EditProduct = () => {
                                   )}
                                 </div>
 
-                                <input 
-                                  id={`bulk-img-${val.attribute_value_id}`} 
-                                  type="file" 
-                                  multiple 
-                                  style={{ display: 'none' }} 
-                                  onChange={(e) => applyBulkImage(val.attribute_value_id, e.target.files)} 
+                                <input
+                                  id={`bulk-img-${val.attribute_value_id}`}
+                                  type="file"
+                                  multiple
+                                  style={{ display: 'none' }}
+                                  onChange={(e) => applyBulkImage(val.attribute_value_id, e.target.files)}
                                 />
                               </div>
                             )}
@@ -509,8 +509,8 @@ const EditProduct = () => {
             <div className={styles.sectionContent}>
               <div className={styles.dynamicListWrapper}>
                 <div className={styles.listInputRow}>
-                  <InputBox 
-                    placeholder="Add highlight" 
+                  <InputBox
+                    placeholder="Add highlight"
                     id="edit-highlight-input"
                     Icon={Check}
                     onKeyPress={(e) => {
@@ -523,7 +523,7 @@ const EditProduct = () => {
                       }
                     }}
                   />
-                  <button 
+                  <button
                     className={styles.addBtnIcon}
                     onClick={() => {
                       const input = document.getElementById('edit-highlight-input');
@@ -557,8 +557,8 @@ const EditProduct = () => {
             <div className={styles.sectionContent}>
               <div className={styles.dynamicListWrapper}>
                 <div className={styles.listInputRow}>
-                  <InputBox 
-                    placeholder="Add instruction" 
+                  <InputBox
+                    placeholder="Add instruction"
                     id="edit-care-input"
                     Icon={Info}
                     onKeyPress={(e) => {
@@ -571,7 +571,7 @@ const EditProduct = () => {
                       }
                     }}
                   />
-                  <button 
+                  <button
                     className={styles.addBtnIcon}
                     onClick={() => {
                       const input = document.getElementById('edit-care-input');
@@ -609,7 +609,7 @@ const EditProduct = () => {
               <div className={styles.complexListWrapper}>
                 <div className={styles.listInputRow}>
                   <InputBox placeholder="Service title" id="edit-service-input" Icon={Truck} />
-                  <button 
+                  <button
                     className={styles.addBtnIcon}
                     onClick={() => {
                       const input = document.getElementById('edit-service-input');
@@ -646,17 +646,17 @@ const EditProduct = () => {
                 <div className={styles.multiInputRow}>
                   <InputBox placeholder="Title" id="edit-trust-title" />
                   <InputBox placeholder="Subtitle" id="edit-trust-sub" />
-                  <button 
+                  <button
                     className={styles.addBtnIcon}
                     onClick={() => {
                       const titleInp = document.getElementById('edit-trust-title');
                       const subInp = document.getElementById('edit-trust-sub');
                       if (titleInp.value.trim()) {
-                        setProductData({ 
-                          trustBadges: [...(productData.trustBadges || []), { 
-                            title: titleInp.value.trim(), 
-                            subtitle: subInp.value.trim() 
-                          }] 
+                        setProductData({
+                          trustBadges: [...(productData.trustBadges || []), {
+                            title: titleInp.value.trim(),
+                            subtitle: subInp.value.trim()
+                          }]
                         });
                         titleInp.value = '';
                         subInp.value = '';
@@ -689,9 +689,9 @@ const EditProduct = () => {
             <LayoutGrid size={16} className={styles.sectionIcon} />
             <h3>Variants & Inventory</h3>
             <div className={styles.sectionHeaderActions} style={{ gap: '1rem' }}>
-               <button className={styles.headerActionBtn} onClick={generateVariants}>
-                 <Layers size={14} /> Generate Combinations
-               </button>
+              <button className={styles.headerActionBtn} onClick={generateVariants}>
+                <Layers size={14} /> Generate Combinations
+              </button>
             </div>
           </div>
           <div className={styles.sectionContent}>
@@ -702,54 +702,55 @@ const EditProduct = () => {
                     const pricing = calculateGSTFields(v.sellingPrice, productData.gstPercent, productData.priceIncludesGST);
 
                     return (
-                    <div key={vIdx} className={styles.variantCard}>
-                      <div className={styles.variantCardHeader}>
-                        <span className={styles.variantTitle}>
-                           {v.sku || 'No SKU'} {v.variant_id && <small>(ID: {String(v.variant_id).split('-')[0]})</small>}
-                        </span>
-                        <button className={styles.removeVariantBtn} onClick={() => deleteVariant(vIdx)}><Trash2 size={16} /></button>
-                      </div>
-                      <div className={styles.inlineGridWide}>
-                        <InputBox label="SKU" value={v.sku} onChange={e => updateVariant(vIdx, 'sku', e.target.value)} Icon={Tag} />
-                        <InputBox label="Stock" type="number" value={v.stock} onChange={e => updateVariant(vIdx, 'stock', e.target.value)} Icon={PackageIcon} />
-                        <InputBox label="Alert Level" type="number" value={v.low_stock_threshold} onChange={e => updateVariant(vIdx, 'low_stock_threshold', e.target.value)} Icon={Info} />
-                        <InputBox label="MRP" type="text" value={v.mrp} onChange={e => updateVariant(vIdx, 'mrp', e.target.value)} Icon={Star} />
-                        <InputBox label="Selling Price" type="text" value={v.sellingPrice} onChange={e => updateVariant(vIdx, 'sellingPrice', e.target.value)} Icon={Percent} />
-                        
-                        <div className={styles.variantAttrBadges}>
-                            {Object.entries(v.attributeValues || {}).map(([attrId, val]) => (
-                                <span key={attrId} className={styles.attrBadge}>{val.name}</span>
-                            ))}
+                      <div key={vIdx} className={styles.variantCard}>
+                        <div className={styles.variantCardHeader}>
+                          <span className={styles.variantTitle}>
+                            {v.sku || 'No SKU'} {v.variant_id && <small>(ID: {String(v.variant_id).split('-')[0]})</small>}
+                          </span>
+                          <button className={styles.removeVariantBtn} onClick={() => deleteVariant(vIdx)}><Trash2 size={16} /></button>
                         </div>
-                      </div>
+                        <div className={styles.inlineGridWide}>
+                          <InputBox label="SKU" value={v.sku} onChange={e => updateVariant(vIdx, 'sku', e.target.value)} Icon={Tag} />
+                          <InputBox label="Stock" type="number" value={v.stock} onChange={e => updateVariant(vIdx, 'stock', e.target.value)} Icon={PackageIcon} />
+                          <InputBox label="Alert Level" type="number" value={v.low_stock_threshold} onChange={e => updateVariant(vIdx, 'low_stock_threshold', e.target.value)} Icon={Info} />
+                          <InputBox label="MRP" type="text" value={v.mrp} onChange={e => updateVariant(vIdx, 'mrp', e.target.value)} Icon={Star} />
+                          <InputBox label="Selling Price" type="text" value={v.sellingPrice} onChange={e => updateVariant(vIdx, 'sellingPrice', e.target.value)} Icon={Percent} />
 
-                      {/* Computed Pricing Summary */}
-                      <div className={styles.pricingSummaryMini}>
+                          <div className={styles.variantAttrBadges}>
+                            {Object.entries(v.attributeValues || {}).map(([attrId, val]) => (
+                              <span key={attrId} className={styles.attrBadge}>{val.name}</span>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Computed Pricing Summary */}
+                        <div className={styles.pricingSummaryMini}>
                           <div><span>Base</span><strong>₹{pricing.basePrice}</strong></div>
                           <div><span>GST ({productData.gstPercent}%)</span><strong>₹{pricing.gstAmount}</strong></div>
                           <div className={styles.finalPriceWrap}><span>Final</span><strong>₹{pricing.finalPrice}</strong></div>
-                      </div>
+                        </div>
 
-                      <div className={styles.imageGrid}>
-                        {v.images?.map((img, imgIdx) => (
-                          <div key={imgIdx} className={styles.imageItem}>
-                            <img src={getImageUrl(img)} alt="v-img" />
-                            <div className={styles.imageOverlay}>
-                              <button className={styles.overlayBtn} onClick={() => removeVariantImage(vIdx, imgIdx)}>
-                                <Trash2 size={12} />
-                              </button>
+                        <div className={styles.imageGrid}>
+                          {v.images?.map((img, imgIdx) => (
+                            <div key={imgIdx} className={styles.imageItem}>
+                              <img src={getImageUrl(img)} alt="v-img" />
+                              <div className={styles.imageOverlay}>
+                                <button className={styles.overlayBtn} onClick={() => removeVariantImage(vIdx, imgIdx)}>
+                                  <Trash2 size={12} />
+                                </button>
+                              </div>
                             </div>
-                          </div>
-                        ))}
-                        {v.images?.length < 5 && (
-                          <div className={styles.uploadZone} onClick={() => document.getElementById(`v-img-${vIdx}`).click()}>
-                            <CloudUpload size={16} /><p className={styles.uploadMain}>Add</p>
-                            <input id={`v-img-${vIdx}`} type="file" multiple style={{ display: 'none' }} onChange={e => handleVariantImageUpload(e, vIdx)} />
-                          </div>
-                        )}
+                          ))}
+                          {v.images?.length < 5 && (
+                            <div className={styles.uploadZone} onClick={() => document.getElementById(`v-img-${vIdx}`).click()}>
+                              <CloudUpload size={16} /><p className={styles.uploadMain}>Add</p>
+                              <input id={`v-img-${vIdx}`} type="file" multiple style={{ display: 'none' }} onChange={e => handleVariantImageUpload(e, vIdx)} />
+                            </div>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  )})}
+                    )
+                  })}
                 </div>
                 <button className={styles.addVariantBtn} onClick={addVariant}><PlusCircle size={16} /> Add Manual Variant</button>
               </div>
@@ -766,13 +767,13 @@ const EditProduct = () => {
             </div>
             <div className={styles.sectionContent}>
               <div className={styles.labelWrapper}>
-                <textarea 
-                  name="description" 
-                  value={productData.description || ''} 
-                  onChange={handleProductChange} 
-                  className={styles.textarea} 
-                  rows={4} 
-                  placeholder="Full product description..." 
+                <textarea
+                  name="description"
+                  value={productData.description || ''}
+                  onChange={handleProductChange}
+                  className={styles.textarea}
+                  rows={4}
+                  placeholder="Full product description..."
                 />
               </div>
             </div>
@@ -785,26 +786,26 @@ const EditProduct = () => {
             </div>
             <div className={styles.sectionContent}>
               <div className={styles.formGrid2} style={{ gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '0.75rem' }}>
-                <InputBox 
-                  label="Meta Title" 
-                  name="meta_title" 
-                  value={productData.meta_title || ''} 
-                  onChange={handleProductChange} 
+                <InputBox
+                  label="Meta Title"
+                  name="meta_title"
+                  value={productData.meta_title || ''}
+                  onChange={handleProductChange}
                   placeholder="SEO Title"
                 />
-                <InputBox 
-                  label="URL Slug" 
-                  name="slug" 
-                  value={productData.slug || ''} 
-                  onChange={handleProductChange} 
+                <InputBox
+                  label="URL Slug"
+                  name="slug"
+                  value={productData.slug || ''}
+                  onChange={handleProductChange}
                   placeholder="product-slug"
                 />
               </div>
-              <InputBox 
-                label="Meta Description" 
-                name="meta_description" 
-                value={productData.meta_description || ''} 
-                onChange={handleProductChange} 
+              <InputBox
+                label="Meta Description"
+                name="meta_description"
+                value={productData.meta_description || ''}
+                onChange={handleProductChange}
                 placeholder="SEO Description"
               />
             </div>
@@ -819,38 +820,38 @@ const EditProduct = () => {
           </div>
           <div className={styles.sectionContent}>
             <div className={styles.formGrid4}>
-              <InputBox 
-                label="Tax Text" 
-                value={productData.pricingMeta?.taxIncludedText} 
+              <InputBox
+                label="Tax Text"
+                value={productData.pricingMeta?.taxIncludedText}
                 onChange={(e) => setProductData({ pricingMeta: { ...productData.pricingMeta, taxIncludedText: e.target.value } })}
                 placeholder="e.g. Inclusive of all taxes"
                 Icon={DollarSign}
               />
-              <InputBox 
-                label="Low Stock Alert Text" 
-                value={productData.stockMeta?.lowStockText} 
+              <InputBox
+                label="Low Stock Alert Text"
+                value={productData.stockMeta?.lowStockText}
                 onChange={(e) => setProductData({ stockMeta: { ...productData.stockMeta, lowStockText: e.target.value } })}
                 placeholder="Only 5 left!"
                 Icon={PackageIcon}
               />
-              <InputBox 
-                label="Urgency Text" 
-                value={productData.stockMeta?.urgencyText} 
+              <InputBox
+                label="Urgency Text"
+                value={productData.stockMeta?.urgencyText}
                 onChange={(e) => setProductData({ stockMeta: { ...productData.stockMeta, urgencyText: e.target.value } })}
                 placeholder="Selling fast!"
                 Icon={Zap}
               />
-              <InputBox 
-                label="Fake View Count" 
+              <InputBox
+                label="Fake View Count"
                 type="number"
-                value={productData.stockMeta?.viewCount} 
+                value={productData.stockMeta?.viewCount}
                 onChange={(e) => setProductData({ stockMeta: { ...productData.stockMeta, viewCount: parseInt(e.target.value) || 0 } })}
                 Icon={User}
               />
             </div>
-            
+
             <div className={styles.divider} style={{ margin: '1.5rem 0 1rem 0', borderTop: '1px solid #f1f5f9' }} />
-            
+
             <div className={styles.formGrid2} style={{ gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
               <div className={styles.kvContainer}>
                 <div className={styles.kvHeader}>
@@ -918,9 +919,9 @@ const EditProduct = () => {
               ))}
             </div>
             <div className={styles.actionBar}>
-              <Button onClick={() => { 
-                  assignAttributes(productData.sub_category_id, selectedAttributeIds); 
-                  setIsMappingModalOpen(false); 
+              <Button onClick={() => {
+                assignAttributes(productData.sub_category_id, selectedAttributeIds);
+                setIsMappingModalOpen(false);
               }}>Save Mappings</Button>
             </div>
           </div>
@@ -939,7 +940,7 @@ const EditProduct = () => {
                 <div key={attr.attribute_id} className={styles.attrRow}>
                   {editingAttr?.attribute_id === attr.attribute_id ? <InputBox value={editingAttrName} onChange={e => setEditingAttrName(e.target.value)} /> : <b>{attr.name}</b>}
                   <div className={styles.attrActions}>
-                    {editingAttr?.attribute_id === attr.attribute_id ? <button className={styles.miniBtn} onClick={submitUpdateGlobalAttr}><Check /></button> : <button className={styles.miniBtn} onClick={() => {setEditingAttr(attr); setEditingAttrName(attr.name);}}><Edit2 /></button>}
+                    {editingAttr?.attribute_id === attr.attribute_id ? <button className={styles.miniBtn} onClick={submitUpdateGlobalAttr}><Check /></button> : <button className={styles.miniBtn} onClick={() => { setEditingAttr(attr); setEditingAttrName(attr.name); }}><Edit2 /></button>}
                     <button className={styles.miniBtn} onClick={() => openValueModal(attr)}><List /></button>
                     <button className={`${styles.miniBtn} ${styles.danger}`} onClick={() => submitDeleteGlobalAttr(attr.attribute_id)}><Trash2 /></button>
                   </div>

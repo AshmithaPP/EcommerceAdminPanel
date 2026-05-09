@@ -279,7 +279,7 @@ const productService = {
 
         const offset = (page - 1) * limit;
         const params = [];
-        let whereClauses = ['p.status = 1'];
+        let whereClauses = ['p.status = 1', "p.name NOT LIKE '%Gift Voucher%'"];
 
         // 1. Category Filter (Multi-select Slug or ID support)
         if (category) {
@@ -348,7 +348,7 @@ const productService = {
             if (max_price) { extraClauses.push('pp.starting_price <= ?'); params.push(parseFloat(max_price)); }
             if (rating) { extraClauses.push('(SELECT AVG(rating) FROM product_reviews WHERE product_id = p.product_id AND status = 1) >= ?'); params.push(parseFloat(rating)); }
             if (stock_status === 'in_stock') { extraClauses.push('pp.total_stock > 0'); }
-            
+
             finalWhereSql += (finalWhereSql ? ' AND ' : 'WHERE ') + extraClauses.join(' AND ');
         }
 
@@ -385,16 +385,16 @@ const productService = {
             ORDER BY ${orderBy}
             LIMIT ? OFFSET ?
         `;
-        
+
         const [rows] = await db.query(productsSql, [...params, parseInt(limit), parseInt(offset)]);
 
         // 7. Fetch Dynamic Filters (Amazon/Flipkart Style - Multi-select safe)
         // We calculate each facet by ignoring its own active filter but respecting others.
-        
+
         const getFacetWhere = (ignoreKey) => {
-            let clauses = ['p.status = 1'];
+            let clauses = ['p.status = 1', "p.name NOT LIKE '%Gift Voucher%'"];
             let facetParams = [];
-            
+
             if (category) {
                 clauses.push('(c.slug = ? OR c.category_id = ? OR sc.slug = ? OR sc.sub_category_id = ?)');
                 facetParams.push(category, category, category, category);
@@ -553,26 +553,26 @@ const productService = {
         } = productData;
 
         // Extract JSON fields with support for both camelCase and snake_case, falling back to existing
-        const variant_config = productData.variantConfig !== undefined ? productData.variantConfig : 
-                              (productData.variant_config !== undefined ? productData.variant_config : existing.variant_config);
-        const pricing_meta = productData.pricingMeta !== undefined ? productData.pricingMeta : 
-                             (productData.pricing_meta !== undefined ? productData.pricing_meta : existing.pricing_meta);
-        const stock_meta = productData.stockMeta !== undefined ? productData.stockMeta : 
-                            (productData.stock_meta !== undefined ? productData.stock_meta : existing.stock_meta);
-        const services = productData.services !== undefined ? productData.services : 
-                         (productData.services !== undefined ? productData.services : existing.services);
-        const trust_badges = productData.trustBadges !== undefined ? productData.trustBadges : 
-                             (productData.trust_badges !== undefined ? productData.trust_badges : existing.trust_badges);
-        const highlights = productData.highlights !== undefined ? productData.highlights : 
-                           (productData.highlights !== undefined ? productData.highlights : existing.highlights);
-        const care_instructions = productData.careInstructions !== undefined ? productData.careInstructions : 
-                                  (productData.care_instructions !== undefined ? productData.care_instructions : existing.care_instructions);
-        const additional_info = productData.additionalInfo !== undefined ? productData.additionalInfo : 
-                                (productData.additional_info !== undefined ? productData.additional_info : existing.additional_info);
-        const origin_info = productData.originInfo !== undefined ? productData.originInfo : 
-                            (productData.origin_info !== undefined ? productData.origin_info : existing.origin_info);
-        const stats = productData.stats !== undefined ? productData.stats : 
-                      (productData.stats !== undefined ? productData.stats : existing.stats);
+        const variant_config = productData.variantConfig !== undefined ? productData.variantConfig :
+            (productData.variant_config !== undefined ? productData.variant_config : existing.variant_config);
+        const pricing_meta = productData.pricingMeta !== undefined ? productData.pricingMeta :
+            (productData.pricing_meta !== undefined ? productData.pricing_meta : existing.pricing_meta);
+        const stock_meta = productData.stockMeta !== undefined ? productData.stockMeta :
+            (productData.stock_meta !== undefined ? productData.stock_meta : existing.stock_meta);
+        const services = productData.services !== undefined ? productData.services :
+            (productData.services !== undefined ? productData.services : existing.services);
+        const trust_badges = productData.trustBadges !== undefined ? productData.trustBadges :
+            (productData.trust_badges !== undefined ? productData.trust_badges : existing.trust_badges);
+        const highlights = productData.highlights !== undefined ? productData.highlights :
+            (productData.highlights !== undefined ? productData.highlights : existing.highlights);
+        const care_instructions = productData.careInstructions !== undefined ? productData.careInstructions :
+            (productData.care_instructions !== undefined ? productData.care_instructions : existing.care_instructions);
+        const additional_info = productData.additionalInfo !== undefined ? productData.additionalInfo :
+            (productData.additional_info !== undefined ? productData.additional_info : existing.additional_info);
+        const origin_info = productData.originInfo !== undefined ? productData.originInfo :
+            (productData.origin_info !== undefined ? productData.origin_info : existing.origin_info);
+        const stats = productData.stats !== undefined ? productData.stats :
+            (productData.stats !== undefined ? productData.stats : existing.stats);
 
         // Validation: Sub-Category
         const targetSubCategoryId = sub_category_id || existing.sub_category_id;

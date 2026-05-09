@@ -4,7 +4,7 @@ const Settings = {
     getAll: async () => {
         const sql = 'SELECT settings_key, value FROM settings';
         const [rows] = await db.query(sql);
-        
+
         // Transform array of [{settings_key, value}, ...] into a single object
         const settingsObj = {};
         rows.forEach(row => {

@@ -91,9 +91,9 @@ const Sidebar = ({ isCollapsed, isMobileOpen, setIsMobileOpen }) => {
         <div className={styles.bottomActions}>
           <div className={styles.profileSection}>
             <div className={styles.avatarWrapper}>
-              <img 
-                src={user?.profile_image || "https://lh3.googleusercontent.com/aida-public/AB6AXuBf0USon3Os1b4D2Zqmsiz4iPwuxWl6zCgsnsFDMpDKDNg5JYUZlFnsx176RghHg5LcQJGeMbqcjJA0x82TBMXdUC2uxl-sJeJ3JIK3gMZ9KVUe_GCRuOybzSMdOSPbib2Add7udK6wwK4H7-s97Liadn-YE_EYiSze05uG-r0VVpff4u-mioVgeOimZ6R3RlChKwOELtq_2v90einIhx7r2sQFCMmOPZXSh5b1KUvB23Ka4xhIT_YJgzjhrLQloh053y2enP-q3uI"} 
-                alt={user?.name || "User"} 
+              <img
+                src={user?.profile_image || "https://lh3.googleusercontent.com/aida-public/AB6AXuBf0USon3Os1b4D2Zqmsiz4iPwuxWl6zCgsnsFDMpDKDNg5JYUZlFnsx176RghHg5LcQJGeMbqcjJA0x82TBMXdUC2uxl-sJeJ3JIK3gMZ9KVUe_GCRuOybzSMdOSPbib2Add7udK6wwK4H7-s97Liadn-YE_EYiSze05uG-r0VVpff4u-mioVgeOimZ6R3RlChKwOELtq_2v90einIhx7r2sQFCMmOPZXSh5b1KUvB23Ka4xhIT_YJgzjhrLQloh053y2enP-q3uI"}
+                alt={user?.name || "User"}
               />
             </div>
             {(!isCollapsed || isMobileOpen) && (
@@ -112,7 +112,7 @@ const Sidebar = ({ isCollapsed, isMobileOpen, setIsMobileOpen }) => {
             <span className="material-symbols-outlined">settings</span>
             {(!isCollapsed || isMobileOpen) && <span>Settings</span>}
           </NavLink>
-          <button 
+          <button
             className={`${styles.bottomLink} ${styles.logout}`}
             onClick={handleLogout}
             disabled={isLoggingOut}

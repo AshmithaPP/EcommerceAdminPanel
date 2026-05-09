@@ -131,41 +131,22 @@ const analyticsService = {
      */
     getTrendData: async (days = 30) => {
         const sql = `
-            SELECT date, total_revenue as revenue, total_orders as orders
-            FROM daily_stats
-            WHERE date >= DATE_SUB(CURDATE(), INTERVAL ? DAY)
-            ORDER BY date ASC
+            SELECT 
+                DATE(created_at) as date, 
+                SUM(CASE WHEN payment_status IN ('Paid', 'success', 'Completed') THEN total_amount ELSE 0 END) as revenue,
+                COUNT(CASE WHEN status != 'Cancelled' THEN 1 END) as orders
+            FROM orders
+            WHERE created_at >= DATE_SUB(CURDATE(), INTERVAL ? DAY)
+            GROUP BY DATE(created_at)
+            ORDER BY DATE(created_at) ASC
         `;
         const [rows] = await db.query(sql, [parseInt(days)]);
         
-        const trendData = rows.map(row => ({
-            ...row,
-            date: row.date.toISOString().split('T')[0]
+        return rows.map(row => ({
+            date: row.date.toISOString().split('T')[0],
+            revenue: parseFloat(row.revenue || 0),
+            orders: parseInt(row.orders || 0)
         }));
-
-        const today = new Date().toISOString().split('T')[0];
-        const hasToday = trendData.some(d => d.date === today);
-
-        if (!hasToday) {
-            // Fetch live today stats to complete the chart
-            const liveSql = `
-                SELECT 
-                    SUM(CASE WHEN payment_status IN ('Paid', 'success', 'Completed') THEN total_amount ELSE 0 END) as revenue,
-                    COUNT(CASE WHEN status != 'Cancelled' THEN 1 END) as orders
-                FROM orders
-                WHERE DATE(created_at) = CURDATE()
-            `;
-            const [liveRows] = await db.query(liveSql);
-            if (liveRows[0]) {
-                trendData.push({
-                    date: today,
-                    revenue: parseFloat(liveRows[0].revenue || 0),
-                    orders: parseInt(liveRows[0].orders || 0)
-                });
-            }
-        }
-
-        return trendData;
     },
 
     /**

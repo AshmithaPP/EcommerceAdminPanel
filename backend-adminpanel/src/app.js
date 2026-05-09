@@ -138,7 +138,7 @@ const db = require('./config/database');
         try {
             await db.query(`ALTER TABLE order_items ADD COLUMN image_url TEXT AFTER price`);
             console.log(`✅ Added column image_url to order_items`);
-        } catch (e) {}
+        } catch (e) { }
 
         console.log('✅ Order items schema check complete');
 
@@ -179,7 +179,7 @@ const db = require('./config/database');
         for (const col of legacyCols) {
             try {
                 await db.query(`ALTER TABLE payments MODIFY COLUMN ${col} VARCHAR(255) NULL`);
-            } catch (e) {}
+            } catch (e) { }
         }
         // --- Migration: Ensure Order Timeline Table exists ---
         await db.query(`
@@ -200,7 +200,7 @@ const db = require('./config/database');
             await db.query('CREATE INDEX idx_orders_payment_status ON orders(payment_status)');
             await db.query('CREATE INDEX idx_order_items_product_id ON order_items(product_id)');
             console.log('✅ Performance indexes created');
-        } catch (e) {}
+        } catch (e) { }
 
     } catch (err) {
         console.error('❌ Migration failed:', err);
@@ -219,9 +219,9 @@ app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 // Enable CORS with credentials support
 const allowedOrigins = [
-    'http://localhost:5173', 
-    'http://127.0.0.1:5173', 
-    'http://localhost:5174', 
+    'http://localhost:5173',
+    'http://127.0.0.1:5173',
+    'http://localhost:5174',
     'http://127.0.0.1:5174',
     'http://localhost:3000',
     'http://127.0.0.1:3000'

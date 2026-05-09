@@ -11,7 +11,6 @@ import {
   MapPin,
   Activity,
   History,
-  User,
   BadgeCheck,
   Package as PackageIcon,
   Tag,
@@ -30,15 +29,16 @@ import {
   FileText,
   Search,
   Loader,
-  Edit2
+  Edit2,
+  User
 } from 'lucide-react';
 import Button from '../../components/ui/Button';
 import InputBox from '../../components/ui/InputBox';
 import SelectBox from '../../components/ui/SelectBox';
 import Modal from '../../components/common/Modal';
+import { privateApi } from '../../services/api';
 import styles from './AddProduct.module.css';
 import useProductFormStore from '../../store/productFormStore';
-import { privateApi } from '../../services/api';
 import { calculateGSTFields } from '../../utils/pricing';
 import { showToast } from '../../utils/toast';
 
@@ -46,6 +46,7 @@ const STORAGE_URL = 'http://localhost:5000';
 
 const getImageUrl = (img) => {
   if (!img) return null;
+  if (img.url && img.url.startsWith('blob:')) return img.url;
   const url = img.image_url || img.url;
   if (!url) return null;
   if (url.startsWith('http')) return url;
@@ -56,51 +57,28 @@ const getImageUrl = (img) => {
 const AddProduct = () => {
   const navigate = useNavigate();
 
-  // --- Store Selectors ---
-  const productData = useProductFormStore(state => state.productData);
-  const baseSku = useProductFormStore(state => state.baseSku);
-  const variants = useProductFormStore(state => state.variants);
-  const categories = useProductFormStore(state => state.categories);
-  const subCategories = useProductFormStore(state => state.subCategories);
-  const categoryAttributes = useProductFormStore(state => state.categoryAttributes);
-  const allAttributes = useProductFormStore(state => state.allAttributes);
-  const attributeValues = useProductFormStore(state => state.attributeValues);
-  const productImages = useProductFormStore(state => state.productImages);
-  const productVideo = useProductFormStore(state => state.productVideo);
-  const variantConfig = useProductFormStore(state => state.variantConfig);
-  const bulkImages = useProductFormStore(state => state.bulkImages);
-  const loading = useProductFormStore(state => state.loading);
-  const error = useProductFormStore(state => state.error);
+  // Store Selectors
+  const {
+    productData, setProductData,
+    baseSku, setBaseSku,
+    variants, updateVariant, addManualVariant, deleteVariant,
+    productImages, setProductImages, removeProductImage,
+    productVideo, setProductVideo, removeVideo,
+    bulkImages, applyBulkImage, clearBulkImages,
+    categories, fetchCategories,
+    subCategories, fetchSubCategories,
+    categoryAttributes, fetchSubCategoryAttributes,
+    allAttributes, fetchAllAttributes,
+    attributeValues, fetchAttributeValues,
+    variantConfig, setVariantConfig, toggleConfigValue,
+    generateVariants,
+    assignAttributes,
+    createProduct,
+    homeSections, fetchHomeSections,
+    loading, error
+  } = useProductFormStore();
 
-  // --- Store Actions ---
-  const fetchCategories = useProductFormStore(state => state.fetchCategories);
-  const fetchGlobalSettings = useProductFormStore(state => state.fetchGlobalSettings);
-  const fetchSubCategories = useProductFormStore(state => state.fetchSubCategories);
-  const fetchSubCategoryAttributes = useProductFormStore(state => state.fetchSubCategoryAttributes);
-  const fetchAllAttributes = useProductFormStore(state => state.fetchAllAttributes);
-  const fetchAttributeValues = useProductFormStore(state => state.fetchAttributeValues);
-  const setProductData = useProductFormStore(state => state.setProductData);
-  const setBaseSku = useProductFormStore(state => state.setBaseSku);
-  const setVariants = useProductFormStore(state => state.setVariants);
-  const updateVariant = useProductFormStore(state => state.updateVariant);
-  const deleteVariant = useProductFormStore(state => state.deleteVariant);
-  const addManualVariant = useProductFormStore(state => state.addManualVariant);
-  const generateVariants = useProductFormStore(state => state.generateVariants);
-  const toggleConfigValue = useProductFormStore(state => state.toggleConfigValue);
-  const setVariantConfig = useProductFormStore(state => state.setVariantConfig);
-  const applyBulkImage = useProductFormStore(state => state.applyBulkImage);
-  const clearBulkImages = useProductFormStore(state => state.clearBulkImages);
-  const setProductImages = useProductFormStore(state => state.setProductImages);
-  const setProductVideo = useProductFormStore(state => state.setProductVideo);
-  const removeProductImage = useProductFormStore(state => state.removeProductImage);
-  const removeVariantImage = useProductFormStore(state => state.removeVariantImage);
-  const assignAttributes = useProductFormStore(state => state.assignAttributes);
-  const unassignAttribute = useProductFormStore(state => state.unassignAttribute);
-  const createProduct = useProductFormStore(state => state.createProduct);
-  const homeSections = useProductFormStore(state => state.homeSections);
-  const fetchHomeSections = useProductFormStore(state => state.fetchHomeSections);
-
-  // --- Local UI State (Modals, Temporary Inputs, Editing) ---
+  // Local UI-only State
   const [isMappingModalOpen, setIsMappingModalOpen] = useState(false);
   const [selectedAttributeIds, setSelectedAttributeIds] = useState([]);
   const [isGlobalAttrModalOpen, setIsGlobalAttrModalOpen] = useState(false);
@@ -110,23 +88,27 @@ const AddProduct = () => {
   const [isValueModalOpen, setIsValueModalOpen] = useState(false);
   const [currentAttribute, setCurrentAttribute] = useState(null);
   const [newValueInput, setNewValueInput] = useState('');
-  const [newValueColor, setNewValueColor] = useState('#000000');
   const [editingValue, setEditingValue] = useState(null);
   const [editingValueText, setEditingValueText] = useState('');
-  const [editingValueColor, setEditingValueColor] = useState('#000000');
 
+  // Initial Load
   useEffect(() => {
     fetchCategories();
-    fetchGlobalSettings();
     fetchHomeSections();
-  }, [fetchCategories, fetchGlobalSettings, fetchHomeSections]);
+    fetchAllAttributes();
+  }, [fetchCategories, fetchHomeSections, fetchAllAttributes]);
 
+  // Dependent Loads
   useEffect(() => {
-    fetchSubCategories(productData.category_id);
+    if (productData.category_id) {
+      fetchSubCategories(productData.category_id);
+    }
   }, [productData.category_id, fetchSubCategories]);
 
   useEffect(() => {
-    fetchSubCategoryAttributes(productData.sub_category_id);
+    if (productData.sub_category_id) {
+      fetchSubCategoryAttributes(productData.sub_category_id);
+    }
   }, [productData.sub_category_id, fetchSubCategoryAttributes]);
 
   const handleProductChange = (e) => {
@@ -138,16 +120,15 @@ const AddProduct = () => {
       const slug = value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
       setProductData({ slug });
     }
+    if (name === 'category_id') setProductData({ sub_category_id: '' });
   };
 
   const openMappingModal = () => {
     setSelectedAttributeIds(categoryAttributes.map(a => a.attribute_id));
-    fetchAllAttributes();
     setIsMappingModalOpen(true);
   };
 
   const openGlobalAttrModal = () => {
-    fetchAllAttributes();
     setIsGlobalAttrModalOpen(true);
   };
 
@@ -174,7 +155,7 @@ const AddProduct = () => {
     const files = Array.from(e.target.files);
     const updatedVariants = [...variants];
     const currentImgs = updatedVariants[vIdx].images || [];
-    
+
     if (currentImgs.length + files.length > 5) {
       showToast.error('Max 5 images allowed per variant');
       return;
@@ -184,13 +165,13 @@ const AddProduct = () => {
       file
     }));
     updatedVariants[vIdx].images = [...currentImgs, ...newImgs];
-    setVariants(updatedVariants);
+    updateVariant(vIdx, 'images', updatedVariants[vIdx].images);
   };
 
   const handleVideoUpload = (e) => {
     const file = e.target.files[0];
     if (file && file.size < 50 * 1024 * 1024) {
-      setProductVideo({ url: URL.createObjectURL(file), file, is_new: true });
+      setProductVideo({ url: URL.createObjectURL(file), file });
     } else {
       showToast.error('Video must be under 50MB');
     }
@@ -203,7 +184,13 @@ const AddProduct = () => {
     }
   };
 
-  // Attribute mutation wrappers (using local state for modals)
+  const removeVariantImageLocal = (vIdx, imgIdx) => {
+    const updated = [...variants];
+    updated[vIdx].images = updated[vIdx].images.filter((_, i) => i !== imgIdx);
+    updateVariant(vIdx, 'images', updated[vIdx].images);
+  };
+
+  // Attribute mutation wrappers
   const submitCreateGlobalAttr = async () => {
     if (!newAttrName.trim()) return;
     try {
@@ -232,70 +219,48 @@ const AddProduct = () => {
   const submitDeleteGlobalAttr = async (attributeId) => {
     if (!window.confirm('Delete this attribute globally?')) return;
     try {
-      console.log('Attempting to delete attribute:', attributeId);
       await privateApi.delete(`/attributes/attribute-delete/${attributeId}`);
       showToast.success('Attribute deleted');
       fetchAllAttributes();
       if (productData.sub_category_id) fetchSubCategoryAttributes(productData.sub_category_id);
     } catch (error) {
-      console.error('Delete Attribute Error:', error);
-      showToast.error(error.response?.data?.message || 'Failed to delete attribute');
+      showToast.error('Failed to delete attribute');
     }
   };
 
-  const submitAddValue = async (attributeId, value, colorCode = null) => {
+  const submitAddValue = async (attributeId, value) => {
     if (!value.trim()) return;
     try {
-      const payload = {
-        values: [{
-          value: value.trim(),
-          color_code: colorCode
-        }]
-      };
-      await privateApi.post(`/attributes/attribute-values-add/${attributeId}`, payload);
+      await privateApi.post(`/attributes/attribute-values-add/${attributeId}`, { values: [value.trim()] });
       showToast.success('Value added');
       fetchAttributeValues(attributeId);
-      if (productData.sub_category_id) fetchSubCategoryAttributes(productData.sub_category_id);
     } catch (error) {
       showToast.error('Failed to add value');
     }
   };
 
-  const submitUpdateValue = async (valueId, newValue, colorCode = null) => {
+  const submitUpdateValue = async (valueId, newValue) => {
     try {
-      const payload = {
-        value: newValue,
-        color_code: colorCode
-      };
-      await privateApi.put(`/attributes/attribute-value-update/${valueId}`, payload);
+      await privateApi.put(`/attributes/attribute-value-update/${valueId}`, { value: newValue });
       showToast.success('Value updated');
       if (currentAttribute) fetchAttributeValues(currentAttribute.attribute_id);
-      if (productData.sub_category_id) fetchSubCategoryAttributes(productData.sub_category_id);
     } catch (error) {
       showToast.error('Failed to update value');
     }
   };
 
   const submitDeleteValue = async (valueId) => {
-    if (!window.confirm('Are you sure you want to delete this value?')) return;
     try {
-      console.log('Attempting to delete attribute value:', valueId);
-      const res = await privateApi.delete(`/attributes/attribute-value-delete/${valueId}`);
-      console.log('Delete Value Response:', res.data);
+      await privateApi.delete(`/attributes/attribute-value-delete/${valueId}`);
       showToast.success('Value deleted');
       if (currentAttribute) fetchAttributeValues(currentAttribute.attribute_id);
-      if (productData.sub_category_id) fetchSubCategoryAttributes(productData.sub_category_id);
     } catch (error) {
-      console.error('Delete Value Error:', error);
-      const msg = error.response?.data?.message || 'Failed to delete value';
-      showToast.error(msg);
+      showToast.error('Failed to delete value');
     }
   };
 
   return (
     <div className={styles.pageContainer}>
-      {error && !loading && <div className={styles.errorBanner}>{error}</div>}
-
       <div className={styles.formFlow}>
         {/* 1. Identity */}
         <section className={styles.formSection}>
@@ -318,7 +283,7 @@ const AddProduct = () => {
               <InputBox label="Brand" name="brand" value={productData.brand} onChange={handleProductChange} Icon={Tag} />
               <InputBox label="Badge" name="badge" value={productData.badge} onChange={handleProductChange} placeholder="e.g. Bridal Special" Icon={BadgeCheck} />
               <InputBox label="Tagline" name="tagline" value={productData.tagline} onChange={handleProductChange} placeholder="Short subtitle" Icon={Star} />
-              
+
               <div className={styles.statusToggleWrap}>
                 <div className={styles.toggleLabel}>
                   <DollarSign size={14} />
@@ -353,8 +318,8 @@ const AddProduct = () => {
                   <div className={styles.checkboxGrid} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '0.5rem', marginTop: '0.5rem' }}>
                     {homeSections.map(section => (
                       <label key={section.section_id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.85rem' }}>
-                        <input 
-                          type="checkbox" 
+                        <input
+                          type="checkbox"
                           checked={(productData.home_sections || []).includes(section.section_id)}
                           onChange={(e) => {
                             const current = productData.home_sections || [];
@@ -403,80 +368,52 @@ const AddProduct = () => {
             ) : (
               <div className={styles.configGrid}>
                 {Array.isArray(variantConfig) && variantConfig.map((attr, idx) => (
-                  <div key={attr.attribute_id} className={styles.configCard}>
+                  <div key={attr.attribute_id || idx} className={styles.configCard}>
                     <div className={styles.configCardHeader}>
                       <span className={styles.configCardTitle}>{attr.name}</span>
                       <div className={styles.generatorToggle}>
                         <span>Variant Generator?</span>
                         <label className={styles.switchSmall}>
-                          <input 
-                            type="checkbox" 
-                            checked={attr.is_generator} 
+                          <input
+                            type="checkbox"
+                            checked={attr.is_generator}
                             onChange={(e) => {
-                              setVariantConfig((Array.isArray(variantConfig) ? variantConfig : []).map((a, i) => 
-                                i === idx ? { ...a, is_generator: e.target.checked } : a
-                              ));
+                              const updated = [...(Array.isArray(variantConfig) ? variantConfig : [])];
+                              updated[idx] = { ...updated[idx], is_generator: e.target.checked };
+                              setVariantConfig(updated);
                             }}
                           />
                           <span className={styles.sliderSmall} />
                         </label>
                       </div>
                     </div>
-                    
-                    {attr.name.toLowerCase().includes('color') && (
-                      <div className={styles.colorTagsContainer}>
-                        {attr.selectedValues.map(v => (
-                          <div key={v.id} className={styles.colorTag}>
-                            <div className={styles.tagSwatch} style={{ backgroundColor: v.color_code || '#cccccc' }} />
-                            <span className={styles.tagName}>{v.name}</span>
-                            <button className={styles.tagRemove} onClick={() => toggleConfigValue(attr.attribute_id, v)}>
-                              <X size={12} />
-                            </button>
-                          </div>
-                        ))}
-                        {attr.selectedValues.length === 0 && <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>No colors selected</span>}
-                      </div>
-                    )}
 
-                    <div className={styles.valuePicker} style={{ marginTop: attr.name.toLowerCase().includes('color') ? '0.75rem' : '0' }}>
+                    <div className={styles.valuePicker}>
                       {categoryAttributes.find(a => String(a.attribute_id) === String(attr.attribute_id))?.values.map(val => {
                         const isSelected = attr.selectedValues.find(v => String(v.id) === String(val.attribute_value_id));
                         const mappedImgs = bulkImages[val.attribute_value_id] || [];
                         const hasBulkImages = mappedImgs.length > 0;
-                        const isColor = attr.name.toLowerCase().includes('color');
-                        
+
                         return (
                           <div key={val.attribute_value_id} className={styles.valueItemContainer}>
                             <div className={styles.valueItemWrapper}>
-                              <button 
+                              <button
                                 className={`${styles.valueChip} ${isSelected ? styles.active : ''}`}
-                                onClick={() => toggleConfigValue(attr.attribute_id, val)}
-                                style={isColor ? { paddingLeft: '0.5rem' } : {}}
+                                onClick={() => toggleConfigValue(attr.attribute_id, { id: val.attribute_value_id, name: val.value })}
                               >
-                                {isColor && (
-                                  <div 
-                                    className={styles.tagSwatch} 
-                                    style={{ 
-                                      backgroundColor: val.color_code || '#cccccc', 
-                                      marginRight: '6px',
-                                      width: '12px',
-                                      height: '12px'
-                                    }} 
-                                  />
-                                )}
                                 {val.value}
-                                {isSelected && !isColor && <Check size={12} style={{ marginLeft: '4px' }} />}
+                                {isSelected && <Check size={12} style={{ marginLeft: '4px' }} />}
                                 {hasBulkImages && <span className={styles.countBadge}>+{mappedImgs.length}</span>}
                               </button>
                             </div>
 
-                            {isSelected && isColor && (
+                            {isSelected && attr.name.trim().toLowerCase().includes('color') && (
                               <div className={styles.bulkImageSection}>
                                 <div className={styles.bulkImageLabel}>
                                   <ImageIcon size={14} />
                                   <span>Apply images to all <strong>{val.value}</strong> variants</span>
                                 </div>
-                                
+
                                 <div className={styles.bulkImageActions}>
                                   <div className={styles.bulkThumbnails}>
                                     {mappedImgs.map((img, i) => (
@@ -484,7 +421,7 @@ const AddProduct = () => {
                                         <img src={getImageUrl(img)} alt="" />
                                       </div>
                                     ))}
-                                    <button 
+                                    <button
                                       className={styles.addBulkImgBtn}
                                       onClick={() => document.getElementById(`bulk-img-${val.attribute_value_id}`).click()}
                                       title="Add images for this value"
@@ -492,7 +429,7 @@ const AddProduct = () => {
                                       <PlusCircle size={14} />
                                     </button>
                                   </div>
-                                  
+
                                   {hasBulkImages && (
                                     <button className={styles.clearBulkBtn} onClick={() => clearBulkImages(val.attribute_value_id)}>
                                       Clear
@@ -500,12 +437,12 @@ const AddProduct = () => {
                                   )}
                                 </div>
 
-                                <input 
-                                  id={`bulk-img-${val.attribute_value_id}`} 
-                                  type="file" 
-                                  multiple 
-                                  style={{ display: 'none' }} 
-                                  onChange={(e) => applyBulkImage(val.attribute_value_id, e.target.files)} 
+                                <input
+                                  id={`bulk-img-${val.attribute_value_id}`}
+                                  type="file"
+                                  multiple
+                                  style={{ display: 'none' }}
+                                  onChange={(e) => applyBulkImage(val.attribute_value_id, e.target.files)}
                                 />
                               </div>
                             )}
@@ -520,6 +457,40 @@ const AddProduct = () => {
           </div>
         </section>
 
+        {/* 3. Visual Assets */}
+        <section className={styles.formSection}>
+          <div className={styles.sectionHeader}><ImageIcon size={16} className={styles.sectionIcon} /><h3>Visual Assets</h3></div>
+          <div className={styles.sectionContent}>
+            <div className={styles.imageGrid}>
+              {productVideo && (
+                <div className={styles.videoItem}>
+                  <div className={styles.videoBadge}><Video size={10} /></div>
+                  <video src={getImageUrl(productVideo)} muted />
+                  <div className={styles.imageOverlay}><button className={styles.overlayBtn} onClick={removeVideo}><Trash2 size={14} /></button></div>
+                </div>
+              )}
+              {productImages.map((img, idx) => (
+                <div key={idx} className={styles.imageItem}>
+                  <img src={getImageUrl(img)} alt="p-img" />
+                  <div className={styles.imageOverlay}><button className={styles.overlayBtn} onClick={() => removeProductImage(idx)}><Trash2 size={14} /></button></div>
+                </div>
+              ))}
+              {productImages.length < 5 && (
+                <div className={styles.uploadZone} onClick={() => document.getElementById('p-img-input').click()}>
+                  <CloudUpload size={18} /><p className={styles.uploadMain}>Add Img</p>
+                  <input id="p-img-input" type="file" multiple accept="image/*" style={{ display: 'none' }} onChange={handleProductImageUpload} />
+                </div>
+              )}
+              {!productVideo && (
+                <div className={styles.uploadZone} onClick={() => document.getElementById('vid-input').click()}>
+                  <Video size={18} /><p className={styles.uploadMain}>Add Vid</p>
+                  <input id="vid-input" type="file" accept="video/*" style={{ display: 'none' }} onChange={handleVideoUpload} />
+                </div>
+              )}
+            </div>
+          </div>
+        </section>
+
         {/* Highlights & Care */}
         <div className={styles.formGrid2} style={{ gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
           <section className={styles.formSection}>
@@ -530,9 +501,9 @@ const AddProduct = () => {
             <div className={styles.sectionContent}>
               <div className={styles.dynamicListWrapper}>
                 <div className={styles.listInputRow}>
-                  <InputBox 
-                    placeholder="Add highlight" 
-                    id="highlight-input"
+                  <InputBox
+                    placeholder="Add highlight"
+                    id="add-highlight-input"
                     Icon={Check}
                     onKeyPress={(e) => {
                       if (e.key === 'Enter') {
@@ -544,10 +515,10 @@ const AddProduct = () => {
                       }
                     }}
                   />
-                  <button 
+                  <button
                     className={styles.addBtnIcon}
                     onClick={() => {
-                      const input = document.getElementById('highlight-input');
+                      const input = document.getElementById('add-highlight-input');
                       const val = input.value.trim();
                       if (val) {
                         setProductData({ highlights: [...(productData.highlights || []), val] });
@@ -578,9 +549,9 @@ const AddProduct = () => {
             <div className={styles.sectionContent}>
               <div className={styles.dynamicListWrapper}>
                 <div className={styles.listInputRow}>
-                  <InputBox 
-                    placeholder="Add instruction" 
-                    id="care-input"
+                  <InputBox
+                    placeholder="Add instruction"
+                    id="add-care-input"
                     Icon={Info}
                     onKeyPress={(e) => {
                       if (e.key === 'Enter') {
@@ -592,10 +563,10 @@ const AddProduct = () => {
                       }
                     }}
                   />
-                  <button 
+                  <button
                     className={styles.addBtnIcon}
                     onClick={() => {
-                      const input = document.getElementById('care-input');
+                      const input = document.getElementById('add-care-input');
                       const val = input.value.trim();
                       if (val) {
                         setProductData({ careInstructions: [...(productData.careInstructions || []), val] });
@@ -629,11 +600,11 @@ const AddProduct = () => {
             <div className={styles.sectionContent}>
               <div className={styles.complexListWrapper}>
                 <div className={styles.listInputRow}>
-                  <InputBox placeholder="Service title" id="service-input" Icon={Truck} />
-                  <button 
+                  <InputBox placeholder="Service title" id="add-service-input" Icon={Truck} />
+                  <button
                     className={styles.addBtnIcon}
                     onClick={() => {
-                      const input = document.getElementById('service-input');
+                      const input = document.getElementById('add-service-input');
                       const val = input.value.trim();
                       if (val) {
                         setProductData({ services: [...(productData.services || []), { title: val }] });
@@ -665,19 +636,19 @@ const AddProduct = () => {
             <div className={styles.sectionContent}>
               <div className={styles.complexListWrapper}>
                 <div className={styles.multiInputRow}>
-                  <InputBox placeholder="Title" id="trust-title" />
-                  <InputBox placeholder="Subtitle" id="trust-sub" />
-                  <button 
+                  <InputBox placeholder="Title" id="add-trust-title" />
+                  <InputBox placeholder="Subtitle" id="add-trust-sub" />
+                  <button
                     className={styles.addBtnIcon}
                     onClick={() => {
-                      const titleInp = document.getElementById('trust-title');
-                      const subInp = document.getElementById('trust-sub');
+                      const titleInp = document.getElementById('add-trust-title');
+                      const subInp = document.getElementById('add-trust-sub');
                       if (titleInp.value.trim()) {
-                        setProductData({ 
-                          trustBadges: [...(productData.trustBadges || []), { 
-                            title: titleInp.value.trim(), 
-                            subtitle: subInp.value.trim() 
-                          }] 
+                        setProductData({
+                          trustBadges: [...(productData.trustBadges || []), {
+                            title: titleInp.value.trim(),
+                            subtitle: subInp.value.trim()
+                          }]
                         });
                         titleInp.value = '';
                         subInp.value = '';
@@ -704,82 +675,30 @@ const AddProduct = () => {
           </section>
         </div>
 
-        {/* 4. Visual Assets */}
-        <section className={styles.formSection}>
-          <div className={styles.sectionHeader}>
-            <ImageIcon size={16} className={styles.sectionIcon} />
-            <h3>Visual Assets</h3>
-          </div>
-          <div className={styles.sectionContent}>
-            <div className={styles.imageGrid}>
-              {productVideo && (
-                <div className={styles.videoItem}>
-                  <div className={styles.videoBadge}><Video size={10} /></div>
-                  <video src={getImageUrl(productVideo)} muted />
-                  <div className={styles.imageOverlay}>
-                    <button className={styles.overlayBtn} onClick={() => setProductVideo(null)}><Trash2 size={14} /></button>
-                  </div>
-                </div>
-              )}
-              {productImages.map((img, idx) => (
-                <div key={idx} className={styles.imageItem}>
-                  <img src={getImageUrl(img)} alt="p-img" />
-                  <div className={styles.imageOverlay}>
-                    <button className={styles.overlayBtn} onClick={() => removeProductImage(idx)}><Trash2 size={14} /></button>
-                  </div>
-                </div>
-              ))}
-              {productImages.length < 5 && (
-                <div className={styles.uploadZone} onClick={() => document.getElementById('p-img-input').click()}>
-                  <CloudUpload size={18} />
-                  <p className={styles.uploadMain}>Add Img</p>
-                  <input id="p-img-input" type="file" multiple accept="image/*" style={{ display: 'none' }} onChange={handleProductImageUpload} />
-                </div>
-              )}
-              {!productVideo && (
-                <div className={styles.uploadZone} onClick={() => document.getElementById('vid-input').click()}>
-                  <Video size={18} />
-                  <p className={styles.uploadMain}>Add Vid</p>
-                  <input id="vid-input" type="file" accept="video/*" style={{ display: 'none' }} onChange={handleVideoUpload} />
-                </div>
-              )}
-            </div>
-          </div>
-        </section>
-
+        {/* 4. Variants & Inventory */}
         <section className={styles.formSection}>
           <div className={styles.sectionHeader}>
             <LayoutGrid size={16} className={styles.sectionIcon} />
             <h3>Variants & Inventory</h3>
             <div className={styles.sectionHeaderActions} style={{ gap: '1rem' }}>
-               <button className={styles.headerActionBtn} onClick={generateVariants}>
-                 <Layers size={14} /> Generate Combinations
-               </button>
+              <button className={styles.headerActionBtn} onClick={generateVariants}>
+                <Layers size={14} /> Generate Combinations
+              </button>
             </div>
           </div>
           <div className={styles.sectionContent}>
-            {!productData.sub_category_id ? (
-              <div className={styles.emptyPrompt}>
-                <Info size={20} />
-                <p>Define <strong>Sub-Category</strong> first</p>
-              </div>
-            ) : variants.length === 0 ? (
-                <div className={styles.emptyPrompt} style={{ textAlign: 'center', padding: '2rem' }}>
-                    <Info size={32} />
-                    <p style={{ marginTop: '1rem' }}>Configure <strong>Attributes</strong> above and click <strong>Generate Combinations</strong> to create variants.</p>
-                </div>
-            ) : (
+            {!productData.sub_category_id ? <div className={styles.emptyPrompt}><Info /> Select Sub-Category</div> : (
               <div className={styles.variantsContainer}>
                 <div className={styles.variantGrid}>
                   {variants.map((v, vIdx) => {
-                    const sp = parseFloat(v.sellingPrice) || 0;
-                    const gst = parseFloat(productData.gstPercent) || 0;
-                    const { basePrice, gstAmount, finalPrice } = calculateGSTFields(sp, gst, productData.priceIncludesGST);
+                    const pricing = calculateGSTFields(v.sellingPrice, productData.gstPercent, productData.priceIncludesGST);
 
                     return (
                       <div key={vIdx} className={styles.variantCard}>
                         <div className={styles.variantCardHeader}>
-                          <span className={styles.variantTitle}>{v.sku}</span>
+                          <span className={styles.variantTitle}>
+                            {v.sku || 'No SKU'}
+                          </span>
                           <button className={styles.removeVariantBtn} onClick={() => deleteVariant(vIdx)}><Trash2 size={16} /></button>
                         </div>
                         <div className={styles.inlineGridWide}>
@@ -788,26 +707,30 @@ const AddProduct = () => {
                           <InputBox label="Alert Level" type="number" value={v.low_stock_threshold} onChange={e => updateVariant(vIdx, 'low_stock_threshold', e.target.value)} Icon={Info} />
                           <InputBox label="MRP" type="text" value={v.mrp} onChange={e => updateVariant(vIdx, 'mrp', e.target.value)} Icon={Star} />
                           <InputBox label="Selling Price" type="text" value={v.sellingPrice} onChange={e => updateVariant(vIdx, 'sellingPrice', e.target.value)} Icon={Percent} />
-                          
+
                           <div className={styles.variantAttrBadges}>
-                            {Object.entries(v.attributeValues).map(([attrId, val]) => (
-                                <span key={attrId} className={styles.attrBadge}>{val.name}</span>
+                            {Object.entries(v.attributeValues || {}).map(([attrId, val]) => (
+                              <span key={attrId} className={styles.attrBadge}>{val.name}</span>
                             ))}
                           </div>
                         </div>
 
                         {/* Computed Pricing Summary */}
                         <div className={styles.pricingSummaryMini}>
-                          <div><span>Base</span><strong>₹{basePrice}</strong></div>
-                          <div><span>GST ({gst}%)</span><strong>₹{gstAmount}</strong></div>
-                          <div className={styles.finalPriceWrap}><span>Final</span><strong>₹{finalPrice}</strong></div>
+                          <div><span>Base</span><strong>₹{pricing.basePrice}</strong></div>
+                          <div><span>GST ({productData.gstPercent}%)</span><strong>₹{pricing.gstAmount}</strong></div>
+                          <div className={styles.finalPriceWrap}><span>Final</span><strong>₹{pricing.finalPrice}</strong></div>
                         </div>
 
                         <div className={styles.imageGrid}>
                           {v.images?.map((img, imgIdx) => (
                             <div key={imgIdx} className={styles.imageItem}>
                               <img src={getImageUrl(img)} alt="v-img" />
-                              <div className={styles.imageOverlay}><button className={styles.overlayBtn} onClick={() => removeVariantImage(vIdx, imgIdx)}><Trash2 size={12} /></button></div>
+                              <div className={styles.imageOverlay}>
+                                <button className={styles.overlayBtn} onClick={() => removeVariantImageLocal(vIdx, imgIdx)}>
+                                  <Trash2 size={12} />
+                                </button>
+                              </div>
                             </div>
                           ))}
                           {v.images?.length < 5 && (
@@ -827,7 +750,7 @@ const AddProduct = () => {
           </div>
         </section>
 
-        {/* 4. Description & SEO */}
+        {/* 5. Description & SEO */}
         <div className={styles.formGrid2} style={{ gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
           <section className={styles.formSection} style={{ marginBottom: 0 }}>
             <div className={styles.sectionHeader}>
@@ -836,7 +759,14 @@ const AddProduct = () => {
             </div>
             <div className={styles.sectionContent}>
               <div className={styles.labelWrapper}>
-                <textarea name="description" value={productData.description} onChange={handleProductChange} className={styles.textarea} rows={4} placeholder="Heritage weaves details..." />
+                <textarea
+                  name="description"
+                  value={productData.description || ''}
+                  onChange={handleProductChange}
+                  className={styles.textarea}
+                  rows={4}
+                  placeholder="Full product description..."
+                />
               </div>
             </div>
           </section>
@@ -844,19 +774,37 @@ const AddProduct = () => {
           <section className={styles.formSection} style={{ marginBottom: 0 }}>
             <div className={styles.sectionHeader}>
               <Search size={16} className={styles.sectionIcon} />
-              <h3>SEO Detail</h3>
+              <h3>SEO Details</h3>
             </div>
             <div className={styles.sectionContent}>
               <div className={styles.formGrid2} style={{ gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '0.75rem' }}>
-                <InputBox label="Meta Title" name="meta_title" value={productData.meta_title} onChange={handleProductChange} />
-                <InputBox label="URL Slug" name="slug" value={productData.slug} onChange={handleProductChange} />
+                <InputBox
+                  label="Meta Title"
+                  name="meta_title"
+                  value={productData.meta_title || ''}
+                  onChange={handleProductChange}
+                  placeholder="SEO Title"
+                />
+                <InputBox
+                  label="URL Slug"
+                  name="slug"
+                  value={productData.slug || ''}
+                  onChange={handleProductChange}
+                  placeholder="product-slug"
+                />
               </div>
-              <InputBox label="Meta Description" name="meta_description" value={productData.meta_description} onChange={handleProductChange} />
+              <InputBox
+                label="Meta Description"
+                name="meta_description"
+                value={productData.meta_description || ''}
+                onChange={handleProductChange}
+                placeholder="SEO Description"
+              />
             </div>
           </section>
         </div>
 
-        {/* New: UX & Metadata Section */}
+        {/* UX & Metadata Section */}
         <section className={styles.formSection}>
           <div className={styles.sectionHeader}>
             <Zap size={16} className={styles.sectionIcon} />
@@ -864,49 +812,49 @@ const AddProduct = () => {
           </div>
           <div className={styles.sectionContent}>
             <div className={styles.formGrid4}>
-              <InputBox 
-                label="Tax Text" 
-                value={productData.pricingMeta?.taxIncludedText} 
+              <InputBox
+                label="Tax Text"
+                value={productData.pricingMeta?.taxIncludedText}
                 onChange={(e) => setProductData({ pricingMeta: { ...productData.pricingMeta, taxIncludedText: e.target.value } })}
                 placeholder="e.g. Inclusive of all taxes"
                 Icon={DollarSign}
               />
-              <InputBox 
-                label="Low Stock Alert Text" 
-                value={productData.stockMeta?.lowStockText} 
+              <InputBox
+                label="Low Stock Alert Text"
+                value={productData.stockMeta?.lowStockText}
                 onChange={(e) => setProductData({ stockMeta: { ...productData.stockMeta, lowStockText: e.target.value } })}
                 placeholder="Only 5 left!"
                 Icon={PackageIcon}
               />
-              <InputBox 
-                label="Urgency Text" 
-                value={productData.stockMeta?.urgencyText} 
+              <InputBox
+                label="Urgency Text"
+                value={productData.stockMeta?.urgencyText}
                 onChange={(e) => setProductData({ stockMeta: { ...productData.stockMeta, urgencyText: e.target.value } })}
                 placeholder="Selling fast!"
                 Icon={Zap}
               />
-              <InputBox 
-                label="Fake View Count" 
+              <InputBox
+                label="Fake View Count"
                 type="number"
-                value={productData.stockMeta?.viewCount} 
+                value={productData.stockMeta?.viewCount}
                 onChange={(e) => setProductData({ stockMeta: { ...productData.stockMeta, viewCount: parseInt(e.target.value) || 0 } })}
                 Icon={User}
               />
             </div>
-            
+
             <div className={styles.divider} style={{ margin: '1.5rem 0 1rem 0', borderTop: '1px solid #f1f5f9' }} />
-            
+
             <div className={styles.formGrid2} style={{ gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
               <div className={styles.kvContainer}>
                 <div className={styles.kvHeader}>
-                  <MapPin size={14} /> <span>Origin Details (Key: Value)</span>
+                  <MapPin size={14} /> <span>Origin Details</span>
                 </div>
                 <div className={styles.kvInputs}>
-                  <InputBox placeholder="City" id="origin-city" />
-                  <InputBox placeholder="State" id="origin-state" />
+                  <InputBox placeholder="City" id="add-origin-city" />
+                  <InputBox placeholder="State" id="add-origin-state" />
                   <button className={styles.actionBtn} onClick={() => {
-                    const city = document.getElementById('origin-city').value;
-                    const state = document.getElementById('origin-state').value;
+                    const city = document.getElementById('add-origin-city').value;
+                    const state = document.getElementById('add-origin-state').value;
                     setProductData({ originInfo: { madeIn: 'India', city, state } });
                   }}>Apply Origin</button>
                 </div>
@@ -917,11 +865,11 @@ const AddProduct = () => {
                   <Activity size={14} /> <span>Product Stats</span>
                 </div>
                 <div className={styles.statsInputs}>
-                  <InputBox placeholder="Label (e.g. Sold)" id="stat-label" />
-                  <InputBox placeholder="Value (e.g. 500+)" id="stat-value" />
-                  <button onClick={() => {
-                    const l = document.getElementById('stat-label');
-                    const v = document.getElementById('stat-value');
+                  <InputBox placeholder="Label" id="add-stat-label" />
+                  <InputBox placeholder="Value" id="add-stat-value" />
+                  <button className={styles.addBtnIcon} onClick={() => {
+                    const l = document.getElementById('add-stat-label');
+                    const v = document.getElementById('add-stat-value');
                     if (l.value && v.value) {
                       setProductData({ stats: [...(productData.stats || []), { label: l.value, value: v.value }] });
                       l.value = ''; v.value = '';
@@ -943,73 +891,50 @@ const AddProduct = () => {
       </div>
 
       <div className={styles.actionBar}>
-        <Button variant="secondary" onClick={() => window.history.back()}>Cancel</Button>
+        <Button variant="secondary" onClick={() => navigate('/products')}>Cancel</Button>
         <Button variant="primary" onClick={handleSubmit} disabled={loading} className={styles.saveBtn}>
-          {loading ? <Loader size={16} className={styles.spinner} /> : 'Publish Product'}
+          {loading ? <Loader className={styles.spinner} /> : 'Create Product'}
         </Button>
       </div>
 
-      {/* MODALS */}
+      {/* Modals */}
       {isMappingModalOpen && (
-        <Modal
-          isOpen={true}
-          title="Assign Attributes to Category"
-          onClose={() => setIsMappingModalOpen(false)}
-        >
+        <Modal isOpen title="Assign Attributes" onClose={() => setIsMappingModalOpen(false)}>
           <div className={styles.modalBody}>
             <div className={styles.mappingGrid}>
               {allAttributes.map(attr => (
                 <label key={attr.attribute_id} className={styles.mappingItem}>
-                  <input
-                    type="checkbox"
-                    checked={selectedAttributeIds.includes(attr.attribute_id)}
-                    onChange={e => {
-                      if (e.target.checked) setSelectedAttributeIds([...selectedAttributeIds, attr.attribute_id]);
-                      else setSelectedAttributeIds(selectedAttributeIds.filter(id => id !== attr.attribute_id));
-                    }}
-                  />
+                  <input type="checkbox" checked={selectedAttributeIds.includes(attr.attribute_id)}
+                    onChange={e => e.target.checked ? setSelectedAttributeIds([...selectedAttributeIds, attr.attribute_id]) : setSelectedAttributeIds(selectedAttributeIds.filter(id => id !== attr.attribute_id))} />
                   {attr.name}
                 </label>
               ))}
             </div>
             <div className={styles.actionBar}>
-              <Button variant="primary" onClick={() => { assignAttributes(productData.sub_category_id, selectedAttributeIds); setIsMappingModalOpen(false); }}>
-                Save Mappings
-              </Button>
+              <Button onClick={() => {
+                assignAttributes(productData.sub_category_id, selectedAttributeIds);
+                setIsMappingModalOpen(false);
+              }}>Save Mappings</Button>
             </div>
           </div>
         </Modal>
       )}
 
       {isGlobalAttrModalOpen && (
-        <Modal
-          isOpen={true}
-          title="Global Attributes Management"
-          onClose={() => setIsGlobalAttrModalOpen(false)}
-        >
+        <Modal isOpen title="Global Attributes" onClose={() => setIsGlobalAttrModalOpen(false)}>
           <div className={styles.modalBody}>
             <div className={styles.formGrid4} style={{ gridTemplateColumns: '1fr auto', marginBottom: '1rem' }}>
-              <InputBox placeholder="New Attribute Name" value={newAttrName} onChange={e => setNewAttrName(e.target.value)} />
-              <Button onClick={submitCreateGlobalAttr}><PlusCircle size={16} /> Create</Button>
+              <InputBox placeholder="Name" value={newAttrName} onChange={e => setNewAttrName(e.target.value)} />
+              <Button onClick={submitCreateGlobalAttr}>Create</Button>
             </div>
             <div className={styles.attrList}>
               {allAttributes.map(attr => (
                 <div key={attr.attribute_id} className={styles.attrRow}>
-                  <div className={styles.attrInfo}>
-                    {editingAttr?.attribute_id === attr.attribute_id ? (
-                      <InputBox value={editingAttrName} onChange={e => setEditingAttrName(e.target.value)} />
-                    ) : (
-                      <span style={{ fontWeight: 600 }}>{attr.name}</span>
-                    )}
-                  </div>
+                  {editingAttr?.attribute_id === attr.attribute_id ? <InputBox value={editingAttrName} onChange={e => setEditingAttrName(e.target.value)} /> : <b>{attr.name}</b>}
                   <div className={styles.attrActions}>
-                    {editingAttr?.attribute_id === attr.attribute_id ? (
-                      <button className={styles.miniBtn} onClick={submitUpdateGlobalAttr}><Check size={16} /></button>
-                    ) : (
-                      <button className={styles.miniBtn} onClick={() => { setEditingAttr(attr); setEditingAttrName(attr.name); }}><Edit2 size={16} /></button>
-                    )}
-                    <button className={styles.miniBtn} onClick={() => openValueModal(attr)}><List size={16} /></button>
-                    <button className={`${styles.miniBtn} ${styles.danger}`} onClick={() => submitDeleteGlobalAttr(attr.attribute_id)}><Trash2 size={16} /></button>
+                    {editingAttr?.attribute_id === attr.attribute_id ? <button className={styles.miniBtn} onClick={submitUpdateGlobalAttr}><Check /></button> : <button className={styles.miniBtn} onClick={() => { setEditingAttr(attr); setEditingAttrName(attr.name); }}><Edit2 /></button>}
+                    <button className={styles.miniBtn} onClick={() => openValueModal(attr)}><List /></button>
+                    <button className={`${styles.miniBtn} ${styles.danger}`} onClick={() => submitDeleteGlobalAttr(attr.attribute_id)}><Trash2 /></button>
                   </div>
                 </div>
               ))}
@@ -1019,123 +944,19 @@ const AddProduct = () => {
       )}
 
       {isValueModalOpen && (
-        <Modal
-          isOpen={true}
-          title={`Values: ${currentAttribute?.name}`}
-          onClose={() => setIsValueModalOpen(false)}
-        >
+        <Modal isOpen title={`Values: ${currentAttribute?.name}`} onClose={() => setIsValueModalOpen(false)}>
           <div className={styles.modalBody}>
-            <div className={styles.valueFormWrapper}>
-              <div className={styles.formGrid2} style={{ gridTemplateColumns: '1fr auto auto', gap: '0.5rem', alignItems: 'end' }}>
-                <InputBox label="Value Name" placeholder="Red, XL, etc." value={newValueInput} onChange={e => setNewValueInput(e.target.value)} />
-                {currentAttribute?.name?.toLowerCase().includes('color') ? (
-                  <div className={styles.premiumColorInputContainer}>
-                    <label className={styles.floatingLabel}>Color</label>
-                    <div 
-                      className={styles.swatchTrigger} 
-                      style={{ backgroundColor: newValueColor }}
-                      onClick={() => document.getElementById('new-val-color').click()}
-                    />
-                    <input 
-                      type="text" 
-                      className={styles.premiumColorInput} 
-                      value={newValueColor} 
-                      onChange={e => {
-                        let val = e.target.value;
-                        if (val && !val.startsWith('#') && val.length > 0 && /^[0-9A-F]{0,6}$/i.test(val)) {
-                           val = '#' + val;
-                        }
-                        setNewValueColor(val);
-                      }}
-                      placeholder="#000000"
-                    />
-                    <input 
-                      id="new-val-color"
-                      type="color" 
-                      value={newValueColor && newValueColor.startsWith('#') && (newValueColor.length === 7 || newValueColor.length === 4) ? newValueColor : '#000000'} 
-                      onInput={e => {
-                        setNewValueColor(e.target.value);
-                      }} 
-                      className={styles.hiddenColorInput} 
-                    />
-                  </div>
-                ) : null}
-                <Button onClick={() => { 
-                  submitAddValue(currentAttribute.attribute_id, newValueInput, currentAttribute?.name?.toLowerCase().includes('color') ? newValueColor : null); 
-                  setNewValueInput(''); 
-                  setNewValueColor('#000000');
-                }}>Add</Button>
-              </div>
+            <div className={styles.formGrid4} style={{ gridTemplateColumns: '1fr auto', marginBottom: '1rem' }}>
+              <InputBox placeholder="New Value" value={newValueInput} onChange={e => setNewValueInput(e.target.value)} />
+              <Button onClick={() => { submitAddValue(currentAttribute.attribute_id, newValueInput); setNewValueInput(''); }}>Add</Button>
             </div>
-
             <div className={styles.attrList}>
               {attributeValues.map(val => (
                 <div key={val.attribute_value_id} className={styles.attrRow}>
-                  <div className={styles.attrInfo}>
-                    {editingValue?.attribute_value_id === val.attribute_value_id ? (
-                      <div className={styles.editingRow}>
-                        <InputBox value={editingValueText} onChange={e => setEditingValueText(e.target.value)} />
-                        {currentAttribute?.name?.toLowerCase().includes('color') && (
-                          <div className={styles.premiumColorInputContainer} style={{ marginTop: 0, width: '140px' }}>
-                            <div 
-                              className={styles.swatchTrigger} 
-                              style={{ backgroundColor: editingValueColor, left: '6px', width: '20px', height: '20px' }}
-                              onClick={() => document.getElementById(`edit-val-color-${val.attribute_value_id}`).click()}
-                            />
-                            <input 
-                              type="text" 
-                              className={styles.premiumColorInput} 
-                              style={{ paddingLeft: '2rem !important', height: '38px' }}
-                              value={editingValueColor} 
-                              onChange={e => {
-                                let v = e.target.value;
-                                if (v && !v.startsWith('#') && v.length > 0 && /^[0-9A-F]{0,6}$/i.test(v)) {
-                                   v = '#' + v;
-                                }
-                                setEditingValueColor(v);
-                              }}
-                            />
-                            <input 
-                              id={`edit-val-color-${val.attribute_value_id}`}
-                              type="color" 
-                              value={editingValueColor && editingValueColor.startsWith('#') && (editingValueColor.length === 7 || editingValueColor.length === 4) ? editingValueColor : '#000000'} 
-                              onInput={e => setEditingValueColor(e.target.value)} 
-                              className={styles.hiddenColorInput} 
-                            />
-                          </div>
-                        )}
-                      </div>
-                    ) : (
-                      <div className={styles.valueDisplay}>
-                        {val.color_code && (
-                          <span className={styles.colorSwatch} style={{ backgroundColor: val.color_code }} />
-                        )}
-                        <span>{val.value || val.value_name}</span>
-                      </div>
-                    )}
-                  </div>
+                  {editingValue?.attribute_value_id === val.attribute_value_id ? <InputBox value={editingValueText} onChange={e => setEditingValueText(e.target.value)} /> : <span>{val.value || val.value_name}</span>}
                   <div className={styles.attrActions}>
-                    {editingValue?.attribute_value_id === val.attribute_value_id ? (
-                      <button className={styles.miniBtn} onClick={() => { 
-                        submitUpdateValue(val.attribute_value_id, editingValueText, currentAttribute?.name?.toLowerCase().includes('color') ? editingValueColor : null); 
-                        setEditingValue(null); 
-                      }}><Check size={16} /></button>
-                    ) : (
-                      <button className={styles.miniBtn} onClick={() => { 
-                        setEditingValue(val); 
-                        setEditingValueText(val.value || val.value_name);
-                        setEditingValueColor(val.color_code || '#000000');
-                      }}><Edit2 size={16} /></button>
-                    )}
-                    <button 
-                      className={`${styles.miniBtn} ${styles.danger}`} 
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        submitDeleteValue(val.attribute_value_id);
-                      }}
-                    >
-                      <Trash2 size={16} />
-                    </button>
+                    {editingValue?.attribute_value_id === val.attribute_value_id ? <button className={styles.miniBtn} onClick={() => { submitUpdateValue(val.attribute_value_id, editingValueText); setEditingValue(null); }}><Check /></button> : <button className={styles.miniBtn} onClick={() => { setEditingValue(val); setEditingValueText(val.value || val.value_name); }}><Edit2 /></button>}
+                    <button className={`${styles.miniBtn} ${styles.danger}`} onClick={() => submitDeleteValue(val.attribute_value_id)}><Trash2 /></button>
                   </div>
                 </div>
               ))}

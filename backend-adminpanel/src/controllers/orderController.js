@@ -11,13 +11,13 @@ const orderController = {
             const guestId = req.headers['x-guest-id'];
             const { address_id, payment_method, address: guestAddress } = req.body;
 
-            console.log('📦 Create Order Request:', { 
-                userId, 
-                guestId, 
+            console.log('📦 Create Order Request:', {
+                userId,
+                guestId,
                 hasAddress: !!(address_id || guestAddress),
-                paymentMethod: payment_method 
+                paymentMethod: payment_method
             });
-            
+
             // 1. Failsafe: Merge guest items into user account if both exist
             if (userId && guestId) {
                 try {
@@ -31,21 +31,21 @@ const orderController = {
 
             // 2. Fetch Cart (Try multiple strategies to find items)
             let cart = await cartService.getCart(userId, guestId);
-            
+
             // Last resort: If cart is empty but we have a userId, try fetching ONLY by userId
             if ((!cart || !cart.items || cart.items.length === 0) && userId) {
                 console.log('🔍 Cart empty with GuestID, retrying with UserID only...');
                 cart = await cartService.getCart(userId, null);
             }
 
-            console.log('🛒 Final Cart Check:', { 
-                cartId: cart?.cart_id, 
+            console.log('🛒 Final Cart Check:', {
+                cartId: cart?.cart_id,
                 itemCount: cart?.items?.length || 0
             });
 
             if (!cart || !cart.items || cart.items.length === 0) {
                 console.warn('🛑 Order creation blocked: No items found in any cart for User:', userId);
-                
+
                 // --- DEEP DEBUG DATA ---
                 const [dbCarts] = await db.query('SELECT * FROM carts WHERE user_id = ? OR guest_id = ?', [userId, guestId]);
                 const [dbItems] = await db.query(`
@@ -58,8 +58,8 @@ const orderController = {
                 const [allCarts] = await db.query('SELECT cart_id, user_id, guest_id FROM carts LIMIT 5');
                 const [userCheck] = await db.query('SELECT user_id FROM users WHERE user_id = ?', [userId]);
 
-                return res.status(400).json({ 
-                    success: false, 
+                return res.status(400).json({
+                    success: false,
                     message: 'Cart is empty'
                 });
             }
@@ -67,13 +67,13 @@ const orderController = {
             // 2. Validate Stock & Prepare Items
             const items = [];
             let subtotal = 0;
-            
+
             for (const item of cart.items) {
                 let price = 0;
                 let variant_name = null;
                 let variant_sku = null;
                 let product_name = 'Item';
-                let image_url = null;                
+                let image_url = null;
                 if (item.variant_id) {
                     const variant = await Product.getVariantById(item.variant_id);
                     if (!variant || variant.stock < item.quantity) {
@@ -81,15 +81,15 @@ const orderController = {
                     }
                     price = parseFloat(variant.finalPrice || variant.sellingPrice || variant.price || 0);
                     variant_sku = variant.sku;
-                    
+
                     const product = await Product.findById(item.product_id);
                     product_name = product?.name || 'Product';
-                    
+
                     // Prioritize variant image, fallback to product image
-                    image_url = (variant.images && variant.images.length > 0) 
-                        ? variant.images[0].url 
+                    image_url = (variant.images && variant.images.length > 0)
+                        ? variant.images[0].url
                         : (product?.image_url || null);
-                    
+
                     // Create a readable variant name from attributes
                     if (variant.attributes && variant.attributes.length > 0) {
                         variant_name = variant.attributes.map(a => a.attribute_value).join(' / ');
@@ -104,7 +104,7 @@ const orderController = {
                     variant_sku = product.base_sku;
                     image_url = product?.image_url || null;
                 }
-                
+
                 items.push({
                     product_id: item.product_id,
                     variant_id: item.variant_id || null,
@@ -184,7 +184,7 @@ const orderController = {
         try {
             const { order_id } = req.params;
             const order = await Order.findById(order_id);
-            
+
             if (!order) {
                 return res.status(404).json({ success: false, message: 'Order not found' });
             }
@@ -221,9 +221,9 @@ const orderController = {
 
             const success = await Order.cancelOrder(order_id, userId);
             if (!success) {
-                return res.status(400).json({ 
-                    success: false, 
-                    message: 'Cannot cancel order. It may have already been shipped or doesn\'t exist.' 
+                return res.status(400).json({
+                    success: false,
+                    message: 'Cannot cancel order. It may have already been shipped or doesn\'t exist.'
                 });
             }
 

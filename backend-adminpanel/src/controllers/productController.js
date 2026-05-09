@@ -25,7 +25,7 @@ const injectFileUrl = (data, fieldname, urls) => {
         const index = parseInt(parts[parts.length - 1]);
         if (!data.images) data.images = [];
         if (!data.images[index]) data.images[index] = {};
-        
+
         data.images[index] = {
             ...data.images[index],
             image_url: main_url,
@@ -41,12 +41,12 @@ const injectFileUrl = (data, fieldname, urls) => {
         const parts = fieldname.split('_');
         const vIndex = parseInt(parts[1]);
         const imgIndex = parseInt(parts[3]);
-        
+
         if (!data.variants) data.variants = [];
         if (!data.variants[vIndex]) data.variants[vIndex] = { images: [] };
         if (!data.variants[vIndex].images) data.variants[vIndex].images = [];
         if (!data.variants[vIndex].images[imgIndex]) data.variants[vIndex].images[imgIndex] = {};
-        
+
         data.variants[vIndex].images[imgIndex] = {
             ...data.variants[vIndex].images[imgIndex],
             image_url: main_url,
@@ -65,7 +65,7 @@ const productController = {
     createProduct: async (req, res, next) => {
         try {
             let productData = req.body;
-            
+
             // Handle multipart/form-data where productData might be in 'productData' or 'req' field
             const rawData = req.body.productData || req.body.req;
             if (rawData && typeof rawData === 'string') {
@@ -82,7 +82,7 @@ const productController = {
             if (req.files && req.files.length > 0) {
                 for (const file of req.files) {
                     const fieldname = file.fieldname;
-                    
+
                     if (file.mimetype.startsWith('image/')) {
                         // Relaxed validation: 2MB limit for images
                         if (file.size > 2 * 1024 * 1024) {
@@ -151,7 +151,7 @@ const productController = {
             };
 
             const result = await productService.getProductsFrontend(query);
-            
+
             res.status(200).json({
                 success: true,
                 products: result.products,
@@ -207,7 +207,7 @@ const productController = {
             if (req.files && req.files.length > 0) {
                 for (const file of req.files) {
                     const fieldname = file.fieldname;
-                    
+
                     if (file.mimetype.startsWith('image/')) {
                         // Relaxed validation: 2MB limit for images
                         if (file.size > 2 * 1024 * 1024) {

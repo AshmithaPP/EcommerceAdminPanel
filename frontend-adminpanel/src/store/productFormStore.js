@@ -201,13 +201,13 @@ const useProductFormStore = create((set, get) => ({
     // Media Handlers
     setProductImages: (images) => set({ productImages: images }),
     setProductVideo: (video) => set({ productVideo: video }),
-    
+
     removeProductImage: (idx) => {
         set((state) => ({
             productImages: state.productImages.filter((_, i) => i !== idx)
         }));
     },
-    
+
     removeVariantImage: (vIdx, imgIdx) => {
         set((state) => {
             const updated = [...state.variants];
@@ -224,17 +224,17 @@ const useProductFormStore = create((set, get) => ({
             variantConfig: state.variantConfig.map(attr => {
                 if (String(attr.attribute_id) !== String(attrId)) return attr;
                 const isSelected = attr.selectedValues.find(v => String(v.id) === String(valueObj.attribute_value_id || valueObj.id));
-                
+
                 return {
                     ...attr,
                     selectedValues: isSelected
                         ? attr.selectedValues.filter(v => String(v.id) !== String(valueObj.attribute_value_id || valueObj.id))
-                        : [...attr.selectedValues, { 
-                            ...valueObj, 
+                        : [...attr.selectedValues, {
+                            ...valueObj,
                             id: String(valueObj.attribute_value_id || valueObj.id),
                             name: valueObj.value || valueObj.name,
                             color_code: valueObj.color_code || null
-                          }]
+                        }]
                 };
             })
         }));

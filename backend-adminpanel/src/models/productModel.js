@@ -53,7 +53,7 @@ const Product = {
                     FROM product_variants 
                     WHERE product_id = p.product_id AND status = 1) as starting_price
             FROM products p
-            WHERE p.sub_category_id = ? AND p.product_id != ? AND p.status = 1
+            WHERE p.sub_category_id = ? AND p.product_id != ? AND p.status = 1 AND p.name NOT LIKE '%Gift Voucher%'
             LIMIT ?
         `;
         let [rows] = await db.query(sql, [subCategoryId, currentProductId, parseInt(limit)]);
@@ -74,7 +74,7 @@ const Product = {
                         WHERE product_id = p.product_id AND status = 1) as starting_price
                 FROM products p
                 LEFT JOIN sub_categories sc ON p.sub_category_id = sc.sub_category_id
-                WHERE sc.category_id = ? AND p.product_id NOT IN (${excludeIds.map(() => '?').join(',')}) AND p.status = 1
+                WHERE sc.category_id = ? AND p.product_id NOT IN (${excludeIds.map(() => '?').join(',')}) AND p.status = 1 AND p.name NOT LIKE '%Gift Voucher%'
                 LIMIT ?
             `;
             const [moreRows] = await db.query(sql, [categoryId, ...excludeIds, remaining]);

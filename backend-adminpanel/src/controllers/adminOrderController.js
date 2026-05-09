@@ -7,15 +7,21 @@ const adminOrderController = {
             const { status, page = 1, limit = 20 } = req.query;
             const offset = (page - 1) * limit;
 
-            let sql = 'SELECT * FROM orders';
+            let sql = `
+                SELECT o.*, u.name as customer_name, u.email as customer_email,
+                COALESCE(o.transaction_id, p.gateway_payment_id) as transaction_id
+                FROM orders o
+                LEFT JOIN users u ON o.user_id = u.user_id
+                LEFT JOIN payments p ON o.order_id = p.order_id AND p.status = 'success'
+            `;
             const params = [];
 
             if (status) {
-                sql += ' WHERE status = ?';
+                sql += ' WHERE o.status = ?';
                 params.push(status);
             }
 
-            sql += ' ORDER BY created_at DESC LIMIT ? OFFSET ?';
+            sql += ' ORDER BY o.created_at DESC LIMIT ? OFFSET ?';
             params.push(parseInt(limit), parseInt(offset));
 
             const [orders] = await db.query(sql, params);
@@ -40,10 +46,25 @@ const adminOrderController = {
     getOrderDetails: async (req, res, next) => {
         try {
             const { order_id } = req.params;
-            const order = await Order.findById(order_id);
+            
+            // JOIN with payments to get transaction_id if missing in orders table (legacy/fallback)
+            const [orderRows] = await db.query(`
+                SELECT o.*, COALESCE(o.transaction_id, p.gateway_payment_id) as transaction_id
+                FROM orders o
+                LEFT JOIN payments p ON o.order_id = p.order_id AND p.status = 'success'
+                WHERE o.order_id = ?
+            `, [order_id]);
+            
+            const order = orderRows[0];
+            
             if (!order) {
                 return res.status(404).json({ success: false, message: 'Order not found' });
             }
+
+            // Fetch order items and timeline using the model helper (since it parses JSON etc)
+            const fullOrder = await Order.findById(order_id);
+            order.items = fullOrder.items;
+            order.timeline = fullOrder.timeline;
 
             // Fetch User details for customer section
             const [userRows] = await db.query('SELECT name, email, phone FROM users WHERE user_id = ?', [order.user_id]);
