@@ -431,9 +431,9 @@ const useProductFormStore = create((set, get) => ({
             set({ loading: false });
             return true;
         } catch (err) {
-            const msg = err.message || 'Failed to create product';
-            set({ error: msg, loading: false });
-            showToast.error(msg);
+            const errorMsg = err.response?.data?.message || err.message || 'Failed to create product';
+            set({ error: errorMsg, loading: false });
+            showToast.error(errorMsg);
             return false;
         }
     }

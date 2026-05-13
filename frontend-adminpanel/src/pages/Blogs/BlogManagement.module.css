@@ -120,5 +120,79 @@
 }
 
 .deleteBtn:hover {
-  color: #ef4444;
+    background: #fee2e2;
+    color: #ef4444;
+}
+
+/* Image Upload Styles */
+.imageUploadSection {
+    margin-bottom: 20px;
+    padding-bottom: 20px;
+    border-bottom: 1px dashed var(--border-default);
+}
+
+.uploadArea {
+    background: #f8fafc;
+    border: 2px dashed #e2e8f0;
+    border-radius: 12px;
+    padding: 20px;
+}
+
+.validationInfo {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #64748b;
+    font-size: 12px;
+    margin-bottom: 16px;
+    background: #fff;
+    padding: 8px 12px;
+    border-radius: 6px;
+    border: 1px solid #e2e8f0;
+}
+
+.uploadTriggerRow {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 16px;
+}
+
+.successMsg {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    color: #10b981;
+    font-size: 13px;
+    font-weight: 500;
+}
+
+.previewBox {
+    position: relative;
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid #e2e8f0;
+    background: #fff;
+    max-width: 400px;
+}
+
+.previewBox img {
+    width: 100%;
+    height: auto;
+    display: block;
+}
+
+.previewOverlay {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: rgba(16, 185, 129, 0.9);
+    color: white;
+    padding: 4px 10px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }

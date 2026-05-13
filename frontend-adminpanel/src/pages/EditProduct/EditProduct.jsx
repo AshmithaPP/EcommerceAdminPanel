@@ -66,6 +66,7 @@ const EditProduct = () => {
     status, setStatus,
     productImages, setProductImages, removeProductImage,
     productVideo, setProductVideo, removeVideo,
+    removeVariantImage,
     bulkImages, applyBulkImage, clearBulkImages,
     categories, initializeEditProduct, resetEditForm,
     subCategories, fetchSubCategories,

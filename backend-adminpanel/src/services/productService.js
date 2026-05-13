@@ -317,7 +317,7 @@ const productService = {
                         JOIN variant_attributes va ON pv2.variant_id = va.variant_id
                         JOIN attributes a ON va.attribute_id = a.attribute_id
                         JOIN attribute_values av ON va.attribute_value_id = av.attribute_value_id
-                        WHERE a.name = ? AND av.slug IN (${slugs.map(() => '?').join(',')})
+                        WHERE pv2.status = 1 AND a.name = ? AND av.slug IN (${slugs.map(() => '?').join(',')})
                     )
                 )`);
                 params.push(key, ...slugs, key, ...slugs);
@@ -372,9 +372,37 @@ const productService = {
         const [[{ total }]] = await db.query(countSql, params);
 
         // 6. Execute Main Query
+        let imageSelectionSql = `(SELECT m.url FROM product_media pm JOIN media m ON pm.media_id = m.media_id WHERE pm.product_id = p.product_id ORDER BY pm.is_primary DESC LIMIT 1)`;
+        let imageParams = [];
+
+        if (color) {
+            const colorSlugs = color.split(',').map(s => s.trim().toLowerCase());
+            imageSelectionSql = `
+                COALESCE(
+                    (SELECT m.url FROM attribute_media am 
+                     JOIN attribute_values av ON am.attribute_value_id = av.attribute_value_id
+                     JOIN media m ON am.media_id = m.media_id
+                     WHERE am.product_id = p.product_id 
+                       AND av.slug IN (${colorSlugs.map(() => '?').join(',')}) 
+                     LIMIT 1),
+                    (SELECT m.url FROM variant_media vm
+                     JOIN variant_attributes va ON vm.variant_id = va.variant_id
+                     JOIN attribute_values av ON va.attribute_value_id = av.attribute_value_id
+                     JOIN product_variants pv ON vm.variant_id = pv.variant_id
+                     JOIN media m ON vm.media_id = m.media_id
+                     WHERE pv.product_id = p.product_id 
+                       AND av.slug IN (${colorSlugs.map(() => '?').join(',')}) 
+                     ORDER BY vm.is_primary DESC, vm.sort_order ASC
+                     LIMIT 1),
+                    (SELECT m.url FROM product_media pm JOIN media m ON pm.media_id = m.media_id WHERE pm.product_id = p.product_id ORDER BY pm.is_primary DESC LIMIT 1)
+                )
+            `;
+            imageParams = [...colorSlugs, ...colorSlugs];
+        }
+
         const productsSql = `
             SELECT p.*, c.name as category_name, pp.starting_price, pp.total_stock,
-                   (SELECT m.url FROM product_media pm JOIN media m ON pm.media_id = m.media_id WHERE pm.product_id = p.product_id ORDER BY pm.is_primary DESC LIMIT 1) as image_url,
+                   ${imageSelectionSql} as image_url,
                    (SELECT AVG(rating) FROM product_reviews WHERE product_id = p.product_id AND status = 1) as rating,
                    (SELECT COUNT(*) FROM product_reviews WHERE product_id = p.product_id AND status = 1) as rating_count
             FROM products p
@@ -386,7 +414,7 @@ const productService = {
             LIMIT ? OFFSET ?
         `;
 
-        const [rows] = await db.query(productsSql, [...params, parseInt(limit), parseInt(offset)]);
+        const [rows] = await db.query(productsSql, [...imageParams, ...params, parseInt(limit), parseInt(offset)]);
 
         // 7. Fetch Dynamic Filters (Amazon/Flipkart Style - Multi-select safe)
         // We calculate each facet by ignoring its own active filter but respecting others.
@@ -418,7 +446,7 @@ const productService = {
                             JOIN variant_attributes va ON pv2.variant_id = va.variant_id
                             JOIN attributes a ON va.attribute_id = a.attribute_id
                             JOIN attribute_values av ON va.attribute_value_id = av.attribute_value_id
-                            WHERE a.name = ? AND av.slug IN (${slugs.map(() => '?').join(',')})
+                            WHERE pv2.status = 1 AND a.name = ? AND av.slug IN (${slugs.map(() => '?').join(',')})
                         )
                     )`);
                     facetParams.push(key, ...slugs, key, ...slugs);
@@ -449,7 +477,7 @@ const productService = {
                     JOIN variant_attributes va ON pv.variant_id = va.variant_id
                     JOIN attributes a ON va.attribute_id = a.attribute_id
                     JOIN attribute_values av ON va.attribute_value_id = av.attribute_value_id
-                    ${fWhere} AND a.name = ?
+                    ${fWhere} AND pv.status = 1 AND a.name = ?
                 ) as combined_attrs
                 GROUP BY attr_value, attr_slug
                 ORDER BY count DESC
@@ -519,7 +547,7 @@ const productService = {
         };
     },
 
-    getProductBySlug: async (slug) => {
+    getProductBySlug: async (slug, query = {}) => {
         const product = await Product.findBySlug(slug);
         if (!product) {
             const error = new Error('Product not found');
@@ -535,7 +563,7 @@ const productService = {
 
         const home_sections = await Product.getHomeSections(product.product_id);
 
-        return formatProductDetail({ ...product, home_sections }, product.variants, subCategoryAttributes, relatedProducts);
+        return formatProductDetail({ ...product, home_sections }, product.variants, subCategoryAttributes, relatedProducts, query);
     },
 
     updateProduct: async (productId, productData) => {

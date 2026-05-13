@@ -162,7 +162,7 @@ const attributeController = {
                 throw err;
             }
 
-            await attributeService.updateAttributeValue(attribute_value_id, req.body.value, req.user.user_id);
+            await attributeService.updateAttributeValue(attribute_value_id, req.body, req.user.user_id);
 
             res.status(200).json({
                 success: true,

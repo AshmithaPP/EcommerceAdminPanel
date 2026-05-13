@@ -1,4 +1,7 @@
 const db = require('../config/database');
+const sharp = require('sharp');
+const path = require('path');
+const fs = require('fs');
 
 // Public: Get all published blogs (paginated)
 const getAllBlogs = async (req, res) => {
@@ -6,8 +9,13 @@ const getAllBlogs = async (req, res) => {
         const { category, page = 1, limit = 10 } = req.query;
         const offset = (page - 1) * limit;
 
-        let query = 'SELECT id as blog_id, title, slug, category, published_date, excerpt, image as image_url FROM blogs WHERE is_published = 1';
+        let query = 'SELECT id as blog_id, title, subtitle, slug, category, published_date, excerpt, image as image_url, content, is_published FROM blogs WHERE 1=1';
         const queryParams = [];
+
+        // For public requests, only show published
+        if (!req.user || req.user.role === 'user') {
+            query += ' AND is_published = 1';
+        }
 
         if (category) {
             query += ' AND category = ?';
@@ -19,7 +27,10 @@ const getAllBlogs = async (req, res) => {
 
         const [blogs] = await db.query(query, queryParams);
 
-        let countQuery = 'SELECT COUNT(*) as total FROM blogs WHERE is_published = 1';
+        let countQuery = 'SELECT COUNT(*) as total FROM blogs WHERE 1=1';
+        if (!req.user || req.user.role === 'user') {
+            countQuery += ' AND is_published = 1';
+        }
         const countParams = [];
         if (category) {
             countQuery += ' AND category = ?';
@@ -44,13 +55,15 @@ const getAllBlogs = async (req, res) => {
     }
 };
 
-// Public: Get blog by slug
+// Public: Get blog by slug or ID
 const getBlogBySlug = async (req, res) => {
     try {
         const { slug } = req.params;
-        const [blogs] = await db.query(
-            'SELECT id as blog_id, title, slug, category, published_date, excerpt, image as image_url, content FROM blogs WHERE slug = ? AND is_published = 1',
-            [slug]
+        
+        // Try searching by slug first
+        let [blogs] = await db.query(
+            'SELECT id as blog_id, title, subtitle, slug, category, published_date, excerpt, image as image_url, content FROM blogs WHERE (slug = ? OR id = ?) AND is_published = 1',
+            [slug, slug]
         );
 
         if (blogs.length === 0) {
@@ -132,11 +145,51 @@ const deleteBlog = async (req, res) => {
     }
 };
 
+const uploadBlogImage = async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ success: false, message: 'No file uploaded' });
+        }
+
+        const filePath = req.file.path;
+        const metadata = await sharp(filePath).metadata();
+
+        // Validate dimensions: 1280x720 (min) to 1920x1080 (max)
+        const minWidth = 1280;
+        const minHeight = 720;
+        const maxWidth = 1920;
+        const maxHeight = 1080;
+
+        if (metadata.width < minWidth || metadata.height < minHeight || 
+            metadata.width > maxWidth || metadata.height > maxHeight) {
+            
+            // Delete the invalid file
+            fs.unlinkSync(filePath);
+            return res.status(400).json({ 
+                success: false, 
+                message: `Invalid resolution: ${metadata.width}x${metadata.height}. Required between ${minWidth}x${minHeight} and ${maxWidth}x${maxHeight}.` 
+            });
+        }
+
+        const imageUrl = `/uploads/blogs/${req.file.filename}`;
+        res.status(200).json({
+            success: true,
+            message: 'Blog image uploaded and validated',
+            image_url: imageUrl,
+            dimensions: { width: metadata.width, height: metadata.height }
+        });
+    } catch (error) {
+        if (req.file) fs.unlinkSync(req.file.path);
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
 module.exports = {
     getAllBlogs,
     getBlogBySlug,
     getBlogById,
     createBlog,
     updateBlog,
-    deleteBlog
+    deleteBlog,
+    uploadBlogImage
 };

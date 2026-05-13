@@ -13,8 +13,8 @@ const getHomeData = async (req, res) => {
         // 3. Fetch Featured Products
         const [featuredProducts] = await db.query(`
             SELECT p.*, 
-                   (SELECT m.url FROM product_media pm JOIN media m ON pm.media_id = m.media_id 
-                    WHERE pm.product_id = p.product_id ORDER BY pm.is_primary DESC, pm.sort_order ASC LIMIT 1) as image_url,
+                   COALESCE(p.home_image_url, (SELECT m.url FROM product_media pm JOIN media m ON pm.media_id = m.media_id 
+                    WHERE pm.product_id = p.product_id ORDER BY pm.is_primary DESC, pm.sort_order ASC LIMIT 1)) as image_url,
                    (SELECT MIN(finalPrice) FROM product_variants WHERE product_id = p.product_id AND status = 1) as starting_price
             FROM products p 
             WHERE p.is_featured = 1 AND p.status = 1
@@ -29,8 +29,8 @@ const getHomeData = async (req, res) => {
         const productSections = await Promise.all(sections.map(async (section) => {
             const [products] = await db.query(`
                 SELECT p.*, 
-                       (SELECT m.url FROM product_media pm JOIN media m ON pm.media_id = m.media_id 
-                        WHERE pm.product_id = p.product_id ORDER BY pm.is_primary DESC, pm.sort_order ASC LIMIT 1) as image_url,
+                       COALESCE(p.home_image_url, (SELECT m.url FROM product_media pm JOIN media m ON pm.media_id = m.media_id 
+                        WHERE pm.product_id = p.product_id ORDER BY pm.is_primary DESC, pm.sort_order ASC LIMIT 1)) as image_url,
                        (SELECT MIN(finalPrice) FROM product_variants WHERE product_id = p.product_id AND status = 1) as starting_price
                 FROM products p
                 JOIN home_section_products hsp ON p.product_id = hsp.product_id
@@ -184,6 +184,54 @@ const updateHero = async (req, res) => {
     }
 };
 
+const uploadHeroImage = async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ success: false, message: 'No file uploaded' });
+        }
+
+        const sharp = require('sharp');
+        const metadata = await sharp(req.file.path).metadata();
+
+        // Strict Resolution Check: 1280x720 min, 1920x1080 max
+        const minW = 1280, minH = 720;
+        const maxW = 1920, maxH = 1080;
+
+        if (metadata.width < minW || metadata.height < minH) {
+            require('fs').unlinkSync(req.file.path);
+            return res.status(400).json({ 
+                success: false, 
+                message: `Image resolution too low (${metadata.width}x${metadata.height}). Minimum required: ${minW}x${minH}.` 
+            });
+        }
+
+        if (metadata.width > maxW || metadata.height > maxH) {
+            require('fs').unlinkSync(req.file.path);
+            return res.status(400).json({ 
+                success: false, 
+                message: `Image resolution too high (${metadata.width}x${metadata.height}). Maximum allowed: ${maxW}x${maxH}.` 
+            });
+        }
+
+        const url = `/uploads/hero/${req.file.filename}`;
+
+        res.status(200).json({
+            success: true,
+            message: 'Hero image uploaded and validated successfully',
+            data: {
+                url,
+                width: metadata.width,
+                height: metadata.height,
+                size: req.file.size,
+                format: metadata.format
+            }
+        });
+    } catch (error) {
+        if (req.file) require('fs').unlinkSync(req.file.path);
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
 // Sections
 const getAllSections = async (req, res) => {
     try {
@@ -202,6 +250,30 @@ const createSection = async (req, res) => {
             [section_id || require('crypto').randomUUID(), title, type, is_active, display_order || 0]
         );
         res.status(201).json({ success: true, message: 'Section created successfully' });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+const updateSection = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { title, type, is_active, display_order } = req.body;
+        await db.query(
+            'UPDATE home_sections SET title = ?, type = ?, is_active = ?, display_order = ? WHERE section_id = ?',
+            [title, type, is_active, display_order, id]
+        );
+        res.status(200).json({ success: true, message: 'Section updated successfully' });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+const deleteSection = async (req, res) => {
+    try {
+        const { id } = req.params;
+        await db.query('DELETE FROM home_sections WHERE section_id = ?', [id]);
+        res.status(200).json({ success: true, message: 'Section deleted successfully' });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
     }
@@ -281,6 +353,17 @@ const updateCategoryImage = async (req, res) => {
         const { image_url } = req.body;
         await db.query('UPDATE categories SET image_url = ? WHERE category_id = ?', [image_url, id]);
         res.status(200).json({ success: true, message: 'Category image updated' });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+const updateProductHomeImage = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { image_url } = req.body;
+        await db.query('UPDATE products SET home_image_url = ? WHERE product_id = ?', [image_url, id]);
+        res.status(200).json({ success: true, message: 'Product home image updated' });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
     }
@@ -445,8 +528,11 @@ module.exports = {
     getHomeData,
     getHero,
     updateHero,
+    uploadHeroImage,
     getAllSections,
     createSection,
+    updateSection,
+    deleteSection,
     getTestimonials,
     createTestimonial,
     updateTestimonial,
@@ -454,6 +540,7 @@ module.exports = {
     toggleFeaturedProduct,
     toggleFeaturedCategory,
     updateCategoryImage,
+    updateProductHomeImage,
     // New dynamic section methods
     getOccasions,
     updateOccasion,

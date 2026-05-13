@@ -165,7 +165,7 @@ const productController = {
 
     getProductBySlug: async (req, res, next) => {
         try {
-            const result = await productService.getProductBySlug(req.params.slug);
+            const result = await productService.getProductBySlug(req.params.slug, req.query);
             res.status(200).json({
                 success: true,
                 data: result

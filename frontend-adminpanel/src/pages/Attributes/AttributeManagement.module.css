@@ -202,3 +202,50 @@
     gap: 0.75rem;
     margin-top: 2rem;
 }
+
+.colorPreview {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    border: 1px solid rgba(0,0,0,0.1);
+}
+
+.colorInputSection {
+    margin-top: 1.5rem;
+}
+
+.label {
+    display: block;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #374151;
+    margin-bottom: 0.5rem;
+}
+
+.colorPickerWrapper {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    background: #f9fafb;
+    padding: 0.75rem;
+    border-radius: 8px;
+    border: 1px solid #e5e7eb;
+}
+
+.colorInput {
+    border: none;
+    background: none;
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    cursor: pointer;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.colorHex {
+    font-family: monospace;
+    font-weight: 600;
+    color: #4b5563;
+    text-transform: uppercase;
+}

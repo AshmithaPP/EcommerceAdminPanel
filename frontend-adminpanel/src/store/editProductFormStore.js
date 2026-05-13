@@ -514,8 +514,9 @@ const useEditProductFormStore = create((set, get) => ({
             showToast.success('Product updated successfully');
             return true;
         } catch (err) {
-            set({ loading: false, error: err.message });
-            showToast.error(err.message || 'Update failed');
+            const errorMsg = err.response?.data?.message || err.message || 'Update failed';
+            set({ loading: false, error: errorMsg });
+            showToast.error(errorMsg);
             return false;
         }
     }

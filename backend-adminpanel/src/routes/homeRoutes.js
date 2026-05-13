@@ -3,15 +3,19 @@ const router = express.Router();
 const homeController = require('../controllers/homeController');
 
 const { protect, authorize } = require('../middlewares/authMiddleware');
+const heroUpload = require('../middlewares/heroUploadMiddleware');
 
 router.get('/', homeController.getHomeData);
 
 // Admin Management Routes
 router.get('/admin/hero', protect, authorize('admin', 'superadmin'), homeController.getHero);
 router.put('/admin/hero', protect, authorize('admin', 'superadmin'), homeController.updateHero);
+router.post('/admin/hero/upload', protect, authorize('admin', 'superadmin'), heroUpload.single('heroImage'), homeController.uploadHeroImage);
 
 router.get('/admin/sections', protect, authorize('admin', 'superadmin'), homeController.getAllSections);
 router.post('/admin/sections', protect, authorize('admin', 'superadmin'), homeController.createSection);
+router.put('/admin/sections/:id', protect, authorize('admin', 'superadmin'), homeController.updateSection);
+router.delete('/admin/sections/:id', protect, authorize('admin', 'superadmin'), homeController.deleteSection);
 
 router.get('/admin/testimonials', protect, authorize('admin', 'superadmin'), homeController.getTestimonials);
 router.post('/admin/testimonials', protect, authorize('admin', 'superadmin'), homeController.createTestimonial);
@@ -22,6 +26,7 @@ router.delete('/admin/testimonials/:id', protect, authorize('admin', 'superadmin
 router.patch('/admin/toggle-featured-product/:id', protect, authorize('admin', 'superadmin'), homeController.toggleFeaturedProduct);
 router.patch('/admin/toggle-featured-category/:id', protect, authorize('admin', 'superadmin'), homeController.toggleFeaturedCategory);
 router.patch('/admin/category-image/:id', protect, authorize('admin', 'superadmin'), homeController.updateCategoryImage);
+router.patch('/admin/product-home-image/:id', protect, authorize('admin', 'superadmin'), homeController.updateProductHomeImage);
 
 // Occasions
 router.get('/admin/occasions', protect, authorize('admin', 'superadmin'), homeController.getOccasions);

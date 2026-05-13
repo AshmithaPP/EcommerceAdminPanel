@@ -56,8 +56,16 @@ const cartService = {
 
     addToCart: async (userId, guestId, { product_id, variant_id, quantity }) => {
         // 1. Validate Product/Variant
+        // If no variant is provided, try to find the first one for this product
+        if (!variant_id && product_id) {
+            const variants = await Product.getVariants(product_id);
+            if (variants && variants.length > 0) {
+                variant_id = variants[0].variant_id;
+            }
+        }
+
         const variant = await Product.getVariantById(variant_id);
-        if (!variant || variant.product_id !== product_id) {
+        if (!variant || (product_id && variant.product_id !== product_id)) {
             const error = new Error('Invalid product or variant');
             error.statusCode = 400;
             throw error;

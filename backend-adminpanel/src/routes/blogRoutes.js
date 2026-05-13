@@ -3,10 +3,13 @@ const router = express.Router();
 const blogController = require('../controllers/blogController');
 const { protect, authorize } = require('../middlewares/authMiddleware');
 
+const blogUpload = require('../middlewares/blogUploadMiddleware');
+
 router.get('/', blogController.getAllBlogs);
 router.get('/:slug', blogController.getBlogBySlug);
 
 // Protected routes (for admin)
+router.post('/admin/upload', protect, authorize('admin', 'superadmin'), blogUpload.single('image'), blogController.uploadBlogImage);
 router.post('/', protect, authorize('admin', 'superadmin'), blogController.createBlog);
 router.get('/admin/:id', protect, authorize('admin', 'superadmin'), blogController.getBlogById);
 router.put('/:id', protect, authorize('admin', 'superadmin'), blogController.updateBlog);

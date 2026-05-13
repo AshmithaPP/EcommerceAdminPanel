@@ -22,6 +22,7 @@ const AttributeManagement = () => {
     const [showValueModal, setShowValueModal] = useState(false);
     const [editingValue, setEditingValue] = useState(null);
     const [valueName, setValueName] = useState('');
+    const [colorCode, setColorCode] = useState('');
 
     useEffect(() => {
         fetchAttributes();
@@ -81,10 +82,18 @@ const AttributeManagement = () => {
         if (!valueName.trim() || !selectedAttr) return;
         try {
             if (editingValue) {
-                await privateApi.put(`/attributes/attribute-value-update/${editingValue.attribute_value_id}`, { value: valueName });
+                await privateApi.put(`/attributes/attribute-value-update/${editingValue.attribute_value_id}`, { 
+                    value: valueName,
+                    color_code: colorCode 
+                });
                 toast.success('Value updated');
             } else {
-                await privateApi.post(`/attributes/attribute-values-add/${selectedAttr.attribute_id}`, { values: [valueName] });
+                await privateApi.post(`/attributes/attribute-values-add/${selectedAttr.attribute_id}`, { 
+                    values: [{
+                        value: valueName,
+                        color_code: colorCode
+                    }] 
+                });
                 toast.success('Value added');
             }
             setShowValueModal(false);
@@ -149,16 +158,35 @@ const AttributeManagement = () => {
                         <>
                             <div className={styles.cardHeader}>
                                 <h3 className={styles.cardTitle}>Values for "{selectedAttr.name}"</h3>
-                                <Button size="small" onClick={() => { setEditingValue(null); setValueName(''); setShowValueModal(true); }}>
+                                <Button size="small" onClick={() => { 
+                                    setEditingValue(null); 
+                                    setValueName(''); 
+                                    setColorCode('#000000');
+                                    setShowValueModal(true); 
+                                }}>
                                     <Plus size={16} /> Add Value
                                 </Button>
                             </div>
-                            <div className={styles.valuesGrid}>
+                             <div className={styles.valuesGrid}>
                                 {attrValues.length > 0 ? attrValues.map(v => (
                                     <div key={v.attribute_value_id} className={styles.valueChip}>
-                                        <span>{v.value}</span>
+                                        <div style={{display: 'flex', alignItems: 'center', gap: '0.5rem'}}>
+                                            {v.color_code && (
+                                                <div 
+                                                    className={styles.colorPreview} 
+                                                    style={{backgroundColor: v.color_code}}
+                                                    title={v.color_code}
+                                                />
+                                            )}
+                                            <span>{v.value}</span>
+                                        </div>
                                         <div className={styles.chipActions}>
-                                            <button onClick={() => { setEditingValue(v); setValueName(v.value); setShowValueModal(true); }}><Edit2 size={12} /></button>
+                                            <button onClick={() => { 
+                                                setEditingValue(v); 
+                                                setValueName(v.value); 
+                                                setColorCode(v.color_code || '#000000');
+                                                setShowValueModal(true); 
+                                            }}><Edit2 size={12} /></button>
                                             <button onClick={() => handleDeleteValue(v.attribute_value_id)} className={styles.delete}><X size={12} /></button>
                                         </div>
                                     </div>
@@ -187,10 +215,26 @@ const AttributeManagement = () => {
                 </div>
             </Modal>
 
-            {/* Value Modal */}
+             {/* Value Modal */}
             <Modal isOpen={showValueModal} onClose={() => setShowValueModal(false)} title={editingValue ? 'Edit Value' : 'New Value'}>
                 <div className={styles.modalContent}>
-                    <InputBox label="Value" value={valueName} onChange={(e) => setValueName(e.target.value)} placeholder="e.g. Pink, Floral, Silk" required />
+                    <InputBox label="Value Name" value={valueName} onChange={(e) => setValueName(e.target.value)} placeholder="e.g. Pink, Floral, Silk" required />
+                    
+                    {selectedAttr?.name?.toLowerCase()?.includes('color') && (
+                        <div className={styles.colorInputSection}>
+                            <label className={styles.label}>Pick Color</label>
+                            <div className={styles.colorPickerWrapper}>
+                                <input 
+                                    type="color" 
+                                    value={colorCode} 
+                                    onChange={(e) => setColorCode(e.target.value)}
+                                    className={styles.colorInput}
+                                />
+                                <span className={styles.colorHex}>{colorCode}</span>
+                            </div>
+                        </div>
+                    )}
+
                     <div className={styles.modalFooter}>
                         <Button variant="ghost" onClick={() => setShowValueModal(false)}>Cancel</Button>
                         <Button onClick={handleSaveValue}>Save</Button>

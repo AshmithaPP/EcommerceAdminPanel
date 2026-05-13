@@ -42,7 +42,7 @@ const formatProductList = (product) => {
     };
 };
 
-const formatProductDetail = (product, variants, subCategoryAttributes = [], relatedProducts = []) => {
+const formatProductDetail = (product, variants, subCategoryAttributes = [], relatedProducts = [], query = {}) => {
     // 1. Organize Attributes
     const variantAttrIds = new Set(
         subCategoryAttributes
@@ -146,8 +146,16 @@ const formatProductDetail = (product, variants, subCategoryAttributes = [], rela
     }
 
     // 4. Default & Selected Variant
+    let selectedVariant = null;
+    if (query.color) {
+        const requestedColor = query.color.split(',')[0].toLowerCase();
+        selectedVariant = formattedVariants.find(v => 
+            v.attributes.color && (v.attributes.color.name?.toLowerCase() === requestedColor || v.attributes.color.toLowerCase?.() === requestedColor)
+        );
+    }
+
     const inStockVariant = formattedVariants.find(v => v.stock.quantity > 0);
-    const selectedVariant = inStockVariant || formattedVariants[0] || null;
+    if (!selectedVariant) selectedVariant = inStockVariant || formattedVariants[0] || null;
     
     // 5. Pricing (based on selected variant)
     const price = selectedVariant ? {

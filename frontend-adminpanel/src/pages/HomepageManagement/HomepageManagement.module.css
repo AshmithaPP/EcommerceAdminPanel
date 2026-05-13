@@ -209,3 +209,43 @@
   gap: 1rem;
   margin-top: 1rem;
 }
+
+.validationInfo {
+  width: 100%;
+  padding: 0.75rem;
+  background: #eff6ff;
+  border-left: 4px solid #3b82f6;
+  border-radius: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin-bottom: 1rem;
+}
+
+.validationInfo span {
+  font-size: 0.75rem;
+  color: #1e40af;
+  font-weight: 500;
+}
+
+.previewContainer {
+  position: relative;
+  width: 100%;
+  max-width: 500px;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+.previewImg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.previewOverlay {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+}
+

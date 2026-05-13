@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { privateApi } from '../../services/api';
-import { Edit2, Trash2, Plus } from 'lucide-react';
+import { Edit2, Trash2, Plus, Upload, Check, AlertCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 import Button from '../../components/ui/Button';
@@ -18,12 +18,18 @@ const BlogManagement = () => {
     const [editingBlog, setEditingBlog] = useState(null);
     const [formData, setFormData] = useState({
         title: '',
+        subtitle: '',
         slug: '',
         category: '',
         excerpt: '',
         content: '',
-        is_published: false
+        image: '',
+        is_published: false,
+        published_date: ''
     });
+    const [uploading, setUploading] = useState(false);
+    const [previewImage, setPreviewImage] = useState(null);
+    const [validationMsg, setValidationMsg] = useState(null);
 
     useEffect(() => {
         fetchBlogs();
@@ -41,18 +47,75 @@ const BlogManagement = () => {
         }
     };
 
+    const handleImageUpload = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        // 1. Client-side Format Validation
+        const allowedTypes = ['image/jpeg', 'image/jpg', 'image/webp'];
+        if (!allowedTypes.includes(file.type)) {
+            toast.error('Only WebP and JPEG/JPG formats are allowed.');
+            return;
+        }
+
+        // 2. Client-side Size Validation (200 KB)
+        if (file.size > 200 * 1024) {
+            toast.error('File size exceeds 200 KB. Please optimize the image.');
+            return;
+        }
+
+        // 3. Client-side Resolution Validation
+        const img = new Image();
+        img.src = URL.createObjectURL(file);
+        img.onload = async () => {
+            const width = img.width;
+            const height = img.height;
+            
+            if (width < 1280 || height < 720 || width > 1920 || height > 1080) {
+                toast.error(`Invalid resolution: ${width}x${height}. Required: 1280x720 to 1920x1080.`);
+                return;
+            }
+
+            // 4. Upload to Server
+            setUploading(true);
+            setValidationMsg('Uploading and validating on server...');
+            
+            const formDataUpload = new FormData();
+            formDataUpload.append('image', file);
+
+            try {
+                const { data } = await privateApi.post('/blogs/admin/upload', formDataUpload);
+                if (data.success) {
+                    setFormData(prev => ({ ...prev, image: data.image_url }));
+                    setPreviewImage(data.image_url);
+                    setValidationMsg('Image optimized and verified successfully');
+                    toast.success('Image uploaded successfully');
+                }
+            } catch (err) {
+                const msg = err.response?.data?.message || 'Upload failed';
+                toast.error(msg);
+                setValidationMsg(null);
+            } finally {
+                setUploading(false);
+            }
+        };
+    };
+
     const handleSave = async (e) => {
         e.preventDefault();
         try {
+            const finalData = { ...formData, image: formData.image || formData.image_url };
             if (editingBlog) {
-                await privateApi.put(`/blogs/${editingBlog.id || editingBlog.blog_id}`, formData);
+                await privateApi.put(`/blogs/${editingBlog.id || editingBlog.blog_id}`, finalData);
                 toast.success('Blog updated');
             } else {
-                await privateApi.post('/blogs', formData);
+                await privateApi.post('/blogs', finalData);
                 toast.success('Blog created');
             }
             setShowModal(false);
             fetchBlogs();
+            setPreviewImage(null);
+            setValidationMsg(null);
         } catch (err) {
             toast.error('Save failed');
         }
@@ -75,7 +138,7 @@ const BlogManagement = () => {
                 <h2 className={styles.title}>Blog Management</h2>
                 <Button onClick={() => {
                     setEditingBlog(null);
-                    setFormData({ title: '', slug: '', category: '', excerpt: '', content: '', is_published: false });
+                    setFormData({ title: '', subtitle: '', slug: '', category: '', excerpt: '', content: '', image: '', is_published: false, published_date: '' });
                     setShowModal(true);
                 }}>
                     <Plus size={16} /> New Blog Post
@@ -127,22 +190,85 @@ const BlogManagement = () => {
 
             <Modal 
                 isOpen={showModal} 
-                onClose={() => setShowModal(false)} 
+                onClose={() => {
+                    setShowModal(false);
+                    setPreviewImage(null);
+                    setValidationMsg(null);
+                }} 
                 title={editingBlog ? 'Edit Blog' : 'Create Blog'}
+                maxWidth="700px"
                 footer={
                     <div className={styles.modalFooter}>
                         <Button variant="ghost" onClick={() => setShowModal(false)}>Cancel</Button>
-                        <Button onClick={handleSave}>Save Blog Post</Button>
+                        <Button onClick={handleSave} disabled={uploading}>Save Blog Post</Button>
                     </div>
                 }
             >
                 <div className={styles.formGrid}>
+                    <div className={styles.fullWidth}>
+                        <div className={styles.imageUploadSection}>
+                            <label className={styles.label}>Blog Featured Image</label>
+                            
+                            <div className={styles.uploadArea}>
+                                <div className={styles.validationInfo}>
+                                    <AlertCircle size={14} />
+                                    <span>Recommended: WebP, 1920x1080, Max 200KB. Strictly: Min 1280x720, Block PNG.</span>
+                                </div>
+
+                                <div className={styles.uploadTriggerRow}>
+                                    <input 
+                                        type="file" 
+                                        id="blogImgUpload" 
+                                        accept="image/jpeg,image/webp" 
+                                        onChange={handleImageUpload}
+                                        style={{display: 'none'}}
+                                    />
+                                    <Button 
+                                        variant="outline" 
+                                        size="sm"
+                                        onClick={() => document.getElementById('blogImgUpload').click()}
+                                        isLoading={uploading}
+                                    >
+                                        <Upload size={14} /> {formData.image ? 'Change Image' : 'Select Image'}
+                                    </Button>
+                                    
+                                    {validationMsg && (
+                                        <span className={styles.successMsg}>
+                                            <Check size={14} /> {validationMsg}
+                                        </span>
+                                    )}
+                                </div>
+
+                                {(previewImage || formData.image || formData.image_url) && (
+                                    <div className={styles.previewBox}>
+                                        <div className={styles.previewOverlay}>
+                                            <span>Optimized Preview</span>
+                                        </div>
+                                        <img 
+                                            src={formData.image?.startsWith('http') || formData.image_url?.startsWith('http') 
+                                                ? (formData.image || formData.image_url) 
+                                                : `http://localhost:5000${formData.image || formData.image_url}`} 
+                                            alt="Preview" 
+                                        />
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+
                     <div className={styles.fullWidth}>
                         <InputBox 
                             label="Title"
                             value={formData.title}
                             onChange={(e) => setFormData({...formData, title: e.target.value})}
                             required
+                        />
+                    </div>
+                    <div className={styles.fullWidth}>
+                        <InputBox 
+                            label="Subtitle (appears under title on detail page)"
+                            value={formData.subtitle}
+                            onChange={(e) => setFormData({...formData, subtitle: e.target.value})}
                         />
                     </div>
                     <InputBox 
@@ -155,6 +281,11 @@ const BlogManagement = () => {
                         label="Category"
                         value={formData.category}
                         onChange={(e) => setFormData({...formData, category: e.target.value})}
+                    />
+                    <InputBox 
+                        label="Published Date (e.g. 13 March 2026)"
+                        value={formData.published_date}
+                        onChange={(e) => setFormData({...formData, published_date: e.target.value})}
                     />
                     <div className={styles.fullWidth}>
                         <div className={styles.textareaGroup}>

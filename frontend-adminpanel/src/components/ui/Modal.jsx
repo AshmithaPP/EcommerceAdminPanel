@@ -11,7 +11,7 @@ import styles from './Modal.module.css';
  * @param {React.ReactNode} children - Modal content
  * @param {React.ReactNode} footer - Optional footer actions
  */
-const Modal = ({ isOpen, onClose, title, children, footer }) => {
+const Modal = ({ isOpen, onClose, title, children, footer, maxWidth }) => {
   // Prevent scrolling when modal is open
   useEffect(() => {
     if (isOpen) {
@@ -28,7 +28,11 @@ const Modal = ({ isOpen, onClose, title, children, footer }) => {
 
   return (
     <div className={styles.overlay} onClick={onClose}>
-      <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
+      <div 
+        className={styles.modal} 
+        onClick={(e) => e.stopPropagation()}
+        style={maxWidth ? { maxWidth } : {}}
+      >
         <header className={styles.header}>
           <h3 className={styles.title}>{title}</h3>
           <button className={styles.closeBtn} onClick={onClose}>

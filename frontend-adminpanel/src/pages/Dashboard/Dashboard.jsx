@@ -152,12 +152,6 @@ const Dashboard = () => {
 
   return (
     <div className="page-container">
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-        <div>
-            <h1 className={styles.title}>Dashboard Overview</h1>
-        </div>
-       
-      </div>
 
       {/* Row 1: KPI Grid + Chart */}
       <div className={styles.topRow}>

@@ -1,5 +1,6 @@
 const db = require('../config/database');
 const { v4: uuidv4 } = require('uuid');
+const slugify = require('../utils/slugify');
 
 const Attribute = {
     /**
@@ -102,37 +103,40 @@ const Attribute = {
             const colorCode = isObject ? valObj.color_code : null;
             
             const trimmedVal = val.trim();
+            const slug = slugify(trimmedVal);
             
             // Check if value already exists (including soft-deleted)
             const [existing] = await connection.query(
-                'SELECT * FROM attribute_values WHERE attribute_id = ? AND value = ?',
-                [attributeId, trimmedVal]
+                'SELECT * FROM attribute_values WHERE attribute_id = ? AND (value = ? OR slug = ?)',
+                [attributeId, trimmedVal, slug]
             );
 
             if (existing.length > 0) {
                 const row = existing[0];
-                if (row.status === 0 || colorCode !== row.color_code) {
+                if (row.status === 0 || colorCode !== row.color_code || row.value !== trimmedVal) {
                     // Restore soft-deleted value or update existing metadata
                     await connection.query(
-                        'UPDATE attribute_values SET status = 1, color_code = ? WHERE attribute_value_id = ?',
-                        [colorCode || row.color_code, row.attribute_value_id]
+                        'UPDATE attribute_values SET status = 1, value = ?, slug = ?, color_code = ? WHERE attribute_value_id = ?',
+                        [trimmedVal, slug, colorCode || row.color_code, row.attribute_value_id]
                     );
                 }
                 results.push({ 
                     attribute_value_id: row.attribute_value_id, 
                     value: trimmedVal,
+                    slug: slug,
                     color_code: colorCode || row.color_code
                 });
             } else {
                 // Insert new value
                 const valueId = uuidv4();
                 await connection.query(
-                    'INSERT INTO attribute_values (attribute_value_id, attribute_id, value, color_code) VALUES (?, ?, ?, ?)',
-                    [valueId, attributeId, trimmedVal, colorCode]
+                    'INSERT INTO attribute_values (attribute_value_id, attribute_id, value, slug, color_code) VALUES (?, ?, ?, ?, ?)',
+                    [valueId, attributeId, trimmedVal, slug, colorCode]
                 );
                 results.push({ 
                     attribute_value_id: valueId, 
                     value: trimmedVal,
+                    slug: slug,
                     color_code: colorCode
                 });
             }
@@ -159,9 +163,11 @@ const Attribute = {
 
     updateValue: async (valueId, data, updatedBy) => {
         const { value, color_code } = data;
+        const trimmedVal = value.trim();
+        const slug = slugify(trimmedVal);
         await db.query(
-            'UPDATE attribute_values SET value = ?, color_code = ? WHERE attribute_value_id = ?',
-            [value.trim(), color_code || null, valueId]
+            'UPDATE attribute_values SET value = ?, slug = ?, color_code = ? WHERE attribute_value_id = ?',
+            [trimmedVal, slug, color_code || null, valueId]
         );
     },
 
@@ -197,7 +203,5 @@ const Attribute = {
         return rows[0].count > 0;
     }
 };
-
-module.exports = Attribute;
 
 module.exports = Attribute;

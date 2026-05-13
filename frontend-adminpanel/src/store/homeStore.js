@@ -59,10 +59,14 @@ const useHomeStore = create((set, get) => ({
         }
     },
 
-    saveSection: async (sectionData) => {
+    saveSection: async (id, sectionData) => {
         set({ isLoading: true });
         try {
-            await privateApi.post('/home/admin/sections', sectionData);
+            if (id === 'new') {
+                await privateApi.post('/home/admin/sections', sectionData);
+            } else {
+                await privateApi.put(`/home/admin/sections/${id}`, sectionData);
+            }
             toast.success('Section saved');
             get().fetchSections();
             return true;
@@ -71,6 +75,16 @@ const useHomeStore = create((set, get) => ({
             return false;
         } finally {
             set({ isLoading: false });
+        }
+    },
+
+    deleteSection: async (id) => {
+        try {
+            await privateApi.delete(`/home/admin/sections/${id}`);
+            toast.success('Section deleted');
+            get().fetchSections();
+        } catch (err) {
+            toast.error('Failed to delete section');
         }
     },
 
@@ -295,6 +309,18 @@ const useHomeStore = create((set, get) => ({
         }
     },
 
+    updateProductHomeImage: async (id, imageUrl) => {
+        try {
+            await privateApi.patch(`/home/admin/product-home-image/${id}`, { image_url: imageUrl });
+            toast.success('Product home image updated');
+            get().fetchProducts();
+            return true;
+        } catch (err) {
+            toast.error('Failed to update product image');
+            return false;
+        }
+    },
+
     // --- General Upload ---
     uploadImage: async (file) => {
         const formData = new FormData();
@@ -309,6 +335,30 @@ const useHomeStore = create((set, get) => ({
         } catch (err) {
             toast.error('Image upload failed');
             return null;
+        }
+    },
+
+    uploadHeroImage: async (file) => {
+        const formData = new FormData();
+        formData.append('heroImage', file);
+        set({ isLoading: true });
+        try {
+            const { data } = await privateApi.post('/home/admin/hero/upload', formData, {
+                headers: {
+                    'Content-Type': 'multipart/form-data',
+                },
+            });
+            if (data.success) {
+                toast.success('Hero image validated and uploaded');
+                return data.data.url;
+            }
+            return null;
+        } catch (err) {
+            const msg = err.response?.data?.message || 'Hero image upload failed';
+            toast.error(msg);
+            return null;
+        } finally {
+            set({ isLoading: false });
         }
     }
 }));

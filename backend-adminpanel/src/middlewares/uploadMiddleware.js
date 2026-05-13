@@ -23,16 +23,22 @@ const fileFilter = (req, file, cb) => {
         if (allowedImageTypes.includes(file.mimetype)) {
             cb(null, true);
         } else {
-            cb(new Error('Only WebP, PNG and JPEG/JPG images are allowed!'), false);
+            const error = new Error('Only WebP, PNG and JPEG/JPG images are allowed!');
+            error.statusCode = 400;
+            cb(error, false);
         }
     } else if (file.mimetype.startsWith('video/')) {
         if (allowedVideoTypes.includes(file.mimetype)) {
             cb(null, true);
         } else {
-            cb(new Error('Only MP4, WebM, and MOV videos are allowed!'), false);
+            const error = new Error('Only MP4, WebM, and MOV videos are allowed!');
+            error.statusCode = 400;
+            cb(error, false);
         }
     } else {
-        cb(new Error('Invalid file type!'), false);
+        const error = new Error('Invalid file type!');
+        error.statusCode = 400;
+        cb(error, false);
     }
 };
 

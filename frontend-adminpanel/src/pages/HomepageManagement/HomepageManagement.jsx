@@ -21,11 +21,12 @@ const getImageUrl = (url) => {
 
 const HomepageManagement = () => {
     const {
-        heroData, sections, testimonials, occasions, trendingPicks, priceFilters, categories, products, isLoading,
-        fetchHero, updateHero, fetchSections, saveSection, fetchTestimonials, saveTestimonial,
+        heroData, sections, testimonials, occasions, trendingPicks, priceFilters, categories, products, newsletter, isLoading,
+        fetchHero, updateHero, fetchSections, saveSection, deleteSection,
+        fetchTestimonials, saveTestimonial, deleteTestimonial,
         fetchOccasions, saveOccasion, deleteOccasion, fetchTrendingPicks, saveTrendingPick, deleteTrendingPick,
         fetchPriceFilters, savePriceFilter, deletePriceFilter, fetchCategories, toggleCategoryFeatured, updateCategoryImage,
-        fetchProducts, toggleProductFeatured, uploadImage, newsletter, fetchNewsletter, updateNewsletter
+        fetchProducts, toggleProductFeatured, updateProductHomeImage, uploadImage, uploadHeroImage, fetchNewsletter, updateNewsletter
     } = useHomeStore();
 
     const [activeTab, setActiveTab] = useState('hero');
@@ -64,6 +65,9 @@ const HomepageManagement = () => {
 
     const [showCatImageModal, setShowCatImageModal] = useState(false);
     const [selectedCategory, setSelectedCategory] = useState(null);
+    const [showProductImageModal, setShowProductImageModal] = useState(false);
+    const [selectedProduct, setSelectedProduct] = useState(null);
+    const [tempImageUrl, setTempImageUrl] = useState('');
 
     useEffect(() => {
         fetchHero();
@@ -86,16 +90,62 @@ const HomepageManagement = () => {
         const file = e.target.files[0];
         if (!file) return;
 
-        const url = await uploadImage(file);
-        if (url) {
-            updateHero({ ...heroData, image_url: url });
+        // 1. Client-side Validation: Format (WebP, JPEG)
+        const allowedTypes = ['image/jpeg', 'image/jpg', 'image/webp'];
+        if (!allowedTypes.includes(file.type)) {
+            toast.error('Invalid format. Only WebP (preferred) and JPEG are allowed for hero banners.');
+            e.target.value = '';
+            return;
         }
+
+        // 2. Client-side Validation: Size (200 KB)
+        if (file.size > 200 * 1024) {
+            toast.error('File size exceeds 200 KB. Please optimize the image.');
+            e.target.value = '';
+            return;
+        }
+
+        // 3. Client-side Validation: Resolution check
+        const img = new Image();
+        const objectUrl = URL.createObjectURL(file);
+        img.src = objectUrl;
+        
+        img.onload = async () => {
+            const minW = 1280, minH = 720;
+            const maxW = 1920, maxH = 1080;
+
+            if (img.width < minW || img.height < minH) {
+                toast.error(`Resolution too low (${img.width}x${img.height}). Minimum required: ${minW}x${minH}.`);
+                URL.revokeObjectURL(objectUrl);
+                return;
+            }
+
+            if (img.width > maxW || img.height > maxH) {
+                toast.error(`Resolution too high (${img.width}x${img.height}). Maximum allowed: ${maxW}x${maxH}.`);
+                URL.revokeObjectURL(objectUrl);
+                return;
+            }
+
+            // If all good, upload to server
+            const url = await uploadHeroImage(file);
+            if (url) {
+                // Update local state for preview, but don't save to DB yet (user clicks Update Hero Section to save)
+                useHomeStore.setState({ heroData: { ...heroData, image_url: url } });
+            }
+            URL.revokeObjectURL(objectUrl);
+        };
     };
 
     const handleSaveSection = async (e) => {
         if (e) e.preventDefault();
-        const success = await saveSection(sectionForm);
+        const success = await saveSection(editingSection ? editingSection.section_id : 'new', sectionForm);
         if (success) setShowSectionModal(false);
+    };
+
+    const handleDeleteSection = async (id) => {
+        if (window.confirm('Delete this section and remove it from homepage?')) {
+            await deleteSection(id);
+        }
     };
 
     const handleSaveTestimonial = async (e) => {
@@ -151,10 +201,6 @@ const HomepageManagement = () => {
 
     return (
         <div className={styles.pageContainer}>
-            <div className={styles.headerRow}>
-                <h2 className={styles.title}>Homepage Management</h2>
-            </div>
-
             <div className={styles.card}>
                 <div className={styles.tabs}>
                     <button 
@@ -233,8 +279,17 @@ const HomepageManagement = () => {
                                     <div className={styles.formGroup}>
                                         <label className={styles.label}>Hero Image</label>
                                         <div className={styles.previewBox}>
+                                            <div className={styles.validationInfo}>
+                                                <span>Recommended: WebP, 1920x1080, Max 200KB</span>
+                                                <span>Strictly: Min 1280x720</span>
+                                            </div>
                                             {heroData.image_url ? (
-                                                <img src={getImageUrl(heroData.image_url)} alt="Preview" className={styles.previewImg} />
+                                                <div className={styles.previewContainer}>
+                                                    <img src={getImageUrl(heroData.image_url)} alt="Preview" className={styles.previewImg} />
+                                                    <div className={styles.previewOverlay}>
+                                                        <Badge variant="inStock">Optimized Preview</Badge>
+                                                    </div>
+                                                </div>
                                             ) : (
                                                 <div className={styles.uploadPlaceholder}>
                                                     <Upload size={48} color="#9ca3af" />
@@ -251,12 +306,12 @@ const HomepageManagement = () => {
                                                     disabled={isLoading}
                                                 >
                                                     <Upload size={16} style={{marginRight: '8px'}} />
-                                                    {isLoading ? 'Uploading...' : 'Upload New Image'}
+                                                    {isLoading ? 'Processing...' : 'Choose File'}
                                                 </Button>
                                                 <input 
                                                     id="heroImageUpload"
                                                     type="file" 
-                                                    accept="image/*" 
+                                                    accept="image/jpeg, image/jpg, image/webp" 
                                                     onChange={handleHeroImageUpload} 
                                                     style={{display: 'none'}}
                                                 />
@@ -594,18 +649,31 @@ const HomepageManagement = () => {
                                     {products.map(product => (
                                         <tr key={product.product_id}>
                                             <td>
-                                                <img 
-                                                    src={getImageUrl(product.image_url)} 
-                                                    alt={product.name} 
-                                                    style={{width: '40px', height: '40px', borderRadius: '4px', objectFit: 'cover'}}
-                                                />
+                                                <div style={{display: 'flex', alignItems: 'center', gap: '10px'}}>
+                                                    <img 
+                                                        src={getImageUrl(product.image_url)} 
+                                                        alt={product.name} 
+                                                        style={{width: '40px', height: '40px', borderRadius: '4px', objectFit: 'cover'}}
+                                                    />
+                                                    <button 
+                                                        className={styles.actionBtn}
+                                                        onClick={() => {
+                                                            setSelectedProduct(product);
+                                                            setTempImageUrl(product.image_url || '');
+                                                            setShowProductImageModal(true);
+                                                        }}
+                                                        title="Update Homepage Image"
+                                                    >
+                                                        <Upload size={14} />
+                                                    </button>
+                                                </div>
                                             </td>
                                             <td style={{fontWeight: 600}}>{product.name}</td>
                                             <td style={{fontSize: '0.85rem', color: '#6b7280'}}>{product.base_sku}</td>
-                                            <td style={{fontSize: '0.85rem'}}>₹{product.price || 'N/A'}</td>
+                                            <td style={{fontSize: '0.85rem'}}>₹{product.starting_price || 'N/A'}</td>
                                             <td style={{textAlign: 'right'}}>
                                                 <Toggle 
-                                                    checked={!!product.is_featured}
+                                                    checked={Boolean(product.is_featured)}
                                                     onChange={() => toggleProductFeatured(product.product_id)}
                                                 />
                                             </td>
@@ -968,6 +1036,56 @@ const HomepageManagement = () => {
                             </div>
                         </>
                     )}
+                </div>
+            </Modal>
+            {/* Product Image Update Modal */}
+            <Modal
+                isOpen={showProductImageModal}
+                onClose={() => setShowProductImageModal(false)}
+                title="Update Product Homepage Image"
+            >
+                <div className={styles.formGroup}>
+                    <label className={styles.label}>Image URL</label>
+                    <div style={{display: 'flex', gap: '10px'}}>
+                        <InputBox 
+                            value={tempImageUrl}
+                            onChange={(e) => setTempImageUrl(e.target.value)}
+                            placeholder="Enter image URL"
+                        />
+                        <Button 
+                            variant="secondary" 
+                            size="small"
+                            onClick={() => document.getElementById('productHomeImgUpload').click()}
+                            disabled={isLoading}
+                        >
+                            <Upload size={16} />
+                        </Button>
+                        <input 
+                            id="productHomeImgUpload"
+                            type="file" 
+                            accept="image/*" 
+                            onChange={async (e) => {
+                                const file = e.target.files[0];
+                                if (file) {
+                                    const url = await uploadImage(file);
+                                    if (url) setTempImageUrl(url);
+                                }
+                            }}
+                            style={{display: 'none'}}
+                        />
+                    </div>
+                    {tempImageUrl && (
+                        <div style={{marginTop: '1rem', textAlign: 'center'}}>
+                            <img src={getImageUrl(tempImageUrl)} alt="Preview" style={{maxHeight: '150px', borderRadius: '8px'}} />
+                        </div>
+                    )}
+                </div>
+                <div className={styles.modalFooter} style={{marginTop: '2rem'}}>
+                    <Button variant="outline" onClick={() => setShowProductImageModal(false)}>Cancel</Button>
+                    <Button onClick={async () => {
+                        const success = await updateProductHomeImage(selectedProduct.product_id, tempImageUrl);
+                        if (success) setShowProductImageModal(false);
+                    }} disabled={isLoading}>Save Changes</Button>
                 </div>
             </Modal>
         </div>

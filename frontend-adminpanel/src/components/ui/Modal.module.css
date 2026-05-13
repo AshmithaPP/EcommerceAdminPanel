@@ -17,6 +17,7 @@
   background: #fff;
   width: 100%;
   max-width: 500px;
+  max-height: calc(100vh - 40px); /* Keep within viewport */
   border-radius: 12px;
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
   display: flex;
@@ -24,6 +25,7 @@
   animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
   overflow: hidden;
   border: 1px solid #D8DCF0;
+  margin: 20px;
 }
 
 .header {
@@ -63,6 +65,7 @@
 .content {
   padding: 24px;
   flex: 1;
+  overflow-y: auto; /* Allow scrolling for long forms */
 }
 
 .footer {
