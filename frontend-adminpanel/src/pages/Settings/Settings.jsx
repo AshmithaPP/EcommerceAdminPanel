@@ -66,12 +66,14 @@ const Settings = () => {
   };
 
   const handleModalSave = () => {
+    console.log('Saving Modal Data to Store:', tempSiteInfo);
     setSiteInfo(tempSiteInfo);
     updateStoreSettings(tempStoreSettings);
     setIsModalOpen(false);
   };
 
   const handleTempSiteInfoChange = (key, newValue) => {
+    console.log(`Updating Temp Site Info: ${key} = ${newValue}`);
     setTempSiteInfo(prev => ({
       ...prev,
       [key]: newValue
@@ -94,9 +96,11 @@ const Settings = () => {
   }, [resetStore]);
 
   const getImageUrl = (url) => {
-    if (!url) return 'https://via.placeholder.com/800x450?text=Upload+Image';
-    if (url.startsWith('http')) return url;
-    return `${STORAGE_URL}${url}`;
+    if (!url) return null;
+    if (url.startsWith('http') || url.startsWith('blob:')) return url;
+    const baseUrl = STORAGE_URL.endsWith('/') ? STORAGE_URL.slice(0, -1) : STORAGE_URL;
+    const cleanPath = url.startsWith('/') ? url : `/${url}`;
+    return `${baseUrl}${cleanPath}`;
   };
 
   if (initialLoading) {
@@ -149,7 +153,54 @@ const Settings = () => {
                   key: 'value',
                   render: (row) => {
                     if (row.type === 'image') {
-                      return <img src={getImageUrl(row.value)} alt="logo" style={{ width: 40, height: 40, borderRadius: 8, objectFit: 'contain', border: '1px solid #ddd' }} />;
+                      const imgUrl = getImageUrl(row.value);
+                      return (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                              {imgUrl ? (
+                                <img 
+                                  key={imgUrl}
+                                  src={imgUrl} 
+                                  alt="logo" 
+                                  style={{ 
+                                    height: 40, 
+                                    maxWidth: 150,
+                                    width: 'auto',
+                                    borderRadius: 6, 
+                                    objectFit: 'contain', 
+                                    border: '1px solid #e2e8f0',
+                                    background: '#f8fafc',
+                                    padding: '4px'
+                                  }} 
+                                  onError={(e) => {
+                                    e.target.onerror = null;
+                                    e.target.style.display = 'none';
+                                    e.target.nextSibling.style.display = 'flex';
+                                  }}
+                                />
+                              ) : null}
+                              <div style={{ 
+                                display: imgUrl ? 'none' : 'flex', 
+                                height: 40, 
+                                width: 40, 
+                                borderRadius: 6, 
+                                background: '#f1f5f9', 
+                                alignItems: 'center', 
+                                justifyContent: 'center',
+                                fontSize: '10px',
+                                color: '#94a3b8',
+                                border: '1px dashed #cbd5e1'
+                              }}>
+                                No Logo
+                              </div>
+                            </div>
+                            {row.value && (
+                              <span style={{ fontSize: '0.7rem', color: '#94a3b8', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                {row.value}
+                              </span>
+                            )}
+                          </div>
+                      );
                     }
                     return <span style={{ fontSize: '0.9rem', color: '#666' }}>{row.value}</span>;
                   }
@@ -212,7 +263,34 @@ const Settings = () => {
                   <div className={styles.modalImageField}>
                     <label className={styles.fieldLabel}>{field.name}</label>
                     <div className={styles.modalImageRow}>
-                      <img src={getImageUrl(tempSiteInfo[field.key])} alt="Preview" className={styles.modalImgMini} />
+                      <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                        {tempSiteInfo[field.key] ? (
+                          <img 
+                            src={getImageUrl(tempSiteInfo[field.key])} 
+                            alt="Preview" 
+                            className={styles.modalImgMini} 
+                            onError={(e) => {
+                              e.target.onerror = null;
+                              e.target.style.display = 'none';
+                              e.target.nextSibling.style.display = 'flex';
+                            }}
+                          />
+                        ) : null}
+                        <div style={{ 
+                          display: tempSiteInfo[field.key] ? 'none' : 'flex', 
+                          height: 50, 
+                          width: 50, 
+                          borderRadius: 6, 
+                          background: '#f8fafc', 
+                          alignItems: 'center', 
+                          justifyContent: 'center',
+                          fontSize: '8px',
+                          color: '#94a3b8',
+                          border: '1px solid #D8DCF0'
+                        }}>
+                          No Logo
+                        </div>
+                      </div>
                       <label className={styles.modalUploadIcon}>
                         {uploading.modal ? <Loader2 className="animate-spin" size={16} /> : <Upload size={16} />}
                         Change

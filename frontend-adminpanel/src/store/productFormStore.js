@@ -370,6 +370,7 @@ const useProductFormStore = create((set, get) => ({
 
         try {
             if (!productData.name) throw new Error('Product name is required');
+            if (!baseSku) throw new Error('Base SKU is required');
             if (!productData.category_id) throw new Error('Parent category is required');
             if (!productData.sub_category_id) throw new Error('Sub-category is required');
             if (variants.length === 0) throw new Error('At least one variant is required');

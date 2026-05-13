@@ -60,6 +60,16 @@ const productService = {
             throw error;
         }
 
+        // 1.1 Validation: Base SKU Uniqueness
+        if (base_sku) {
+            const existingProduct = await Product.findByBaseSku(base_sku);
+            if (existingProduct) {
+                const error = new Error(`Base SKU already exists: ${base_sku}`);
+                error.statusCode = 400;
+                throw error;
+            }
+        }
+
         // 2. Generate Unique Slug
         let slug = slugify(name);
         const existingBySlug = await Product.findBySlug(slug);
@@ -613,6 +623,16 @@ const productService = {
             }
         }
 
+        // Validation: Base SKU Uniqueness
+        if (base_sku && base_sku !== existing.base_sku) {
+            const existingProduct = await Product.findByBaseSku(base_sku);
+            if (existingProduct && existingProduct.product_id !== productId) {
+                const error = new Error(`Base SKU already exists: ${base_sku}`);
+                error.statusCode = 400;
+                throw error;
+            }
+        }
+
         // Handle Slug
         let slug = existing.slug;
         if (name && name !== existing.name) {
@@ -1021,6 +1041,13 @@ const productService = {
         } finally {
             connection.release();
         }
+    },
+
+    checkSlugUniqueness: async (slug, productId = null) => {
+        const existing = await Product.findBySlug(slug);
+        if (!existing) return true;
+        if (productId && existing.product_id === productId) return true;
+        return false;
     }
 };
 

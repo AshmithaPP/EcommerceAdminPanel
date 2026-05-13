@@ -2,9 +2,10 @@ import { privateApi } from './api';
 
 const dashboardService = {
     // MAIN API - Loads overview data
-    getOverview: async () => {
+    getOverview: async (params = {}) => {
         try {
-            const response = await privateApi.get('/admin/dashboard/overview');
+            const query = typeof params === 'object' ? new URLSearchParams(params).toString() : '';
+            const response = await privateApi.get(`/admin/dashboard/overview?${query}`);
             return response.data;
         } catch (error) {
             throw error.response?.data || error.message;
@@ -12,9 +13,10 @@ const dashboardService = {
     },
 
     // Chart API - Sales trends
-    getSalesTrend: async (range = '30days') => {
+    getSalesTrend: async (params = {}) => {
         try {
-            const response = await privateApi.get(`/admin/dashboard/sales-trend?range=${range}`);
+            const query = typeof params === 'string' ? `range=${params}` : new URLSearchParams(params).toString();
+            const response = await privateApi.get(`/admin/dashboard/sales-trend?${query}`);
             return response.data;
         } catch (error) {
             throw error.response?.data || error.message;
@@ -22,9 +24,10 @@ const dashboardService = {
     },
 
     // Top Products API
-    getTopProducts: async (limit = 5) => {
+    getTopProducts: async (params = {}) => {
         try {
-            const response = await privateApi.get(`/admin/dashboard/top-products?limit=${limit}`);
+            const query = typeof params === 'object' ? new URLSearchParams(params).toString() : `limit=${params}`;
+            const response = await privateApi.get(`/admin/dashboard/top-products?${query}`);
             return response.data;
         } catch (error) {
             throw error.response?.data || error.message;

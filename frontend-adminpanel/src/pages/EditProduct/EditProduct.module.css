@@ -54,6 +54,37 @@
   gap: 0.75rem;
 }
 
+.skuWrapper {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.5rem;
+}
+
+.skuInput {
+  flex: 1;
+}
+
+.genBtn {
+  background: #f0f4ff;
+  border: 1px solid #d8e4ff;
+  border-radius: 6px;
+  width: 42px;
+  height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #4f7cff;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-bottom: 2px;
+}
+
+.genBtn:hover {
+  background: #4f7cff;
+  color: white;
+  border-color: #4f7cff;
+}
+
 @media (max-width: 1200px) {
   .formGrid4 { grid-template-columns: repeat(3, 1fr); }
 }
@@ -475,6 +506,7 @@
   display: flex;
   gap: 0.5rem;
   align-items: flex-end;
+  flex-wrap: wrap;
 }
 
 .actionBtn {
@@ -482,11 +514,24 @@
   color: white;
   border: none;
   border-radius: 6px;
-  padding: 0.5rem 1rem;
+  padding: 0.5rem 1.25rem;
   font-size: 0.75rem;
   font-weight: 600;
   cursor: pointer;
   height: 38px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: all 0.2s ease;
+}
+
+.actionBtn:hover {
+  background: #3b61ff;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(79, 124, 255, 0.2);
+}
+
+.actionBtn:active {
+  transform: translateY(0);
 }
 
 .statsList {
@@ -1118,4 +1163,43 @@ input:checked + .slider:before {
 
 .gstInfoNotice strong {
   color: #4f7cff;
+}
+
+/* Slug Validation */
+.slugInputWrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  position: relative;
+}
+
+.slugStatus {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.75rem;
+  padding: 0 0.25rem;
+  font-weight: 500;
+  min-height: 18px;
+}
+
+.slugStatus.checking { color: #64748b; }
+.slugStatus.valid { color: #10b981; }
+.slugStatus.invalid { color: #ef4444; }
+
+.inputError {
+  border-color: #ef4444 !important;
+}
+
+.inputSuccess {
+  border-color: #10b981 !important;
+}
+
+.spinner {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }

@@ -314,6 +314,20 @@ const productController = {
         } catch (error) {
             next(error);
         }
+    },
+
+    checkSlug: async (req, res, next) => {
+        try {
+            const { slug } = req.params;
+            const { productId } = req.query;
+            const isUnique = await productService.checkSlugUniqueness(slug, productId);
+            res.status(200).json({
+                success: true,
+                isUnique
+            });
+        } catch (error) {
+            next(error);
+        }
     }
 };
 

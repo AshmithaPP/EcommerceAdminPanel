@@ -19,7 +19,7 @@ const useDashboardStore = create((set, get) => ({
     },
     recentOrders: [],
     orderStatusBreakdown: {
-        pending: 0, processing: 0, shipped: 0, delivered: 0, cancelled: 0
+        pending: 0, processing: 0, shipped: 0, dispatched: 0, delivered: 0, cancelled: 0
     },
 
     // Chart Data
@@ -38,7 +38,10 @@ const useDashboardStore = create((set, get) => ({
     topCategories: [],
     customerInsights: null,
     paymentAnalytics: null,
-    inventoryHealth: null,
+    inventoryHealth: {
+        stats: null,
+        low_stock_items: []
+    },
 
     // UI State
     loading: true,
@@ -46,32 +49,28 @@ const useDashboardStore = create((set, get) => ({
     error: null,
 
     // Actions
-    fetchInitialData: async () => {
+    fetchInitialData: async (filters = {}) => {
         set({ loading: true, error: null });
         try {
-            const overview = await dashboardService.getOverview();
-            
+            const data = await dashboardService.getOverview(filters);
             set({
-                summary: overview.summary,
-                alerts: overview.alerts,
-                recentOrders: overview.recent_orders,
-                orderStatusBreakdown: overview.order_status,
+                summary: data.summary,
+                recentOrders: data.recent_orders,
+                alerts: data.alerts,
+                orderStatusBreakdown: data.order_status,
                 loading: false
             });
-
-            // After main load, start loading heavy analytics in background
-            get().fetchAnalyticsData();
         } catch (err) {
-            console.error('Overview load failed:', err);
-            set({ error: err?.message || 'Failed to load dashboard overview', loading: false });
+            console.error('Dashboard load failed:', err);
+            set({ error: err.message || 'Failed to load dashboard', loading: false });
         }
     },
 
-    fetchAnalyticsData: async () => {
+    fetchAnalyticsData: async (timeframe = '30days') => {
         set({ chartsLoading: true });
         try {
             const [trendRes, productsRes] = await Promise.all([
-                dashboardService.getSalesTrend('30days'),
+                dashboardService.getSalesTrend(timeframe),
                 dashboardService.getTopProducts(5)
             ]);
 

@@ -239,8 +239,11 @@
 
 .previewImg {
   width: 100%;
-  height: auto;
+  max-height: 400px;
+  object-fit: contain;
   display: block;
+  image-rendering: -webkit-optimize-contrast;
+  background: #f3f4f6;
 }
 
 .previewOverlay {

@@ -463,6 +463,7 @@ const useEditProductFormStore = create((set, get) => ({
         set({ loading: true, error: null });
 
         try {
+            if (!baseSku) throw new Error('Base SKU is required');
             const formData = new FormData();
             const metadata = {
                 ...productData,

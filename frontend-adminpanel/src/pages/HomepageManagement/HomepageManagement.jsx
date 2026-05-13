@@ -16,7 +16,8 @@ const STORAGE_URL = 'http://localhost:5000';
 const getImageUrl = (url) => {
     if (!url) return null;
     if (url.startsWith('http') || url.startsWith('blob:')) return url;
-    return `${STORAGE_URL}${url}`;
+    const cleanUrl = url.startsWith('/') ? url : `/${url}`;
+    return `${STORAGE_URL}${cleanUrl}`;
 };
 
 const HomepageManagement = () => {
@@ -593,11 +594,34 @@ const HomepageManagement = () => {
                                         <tr key={cat.category_id}>
                                             <td>
                                                 <div style={{display: 'flex', alignItems: 'center', gap: '0.75rem'}}>
-                                                    <img 
-                                                        src={getImageUrl(cat.image_url)} 
-                                                        alt={cat.name} 
-                                                        style={{width: '40px', height: '40px', borderRadius: '4px', objectFit: 'cover'}}
-                                                    />
+                                                    {cat.image_url ? (
+                                                        <img 
+                                                            src={getImageUrl(cat.image_url)} 
+                                                            alt={cat.name} 
+                                                            style={{width: '40px', height: '40px', borderRadius: '4px', objectFit: 'cover'}}
+                                                            onError={(e) => {
+                                                                e.target.onerror = null; 
+                                                                e.target.style.display = 'none';
+                                                                e.target.nextSibling.style.display = 'flex';
+                                                            }}
+                                                        />
+                                                    ) : null}
+                                                    <div 
+                                                        style={{
+                                                            width: '40px', 
+                                                            height: '40px', 
+                                                            borderRadius: '4px', 
+                                                            background: '#f3f4f6', 
+                                                            display: cat.image_url ? 'none' : 'flex', 
+                                                            alignItems: 'center', 
+                                                            justifyContent: 'center', 
+                                                            fontSize: '0.75rem', 
+                                                            fontWeight: 600, 
+                                                            color: '#9ca3af'
+                                                        }}
+                                                    >
+                                                        {cat.name.charAt(0)}
+                                                    </div>
                                                     <button 
                                                         className={styles.actionBtn}
                                                         onClick={() => {

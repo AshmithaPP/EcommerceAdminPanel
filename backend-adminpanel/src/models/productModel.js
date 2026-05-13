@@ -92,7 +92,7 @@ const Product = {
                     JOIN media m ON pm.media_id = m.media_id
                     WHERE pm.product_id = p.product_id 
                     ORDER BY pm.is_primary DESC, pm.sort_order ASC 
-                    LIMIT 1) as image,
+                    LIMIT 1) as image_url,
                    (SELECT m.thumbnail_url 
                     FROM product_media pm
                     JOIN media m ON pm.media_id = m.media_id
@@ -238,6 +238,12 @@ const Product = {
         product.variants = await Product.getVariants(product.product_id);
 
         return product;
+    },
+
+    findByBaseSku: async (baseSku) => {
+        const sql = 'SELECT * FROM products WHERE base_sku = ? AND status = 1';
+        const [rows] = await db.query(sql, [baseSku]);
+        return rows[0] || null;
     },
 
     update: async (productId, productData, connection = db) => {

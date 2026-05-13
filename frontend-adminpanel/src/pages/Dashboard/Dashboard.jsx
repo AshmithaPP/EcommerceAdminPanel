@@ -10,7 +10,9 @@ import {
   Download,
   Package,
   User,
-  Layers
+  Layers,
+  Calendar,
+  ChevronRight
 } from 'lucide-react';
 import {
   XAxis,
@@ -40,13 +42,48 @@ const Dashboard = () => {
   const recentOrders = useDashboardStore(state => state.recentOrders);
   const alerts = useDashboardStore(state => state.alerts);
   const orderStatusBreakdown = useDashboardStore(state => state.orderStatusBreakdown);
+  const [filterType, setFilterType] = useState('30days');
+  const [customRange, setCustomRange] = useState(() => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const today = String(now.getDate()).padStart(2, '0');
+    return {
+      start: `${year}-${month}-01`,
+      end: `${year}-${month}-${today}`
+    };
+  });
+  const [isCustom, setIsCustom] = useState(false);
 
   // Store Actions
   const fetchInitialData = useDashboardStore(state => state.fetchInitialData);
+  const fetchAnalyticsData = useDashboardStore(state => state.fetchAnalyticsData);
+  const fetchAdvancedAnalytics = useDashboardStore(state => state.fetchAdvancedAnalytics);
+  const inventoryHealth = useDashboardStore(state => state.inventoryHealth);
 
   useEffect(() => {
-    fetchInitialData();
-  }, [fetchInitialData]);
+    const filters = isCustom 
+      ? { startDate: customRange.start, endDate: customRange.end }
+      : { range: filterType };
+
+    if (isCustom && (!customRange.start || !customRange.end)) return;
+
+    fetchInitialData(filters);
+    fetchAnalyticsData(filters);
+    fetchAdvancedAnalytics(); // This stays live (no filter)
+  }, [filterType, customRange, isCustom, fetchInitialData, fetchAnalyticsData, fetchAdvancedAnalytics]);
+
+  const handleQuickFilter = (type) => {
+    setIsCustom(false);
+    setFilterType(type);
+  };
+
+  const handleCustomSubmit = (e) => {
+    e.preventDefault();
+    if (customRange.start && customRange.end) {
+      setIsCustom(true);
+    }
+  };
 
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('en-IN', {
@@ -89,13 +126,30 @@ const Dashboard = () => {
     );
   }
 
-  // Generate 30 days of data ending today
-  const chartData = [];
-  const today = new Date();
+  const lowStockItems = inventoryHealth?.low_stock_items || [];
 
-  for (let i = 29; i >= 0; i--) {
-    const d = new Date();
-    d.setDate(today.getDate() - i);
+  // Generate data based on timeframe
+  const getDaysCount = () => {
+    if (isCustom && customRange.start && customRange.end) {
+      const diffTime = Math.abs(new Date(customRange.end) - new Date(customRange.start));
+      return Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+    }
+    if (filterType === 'today') return 1;
+    if (filterType === '7days') return 7;
+    if (filterType === 'thisMonth') {
+        const d = new Date();
+        return d.getDate();
+    }
+    return 30;
+  };
+
+  const chartData = [];
+  const daysLimit = getDaysCount();
+  const baseDate = isCustom ? new Date(customRange.end) : new Date();
+
+  for (let i = daysLimit - 1; i >= 0; i--) {
+    const d = new Date(baseDate);
+    d.setDate(baseDate.getDate() - i);
     const dateStr = d.toISOString().split('T')[0];
     const name = formatDate(dateStr);
 
@@ -146,12 +200,58 @@ const Dashboard = () => {
     { status: 'Pending', count: orderStatusBreakdown.pending, color: '#f59e0b' },
     { status: 'Processing', count: orderStatusBreakdown.processing, color: '#8b5cf6' },
     { status: 'Shipped', count: orderStatusBreakdown.shipped, color: '#3b82f6' },
+    { status: 'Dispatched', count: orderStatusBreakdown.dispatched, color: '#6366f1' },
     { status: 'Delivered', count: orderStatusBreakdown.delivered, color: '#10b981' },
     { status: 'Cancelled', count: orderStatusBreakdown.cancelled, color: '#ef4444' }
   ];
 
   return (
     <div className="page-container">
+      
+      {/* Analytics Control Center */}
+      <div className={styles.filterSection}>
+        <div className={styles.quickFilters}>
+          {[
+            { id: 'today', label: 'Today' },
+            { id: '7days', label: '7 Days' },
+            { id: '30days', label: '30 Days' },
+            { id: 'thisMonth', label: 'This Month' }
+          ].map((btn) => (
+            <button
+              key={btn.id}
+              className={`${styles.filterBtn} ${(!isCustom && filterType === btn.id) ? styles.activeFilter : ''}`}
+              onClick={() => handleQuickFilter(btn.id)}
+            >
+              {btn.label}
+            </button>
+          ))}
+        </div>
+
+        <div className={styles.customFilter}>
+          <form className={styles.dateForm} onSubmit={handleCustomSubmit}>
+            <div className={styles.dateInputWrapper}>
+              <Calendar size={14} className={styles.dateIcon} />
+              <input 
+                type="date" 
+                className={styles.dateInput}
+                value={customRange.start}
+                onChange={(e) => setCustomRange({...customRange, start: e.target.value})}
+              />
+            </div>
+            <ChevronRight size={14} className={styles.separator} />
+            <div className={styles.dateInputWrapper}>
+              <Calendar size={14} className={styles.dateIcon} />
+              <input 
+                type="date" 
+                className={styles.dateInput}
+                value={customRange.end}
+                onChange={(e) => setCustomRange({...customRange, end: e.target.value})}
+              />
+            </div>
+            <button type="submit" className={styles.applyBtn}>Apply Range</button>
+          </form>
+        </div>
+      </div>
 
       {/* Row 1: KPI Grid + Chart */}
       <div className={styles.topRow}>
@@ -203,11 +303,11 @@ const Dashboard = () => {
           <div className={styles.chartCardWrapper}>
             <TrendChart
               title="Revenue Trend"
-              subtitle="Daily revenue performance for the current period"
+              subtitle={isCustom ? `Performance from ${customRange.start} to ${customRange.end}` : `Daily revenue performance for the selected period`}
               mainValue={formatCurrency(salesTrend.comparison.current_revenue)}
               growth={salesTrend.comparison.growth_percentage}
               data={chartData}
-              timeframe="Last 30 Days"
+              timeframe={isCustom ? 'Custom Range' : filterType}
               loading={chartsLoading}
             />
           </div>
@@ -291,45 +391,77 @@ const Dashboard = () => {
         </div>
 
         {/* Row 3: Operational Alerts */}
-        <InfoCard
-          title="Operational Alerts"
-        >
-          <div className={styles.alertsGrid}>
-
-            <div className={`${styles.alertCard} ${styles.alertWarn}`}>
-              <div>
-                <p className={styles.alertLabel}>Low Stock Items</p>
-                <p className={`${styles.alertValue} ${styles.alertValueWarn}`}>{alerts.low_stock || 0}</p>
+        <div className={styles.bottomRow}>
+          {/* Low Stock Items List */}
+          <div className={styles.inventoryCardWrapper}>
+            <InfoCard title="Inventory Watch: Low Stock Items">
+              <div className={styles.lowStockList}>
+                {lowStockItems.length > 0 ? (
+                  lowStockItems.map((item, index) => (
+                    <div key={index} className={styles.stockItemRow}>
+                      <div className={styles.stockItemInfo}>
+                        <p className={styles.stockProductName}>{item.product_name}</p>
+                        <p className={styles.stockProductSku}>
+                          SKU: <strong>{item.sku}</strong> {item.attributes_summary ? `| ${item.attributes_summary}` : ''}
+                        </p>
+                      </div>
+                      <div className={styles.stockCount}>
+                        <span className={item.quantity === 0 ? styles.countCritical : styles.countWarning}>
+                          {item.quantity} left
+                        </span>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className={styles.emptyInventory}>
+                    <Package size={32} className={styles.emptyIcon} />
+                    <p>All stock levels are healthy!</p>
+                  </div>
+                )}
               </div>
-              <AlertTriangle size={18} className={styles.alertIcon} />
-            </div>
-
-            <div className={`${styles.alertCard} ${styles.alertDanger}`}>
-              <div>
-                <p className={styles.alertLabel}>Out of Stock</p>
-                <p className={`${styles.alertValue} ${styles.alertValueDanger}`}>{alerts.out_of_stock || 0}</p>
-              </div>
-              <AlertOctagon size={18} className={styles.alertIcon} />
-            </div>
-
-            <div className={`${styles.alertCard} ${styles.alertInfo}`}>
-              <div>
-                <p className={styles.alertLabel}>Pending Orders</p>
-                <p className={`${styles.alertValue} ${styles.alertValueInfo}`}>{alerts.pending_orders || 0}</p>
-              </div>
-              <Clock size={18} className={styles.alertIcon} />
-            </div>
-
-            <div className={`${styles.alertCard} ${styles.alertDanger}`}>
-              <div>
-                <p className={styles.alertLabel}>Failed Payments</p>
-                <p className={`${styles.alertValue} ${styles.alertValueDanger}`}>{alerts.failed_payments || 0}</p>
-              </div>
-              <CreditCard size={18} className={styles.alertIcon} />
-            </div>
-
+            </InfoCard>
           </div>
-        </InfoCard>
+
+          <div className={styles.alertsCardWrapper}>
+            <InfoCard title="System Health Alerts">
+              <div className={styles.alertsGrid}>
+
+                <div className={`${styles.alertCard} ${styles.alertWarn}`}>
+                  <div>
+                    <p className={styles.alertLabel}>Low Stock Items</p>
+                    <p className={`${styles.alertValue} ${styles.alertValueWarn}`}>{alerts.low_stock || 0}</p>
+                  </div>
+                  <AlertTriangle size={18} className={styles.alertIcon} />
+                </div>
+
+                <div className={`${styles.alertCard} ${styles.alertDanger}`}>
+                  <div>
+                    <p className={styles.alertLabel}>Out of Stock</p>
+                    <p className={`${styles.alertValue} ${styles.alertValueDanger}`}>{alerts.out_of_stock || 0}</p>
+                  </div>
+                  <AlertOctagon size={18} className={styles.alertIcon} />
+                </div>
+
+                <div className={`${styles.alertCard} ${styles.alertInfo}`}>
+                  <div>
+                    <p className={styles.alertLabel}>Pending Orders</p>
+                    <p className={`${styles.alertValue} ${styles.alertValueInfo}`}>{alerts.pending_orders || 0}</p>
+                  </div>
+                  <Clock size={18} className={styles.alertIcon} />
+                </div>
+
+                <div className={`${styles.alertCard} ${styles.alertDanger}`}>
+                  <div>
+                    <p className={styles.alertLabel}>Failed Payments</p>
+                    <p className={`${styles.alertValue} ${styles.alertValueDanger}`}>{alerts.failed_payments || 0}</p>
+                  </div>
+                  <CreditCard size={18} className={styles.alertIcon} />
+                </div>
+
+              </div>
+            </InfoCard>
+          </div>
+        </div>
 
     </div>
   );

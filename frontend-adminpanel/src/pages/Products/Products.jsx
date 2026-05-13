@@ -88,8 +88,8 @@ const Products = () => {
               key: 'thumbnail',
               render: (row) => (
                 <div className={styles.imageContainer}>
-                  <img
-                    src={getImageUrl(row.thumbnail || row.image)}
+                    <img
+                    src={getImageUrl(row.thumbnail || row.image_url)}
                     alt={row.name}
                     className={styles.productImg}
                   />
@@ -223,7 +223,7 @@ const Products = () => {
             <div className={styles.mobileCardTop}>
               <div className={styles.mobileImageWrap}>
                 <img
-                  src={getImageUrl(product.thumbnail || product.image)}
+                  src={getImageUrl(product.thumbnail || product.image_url)}
                   alt={product.name}
                   className={styles.productImg}
                 />

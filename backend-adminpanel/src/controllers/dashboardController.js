@@ -3,7 +3,7 @@ const dashboardService = require('../services/dashboardService');
 const dashboardController = {
     getOverview: async (req, res, next) => {
         try {
-            const data = await dashboardService.getOverview();
+            const data = await dashboardService.getOverview(req.query);
             res.status(200).json({ success: true, ...data });
         } catch (error) {
             next(error);
@@ -12,8 +12,7 @@ const dashboardController = {
 
     getSalesTrend: async (req, res, next) => {
         try {
-            const { range } = req.query;
-            const data = await dashboardService.getSalesTrend(range);
+            const data = await dashboardService.getSalesTrend(req.query);
             res.status(200).json({ success: true, ...data });
         } catch (error) {
             next(error);
@@ -22,8 +21,7 @@ const dashboardController = {
 
     getTopProducts: async (req, res, next) => {
         try {
-            const { limit } = req.query;
-            const data = await dashboardService.getTopProducts(limit);
+            const data = await dashboardService.getTopProducts(req.query);
             res.status(200).json({ success: true, data });
         } catch (error) {
             next(error);

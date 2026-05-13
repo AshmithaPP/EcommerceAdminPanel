@@ -1,88 +1,22 @@
 const db = require('../config/database');
+const homeService = require('../services/homeService');
 
 const getHomeData = async (req, res) => {
     try {
-        // 1. Fetch Hero Section
-        const [hero] = await db.query('SELECT * FROM home_hero ORDER BY id DESC LIMIT 1');
-
-        // 2. Fetch Featured Categories (Collections)
-        const [categories] = await db.query(
-            'SELECT category_id, name as category_name, slug, image_url, is_featured, badge FROM categories WHERE is_featured = 1 AND status = 1'
-        );
-
-        // 3. Fetch Featured Products
-        const [featuredProducts] = await db.query(`
-            SELECT p.*, 
-                   COALESCE(p.home_image_url, (SELECT m.url FROM product_media pm JOIN media m ON pm.media_id = m.media_id 
-                    WHERE pm.product_id = p.product_id ORDER BY pm.is_primary DESC, pm.sort_order ASC LIMIT 1)) as image_url,
-                   (SELECT MIN(finalPrice) FROM product_variants WHERE product_id = p.product_id AND status = 1) as starting_price
-            FROM products p 
-            WHERE p.is_featured = 1 AND p.status = 1
-            LIMIT 10
-        `);
-
-        // 4. Fetch Dynamic Sections with Products
-        const [sections] = await db.query(
-            'SELECT * FROM home_sections WHERE is_active = 1 ORDER BY display_order ASC'
-        );
-
-        const productSections = await Promise.all(sections.map(async (section) => {
-            const [products] = await db.query(`
-                SELECT p.*, 
-                       COALESCE(p.home_image_url, (SELECT m.url FROM product_media pm JOIN media m ON pm.media_id = m.media_id 
-                        WHERE pm.product_id = p.product_id ORDER BY pm.is_primary DESC, pm.sort_order ASC LIMIT 1)) as image_url,
-                       (SELECT MIN(finalPrice) FROM product_variants WHERE product_id = p.product_id AND status = 1) as starting_price
-                FROM products p
-                JOIN home_section_products hsp ON p.product_id = hsp.product_id
-                WHERE hsp.section_id = ? AND p.status = 1
-                ORDER BY hsp.display_order ASC
-            `, [section.section_id]);
-
-            return {
-                ...section,
-                products
-            };
-        }));
-
-        // 5. Fetch Testimonials
-        const [testimonials] = await db.query(
-            'SELECT * FROM testimonials WHERE is_active = 1'
-        );
-
-        // 6. Fetch Latest Blogs (Limit 3, preview mode)
-        const [blogs] = await db.query(
-            'SELECT id as blog_id, title, slug, category, published_date, excerpt, image as image_url FROM blogs WHERE is_published = 1 ORDER BY published_date DESC LIMIT 3'
-        );
-
-        // 7. Fetch Dynamic Occasions
-        const [occasions] = await db.query(
-            'SELECT id as occasion_id, name, image_url, redirect_url FROM home_occasions ORDER BY display_order ASC'
-        );
-
-        // 8. Fetch Dynamic Trending Picks
-        const [trending] = await db.query(
-            'SELECT id as category_id, name, slug, image_url, display_order FROM home_trending_picks ORDER BY display_order ASC'
-        );
-
-        // 9. Fetch Dynamic Price Filters
-        const [prices] = await db.query(
-            'SELECT id, label, min_price, max_price, image_url, display_order FROM home_price_filters ORDER BY display_order ASC'
-        );
-
-        // 10. Fetch Newsletter
-        const [newsletter] = await db.query('SELECT * FROM home_newsletter LIMIT 1');
+        const data = await homeService.getHomeData();
+        const { hero, categories, featuredProducts, productSections, testimonials, blogs, occasions, trending, prices, newsletter } = data;
 
         res.status(200).json({
             success: true,
             data: {
-                hero_section: hero[0] ? {
-                    title: hero[0].title,
-                    subtitle: hero[0].subtitle,
+                hero_section: hero ? {
+                    title: hero.title,
+                    subtitle: hero.subtitle,
                     cta: {
-                        text: hero[0].cta_text || 'Explore Collections',
-                        redirect_url: hero[0].redirect_url || '/collections'
+                        text: hero.cta_text || 'Explore Collections',
+                        redirect_url: hero.redirect_url || '/collections'
                     },
-                    image_url: hero[0].image_url
+                    image_url: hero.image_url
                 } : null,
 
                 collections: categories.map(c => ({
@@ -130,7 +64,7 @@ const getHomeData = async (req, res) => {
 
                 testimonials: testimonials,
                 blogs: blogs,
-                newsletter: newsletter[0] || {
+                newsletter: newsletter || {
                     title: "Enter The World Of Timeless Sarees",
                     subtitle: "Be the first to discover our latest collections",
                     email_placeholder: "Enter Your Email Address",

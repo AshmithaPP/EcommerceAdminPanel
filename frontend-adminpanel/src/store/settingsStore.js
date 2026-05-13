@@ -56,11 +56,13 @@ const useSettingsStore = create((set, get) => ({
         site_info: state.siteInfo,
         store_settings: state.storeSettings
       };
+      console.log('Sending Save Payload to API:', payload);
 
       const res = await settingsService.updateSettings(payload);
       if (res.success) {
         toast.success('All settings saved successfully');
         set({ hasChanges: false });
+        await get().fetchSettings(); // Re-fetch to ensure sync with DB
       }
     } catch (error) {
       const msg = 'Failed to save settings';

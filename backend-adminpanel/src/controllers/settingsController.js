@@ -40,6 +40,7 @@ const settingsController = {
     updateSettings: async (req, res) => {
         try {
             const settingsData = req.body; // Expecting { key1: value1, key2: value2 }
+            console.log('--- INCOMING SETTINGS UPDATE ---', JSON.stringify(settingsData, null, 2));
             
             if (!settingsData || typeof settingsData !== 'object') {
                 return res.status(400).json({

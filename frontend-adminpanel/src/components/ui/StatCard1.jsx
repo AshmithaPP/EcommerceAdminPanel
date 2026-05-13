@@ -108,7 +108,7 @@ const StatCard = ({
   gradient = ["#7c3aed", "#4f46e5"],
   icon,
   menuIcon,
-  value = "$0",
+  value = "₹0",
   label = "Label",
   trend = "up",
   sparklineData,

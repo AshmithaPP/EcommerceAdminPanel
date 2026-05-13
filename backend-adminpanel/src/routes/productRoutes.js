@@ -10,6 +10,7 @@ const router = express.Router();
 
 // --- Admin Management APIs ---
 router.get('/raw', protect, productController.getProducts); 
+router.get('/check-slug/:slug', protect, productController.checkSlug);
 router.get('/id/:product_id', protect, productController.getProductById);
 router.post('/', protect, upload.any(), productController.createProduct);
 router.put('/:product_id', protect, upload.any(), productController.updateProduct);

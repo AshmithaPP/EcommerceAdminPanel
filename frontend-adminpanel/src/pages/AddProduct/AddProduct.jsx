@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   CloudUpload,
   Check,
-  DollarSign,
+  IndianRupee,
   Truck,
   ShieldCheck,
   Zap,
@@ -90,6 +90,29 @@ const AddProduct = () => {
   const [newValueInput, setNewValueInput] = useState('');
   const [editingValue, setEditingValue] = useState(null);
   const [editingValueText, setEditingValueText] = useState('');
+  const [slugValidation, setSlugValidation] = useState({
+    status: 'idle', // idle, checking, valid, invalid
+    message: ''
+  });
+
+  const checkSlugUniqueness = async (slug) => {
+    if (!slug) {
+      setSlugValidation({ status: 'idle', message: '' });
+      return;
+    }
+    
+    setSlugValidation({ status: 'checking', message: 'Checking availability...' });
+    try {
+      const response = await privateApi.get(`/products/check-slug/${slug}`);
+      if (response.data.isUnique) {
+        setSlugValidation({ status: 'valid', message: 'Slug is available' });
+      } else {
+        setSlugValidation({ status: 'invalid', message: 'Slug is already taken' });
+      }
+    } catch (err) {
+      setSlugValidation({ status: 'invalid', message: 'Error checking slug' });
+    }
+  };
 
   // Initial Load
   useEffect(() => {
@@ -110,6 +133,31 @@ const AddProduct = () => {
       fetchSubCategoryAttributes(productData.sub_category_id);
     }
   }, [productData.sub_category_id, fetchSubCategoryAttributes]);
+
+  const generateAutoSku = () => {
+    if (!productData.category_id || !productData.sub_category_id) {
+      return;
+    }
+    const category = categories.find(c => String(c.category_id) === String(productData.category_id));
+    const subCategory = subCategories.find(s => String(s.sub_category_id) === String(productData.sub_category_id));
+
+    if (category && subCategory) {
+      const getShortName = (name) => {
+        if (!name) return 'SKU';
+        return name.split(/[\s-]+/)[0].toUpperCase().substring(0, 6);
+      };
+      const catPart = getShortName(category.name);
+      const subPart = getShortName(subCategory.name);
+      const randomPart = Math.floor(1000 + Math.random() * 9000);
+      setBaseSku(`${catPart}-${subPart}-${randomPart}`);
+    }
+  };
+
+  useEffect(() => {
+    if (productData.category_id && productData.sub_category_id && !baseSku && categories.length > 0 && subCategories.length > 0) {
+      generateAutoSku();
+    }
+  }, [productData.category_id, productData.sub_category_id, categories, subCategories, baseSku]);
 
   const handleProductChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -178,6 +226,10 @@ const AddProduct = () => {
   };
 
   const handleSubmit = async () => {
+    if (slugValidation.status === 'invalid') {
+      showToast.error('Please resolve URL Slug issues before submitting');
+      return;
+    }
     const success = await createProduct();
     if (success) {
       navigate('/products');
@@ -271,7 +323,12 @@ const AddProduct = () => {
           <div className={styles.sectionContent}>
             <div className={styles.formGrid4}>
               <InputBox label="Product Name" name="name" value={productData.name} onChange={handleProductChange} required Icon={PackageIcon} />
-              <InputBox label="Base SKU" value={baseSku} onChange={e => setBaseSku(e.target.value)} required Icon={Tag} placeholder="e.g. KURTHI" />
+              <div className={styles.skuWrapper}>
+                <InputBox label="Base SKU" value={baseSku} onChange={e => setBaseSku(e.target.value)} required Icon={Tag} placeholder="e.g. KURTHI" containerClassName={styles.skuInput} />
+                <button type="button" className={styles.genBtn} onClick={generateAutoSku} title="Auto-generate SKU">
+                  <Zap size={16} />
+                </button>
+              </div>
               <SelectBox label="Parent Category" name="category_id" value={productData.category_id} onChange={handleProductChange} required Icon={List}>
                 <option value="">Select category</option>
                 {categories.map(cat => <option key={cat.category_id} value={cat.category_id}>{cat.name}</option>)}
@@ -286,7 +343,7 @@ const AddProduct = () => {
 
               <div className={styles.statusToggleWrap}>
                 <div className={styles.toggleLabel}>
-                  <DollarSign size={14} />
+                  <IndianRupee size={14} />
                   <span>Prices include GST?</span>
                 </div>
                 <div className={styles.toggleActions}>
@@ -785,13 +842,25 @@ const AddProduct = () => {
                   onChange={handleProductChange}
                   placeholder="SEO Title"
                 />
-                <InputBox
-                  label="URL Slug"
-                  name="slug"
-                  value={productData.slug || ''}
-                  onChange={handleProductChange}
-                  placeholder="product-slug"
-                />
+                <div className={styles.slugInputWrapper}>
+                  <InputBox
+                    label="URL Slug"
+                    name="slug"
+                    value={productData.slug || ''}
+                    onChange={handleProductChange}
+                    onBlur={(e) => checkSlugUniqueness(e.target.value)}
+                    placeholder="product-slug"
+                    className={slugValidation.status === 'invalid' ? styles.inputError : slugValidation.status === 'valid' ? styles.inputSuccess : ''}
+                  />
+                  {slugValidation.status !== 'idle' && (
+                    <div className={`${styles.slugStatus} ${styles[slugValidation.status]}`}>
+                      {slugValidation.status === 'checking' && <Loader size={14} className={styles.spinner} />}
+                      {slugValidation.status === 'valid' && <Check size={14} />}
+                      {slugValidation.status === 'invalid' && <X size={14} />}
+                      <span>{slugValidation.message}</span>
+                    </div>
+                  )}
+                </div>
               </div>
               <InputBox
                 label="Meta Description"
@@ -817,7 +886,7 @@ const AddProduct = () => {
                 value={productData.pricingMeta?.taxIncludedText}
                 onChange={(e) => setProductData({ pricingMeta: { ...productData.pricingMeta, taxIncludedText: e.target.value } })}
                 placeholder="e.g. Inclusive of all taxes"
-                Icon={DollarSign}
+                Icon={IndianRupee}
               />
               <InputBox
                 label="Low Stock Alert Text"
