@@ -760,8 +760,6 @@ const AddProduct = () => {
                         </div>
                         <div className={styles.inlineGridWide}>
                           <InputBox label="SKU" value={v.sku} onChange={e => updateVariant(vIdx, 'sku', e.target.value)} Icon={Tag} />
-                          <InputBox label="Stock" type="number" value={v.stock} onChange={e => updateVariant(vIdx, 'stock', e.target.value)} Icon={PackageIcon} />
-                          <InputBox label="Alert Level" type="number" value={v.low_stock_threshold} onChange={e => updateVariant(vIdx, 'low_stock_threshold', e.target.value)} Icon={Info} />
                           <InputBox label="MRP" type="text" value={v.mrp} onChange={e => updateVariant(vIdx, 'mrp', e.target.value)} Icon={Star} />
                           <InputBox label="Selling Price" type="text" value={v.sellingPrice} onChange={e => updateVariant(vIdx, 'sellingPrice', e.target.value)} Icon={Percent} />
 
@@ -887,13 +885,6 @@ const AddProduct = () => {
                 onChange={(e) => setProductData({ pricingMeta: { ...productData.pricingMeta, taxIncludedText: e.target.value } })}
                 placeholder="e.g. Inclusive of all taxes"
                 Icon={IndianRupee}
-              />
-              <InputBox
-                label="Low Stock Alert Text"
-                value={productData.stockMeta?.lowStockText}
-                onChange={(e) => setProductData({ stockMeta: { ...productData.stockMeta, lowStockText: e.target.value } })}
-                placeholder="Only 5 left!"
-                Icon={PackageIcon}
               />
               <InputBox
                 label="Urgency Text"

@@ -18,6 +18,7 @@ const menuItems = [
   { name: 'Coupons', icon: 'auto_awesome', path: '/marketing' },
   { name: 'Blogs', icon: 'article', path: '/blogs' },
   { name: 'Admins', icon: 'admin_panel_settings', path: '/admins' },
+  { name: 'Settings', icon: 'settings', path: '/settings' },
 ];
 
 const Sidebar = ({ isCollapsed, isMobileOpen, setIsMobileOpen }) => {

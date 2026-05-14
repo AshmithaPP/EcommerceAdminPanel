@@ -47,18 +47,25 @@ const Products = () => {
     await deleteProduct(productId);
   };
 
+  const renderStatusBadge = (row) => {
+    const total = parseInt(row.total_stock) || 0;
+    const lowCount = parseInt(row.low_stock_count) || 0;
+    const outCount = parseInt(row.out_of_stock_count) || 0;
 
-  const getStockStatus = (row) => {
-    if (row.out_of_stock_count > 0) return 'Stock Warning';
-    if (row.low_stock_count > 0) return 'Low Stock';
-    return 'In Stock';
+    if (total === 0) return <Badge variant="outOfStock" className={styles.compactBadge}>Sold Out</Badge>;
+    
+    // If any variant is under its specific threshold set by admin, mark as Low Stock
+    if (lowCount > 0) return <Badge variant="lowStock" className={styles.compactBadge}>Low Stock</Badge>;
+    
+    // If some variants are sold out or total stock is low (6-15), mark as Limited
+    if (outCount > 0 || (total > 0 && total <= 15)) {
+      return <Badge variant="limitedStock" className={styles.compactBadge}>Limited Stock</Badge>;
+    }
+    
+    return <Badge variant="inStock" className={styles.compactBadge}>In Stock</Badge>;
   };
 
-  const getStatusVariant = (row) => {
-    if (row.out_of_stock_count > 0) return 'outOfStock';
-    if (row.low_stock_count > 0) return 'lowStock';
-    return 'inStock';
-  };
+
 
   return (
     <div className={styles.pageContainer}>
@@ -143,29 +150,11 @@ const Products = () => {
               )
             },
             {
-              label: 'Low Stock',
-              key: 'low_stock',
+              label: 'Status',
+              key: 'status',
               width: '140px',
               align: 'center',
-              render: (row) => {
-                const lowCount = parseInt(row.low_stock_count) || 0;
-                const outCount = parseInt(row.out_of_stock_count) || 0;
-
-                if (outCount === 0 && lowCount === 0) {
-                  return <span className={styles.healthyStock}>Healthy</span>;
-                }
-
-                return (
-                  <div className={styles.alertCellCenter}>
-                    {outCount > 0 && (
-                      <Badge variant="outOfStock" className={styles.compactBadge}>{outCount} Sold Out</Badge>
-                    )}
-                    {lowCount > 0 && (
-                      <Badge variant="lowStock" className={styles.compactBadge}>{lowCount} Low</Badge>
-                    )}
-                  </div>
-                );
-              }
+              render: (row) => renderStatusBadge(row)
             },
             {
               label: 'Featured',
@@ -254,9 +243,7 @@ const Products = () => {
                   Total Stock: {product.total_stock || 0}
                 </span>
               </div>
-              <Badge variant={getStatusVariant(product)}>
-                {product.out_of_stock_count > 0 ? `${product.out_of_stock_count} Out of Stock` : product.low_stock_count > 0 ? `${product.low_stock_count} Low Stock` : 'In Stock'}
-              </Badge>
+              {renderStatusBadge(product)}
               <div className={styles.mobileToggleRow}>
                 <span className={styles.mobileToggleLabel}>Available</span>
                 <Toggle

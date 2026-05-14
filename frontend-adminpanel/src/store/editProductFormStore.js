@@ -92,16 +92,16 @@ const useEditProductFormStore = create((set, get) => ({
                 priceIncludesGST: data.priceIncludesGST !== undefined ? !!data.priceIncludesGST : true,
                 badge: data.badge || '',
                 tagline: data.tagline || '',
-                pricingMeta: data.pricingMeta || { taxIncludedText: 'Inclusive of all taxes' },
-                stockMeta: data.stockMeta || { lowStockText: '', urgencyText: '', viewCount: 0 },
+                pricingMeta: data.pricing_meta || { taxIncludedText: 'Inclusive of all taxes' },
+                stockMeta: data.stock_meta || { urgencyText: '', viewCount: 0 },
                 services: data.services || [],
-                trustBadges: data.trustBadges || [],
+                trustBadges: data.trust_badges || [],
                 highlights: data.highlights || [],
-                careInstructions: data.careInstructions || [],
+                careInstructions: data.care_instructions || [],
                 is_featured: !!data.is_featured,
                 home_sections: data.home_sections || [],
-                additionalInfo: data.additionalInfo || {},
-                originInfo: data.originInfo || {},
+                additionalInfo: data.additional_info || {},
+                originInfo: data.origin_info || {},
                 stats: data.stats || []
             };
 
@@ -109,8 +109,6 @@ const useEditProductFormStore = create((set, get) => ({
                 ...v,
                 mrp: String(v.mrp || ''),
                 sellingPrice: String(v.sellingPrice || ''),
-                stock: String(v.stock || '0'),
-                low_stock_threshold: String(v.low_stock_threshold || '3'),
                 attributeValues: v.attributes?.reduce((acc, attr) => {
                     acc[attr.attribute_id] = { 
                         id: attr.attribute_value_id, 
@@ -332,8 +330,6 @@ const useEditProductFormStore = create((set, get) => ({
                 sku: skuParts.join('-'),
                 mrp: variants[0]?.mrp || '',
                 sellingPrice: variants[0]?.sellingPrice || '',
-                stock: variants[0]?.stock || 0,
-                low_stock_threshold: variants[0]?.low_stock_threshold || 3,
                 attributeValues,
                 images: vImages.slice(0, 5)
             };

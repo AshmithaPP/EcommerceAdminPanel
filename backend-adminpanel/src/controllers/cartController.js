@@ -7,9 +7,11 @@ const cartController = {
             const userId = req.user ? req.user.user_id : null;
             const guestId = req.headers['x-guest-id'] || req.query.guest_id;
             
-            console.log(`🛒 GET CART Request - User: ${userId || 'GUEST'}, Guest: ${guestId || 'NONE'}`);
+            const state = req.query.state || null;
             
-            const result = await cartService.getCart(userId, guestId);
+            console.log(`🛒 GET CART Request - User: ${userId || 'GUEST'}, Guest: ${guestId || 'NONE'}, State: ${state || 'NONE'}`);
+            
+            const result = await cartService.getCart(userId, guestId, state);
             res.status(200).json({ success: true, ...result });
         } catch (error) {
             next(error);

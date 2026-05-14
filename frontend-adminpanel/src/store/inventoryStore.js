@@ -75,6 +75,10 @@ const useInventoryStore = create((set, get) => ({
     set({ page });
   },
 
+  setLimit: (limit) => {
+    set({ limit, page: 1 });
+  },
+
   resetInventoryState: () => {
     set(initialState);
   },
@@ -88,7 +92,7 @@ const useInventoryStore = create((set, get) => ({
     try {
       const response = await inventoryService.getFullInventory(page, limit);
       const data = response.data || [];
-      const total = response.pagination?.total_items || data.length;
+      const total = response.pagination?.total || data.length;
 
       const filtered = get()._applyFilters(data);
 

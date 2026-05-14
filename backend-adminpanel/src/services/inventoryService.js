@@ -13,12 +13,12 @@ const inventoryService = {
      * Set stock level to an absolute value.
      * Log: ADMIN_SET
      */
-    setStockLevel: async (variantId, newStock, reason = 'Admin set', adminId = null, threshold = null, connection = null) => {
+    setStockLevel: async (variantId, newStock, reason = 'Inventory correction', adminId = null, threshold = null, referenceId = null, connection = null) => {
         const conn = connection || await db.getConnection();
         try {
             if (!connection) await conn.beginTransaction();
 
-            const result = await Inventory.setStock(variantId, newStock, reason, conn);
+            const result = await Inventory.setStock(variantId, newStock, reason, referenceId, conn);
 
             if (threshold !== null && threshold !== undefined) {
                 await Inventory.updateLowStockThreshold(variantId, threshold, conn);
@@ -38,12 +38,12 @@ const inventoryService = {
      * Add stock (replenishment).
      * Log: ADMIN_PURCHASE
      */
-    restockStock: async (variantId, quantity, reason = 'Admin restock', adminId = null, threshold = null, connection = null) => {
+    restockStock: async (variantId, quantity, reason = 'New stock added', adminId = null, threshold = null, referenceId = null, connection = null) => {
         const conn = connection || await db.getConnection();
         try {
             if (!connection) await conn.beginTransaction();
 
-            const result = await Inventory.adjustStock(variantId, Math.abs(quantity), 'ADMIN_PURCHASE', null, reason, conn);
+            const result = await Inventory.adjustStock(variantId, Math.abs(quantity), 'ADMIN_PURCHASE', referenceId, reason, conn);
 
             if (threshold !== null && threshold !== undefined) {
                 await Inventory.updateLowStockThreshold(variantId, threshold, conn);

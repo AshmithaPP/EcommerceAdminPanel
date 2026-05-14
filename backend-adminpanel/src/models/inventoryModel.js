@@ -75,7 +75,7 @@ const Inventory = {
      * Sets stock level directly and records the history.
      * Action: ADMIN_SET
      */
-    setStock: async (variantId, newStock, reason = null, connection) => {
+    setStock: async (variantId, newStock, reason = null, referenceId = null, connection) => {
         if (!connection) {
             throw new Error('A database connection (with transaction) is required for stock updates');
         }
@@ -110,7 +110,7 @@ const Inventory = {
             delta,
             previousStock,
             newStock,
-            null,
+            referenceId,
             reason
         ]);
 
@@ -226,8 +226,7 @@ const Inventory = {
                     GROUP BY variant_id
                 ) sh2 ON sh1.variant_id = sh2.variant_id AND sh1.created_at = sh2.max_created
             ) sh ON inv.variant_id = sh.variant_id
-            WHERE p.status = 1
-            ORDER BY p.name, pv.sku
+            ORDER BY p.created_at DESC, pv.sku ASC
             LIMIT ? OFFSET ?
         `;
         const [inventory] = await db.query(sql, [parseInt(limit), parseInt(offset)]);
@@ -236,7 +235,6 @@ const Inventory = {
             SELECT COUNT(*) as total FROM inventory_levels inv
             JOIN product_variants pv ON inv.variant_id = pv.variant_id
             JOIN products p ON pv.product_id = p.product_id
-            WHERE p.status = 1
         `);
 
         return { inventory, total };

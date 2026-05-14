@@ -8,7 +8,8 @@ export const STATUS_TABS = [
   { id: 'SHIPPED', label: 'Shipped' },
   { id: 'OFD', label: 'Out for Delivery' },
   { id: 'DELIVERED', label: 'Delivered' },
-  { id: 'RTO', label: 'RTO' }
+  { id: 'RTO', label: 'RTO' },
+  { id: 'ZONES', label: 'Shipping Zones' }
 ];
 
 export const statusMap = STATUS_TABS.reduce((acc, tab) => {
@@ -31,6 +32,9 @@ const initialState = {
   // States
   loading: false,
   actionLoading: false,
+  // Shipping Zones
+  zones: [],
+  loadingZones: false,
   listError: null,
 };
 
@@ -58,6 +62,8 @@ const useShippingStore = create((set, get) => ({
 
   fetchShipments: async () => {
     const { activeTab, page, limit } = get();
+    if (activeTab === 'ZONES') return; // Don't fetch shipments for zones tab
+    
     set({ loading: true, listError: null });
 
     try {
@@ -99,6 +105,63 @@ const useShippingStore = create((set, get) => ({
       set({ actionLoading: false });
     }
   },
+
+  // Shipping Zones Actions
+  fetchZones: async () => {
+    set({ loadingZones: true });
+    try {
+      const response = await shippingService.getAllZones();
+      set({ zones: response.data || [] });
+    } catch (error) {
+      showToast.error('Failed to fetch shipping zones');
+    } finally {
+      set({ loadingZones: false });
+    }
+  },
+
+  addZone: async (zoneData) => {
+    set({ actionLoading: true });
+    try {
+      await shippingService.createZone(zoneData);
+      showToast.success('Shipping zone added');
+      await get().fetchZones();
+      return true;
+    } catch (error) {
+      showToast.error(error.response?.data?.message || 'Failed to add zone');
+      return false;
+    } finally {
+      set({ actionLoading: false });
+    }
+  },
+
+  updateZone: async (id, zoneData) => {
+    set({ actionLoading: true });
+    try {
+      await shippingService.updateZone(id, zoneData);
+      showToast.success('Shipping zone updated');
+      await get().fetchZones();
+      return true;
+    } catch (error) {
+      showToast.error(error.response?.data?.message || 'Failed to update zone');
+      return false;
+    } finally {
+      set({ actionLoading: false });
+    }
+  },
+
+  deleteZone: async (id) => {
+    if (!window.confirm('Are you sure you want to delete this shipping zone?')) return;
+    set({ actionLoading: true });
+    try {
+      await shippingService.deleteZone(id);
+      showToast.success('Shipping zone deleted');
+      await get().fetchZones();
+    } catch (error) {
+      showToast.error('Failed to delete zone');
+    } finally {
+      set({ actionLoading: false });
+    }
+  }
 }));
 
 export default useShippingStore;

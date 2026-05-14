@@ -69,6 +69,14 @@ const orderController = {
             let subtotal = 0;
 
             for (const item of cart.items) {
+                // Anti-Reseller Limit check
+                if (item.quantity > 10) {
+                    return res.status(400).json({ 
+                        success: false, 
+                        message: `Maximum purchase limit is 10 units per item (${item.name || 'Product'})` 
+                    });
+                }
+
                 let price = 0;
                 let variant_name = null;
                 let variant_sku = null;
@@ -162,12 +170,16 @@ const orderController = {
                 shipping_address: finalAddress
             }, items);
 
-            // 6. Clear Cart (Only for COD/Direct. For Razorpay, we clear after verification)
+            // 6. Post-Creation Logic
+            const orderService = require('../services/orderService');
             if (payment_method !== 'razorpay') {
-                console.log('🧹 Clearing cart for direct payment order...');
+                console.log('🧹 Clearing cart and deducting stock for direct/COD order...');
                 await cartService.clearCart(userId, guestId);
+                
+                // For COD/Direct, we deduct stock immediately
+                await orderService.deductStockForPayment(result.order_id);
             } else {
-                console.log('⏳ Skipping cart clear: Waiting for Razorpay verification...');
+                console.log('⏳ Skipping stock deduction: Waiting for Razorpay verification...');
             }
 
             res.status(201).json({

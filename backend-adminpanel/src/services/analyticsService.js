@@ -2,145 +2,84 @@ const db = require('../config/database');
 
 const analyticsService = {
     /**
-     * Aggregates stats for a single date and updates the daily_stats table.
-     * This is the heart of the "Pre-aggregated" strategy.
+     * Helper to get date range SQL and params
      */
-    updateDailyStats: async (date) => {
-        const connection = await db.getConnection();
-        try {
-            await connection.beginTransaction();
-
-            // 1. Get stats for the day from orders table
-            // Only counting Paid orders as Revenue
-            const sql = `
-                SELECT 
-                    COUNT(*) as total_orders,
-                    SUM(CASE WHEN payment_status IN ('Paid', 'success', 'Completed') THEN total_amount ELSE 0 END) as total_revenue,
-                    SUM(CASE WHEN status != 'Cancelled' THEN (SELECT SUM(quantity) FROM order_items WHERE order_id = o.order_id) ELSE 0 END) as total_items_sold,
-                    SUM(discount_amount) as total_discount,
-                    (SELECT COUNT(DISTINCT user_id) FROM orders WHERE DATE(created_at) = ? AND status != 'Cancelled') as new_customers
-                FROM orders o
-                WHERE DATE(o.created_at) = ?
-                AND o.status != 'Cancelled'
-            `;
-            
-            const [rows] = await connection.query(sql, [date, date]);
-            const stats = rows[0];
-
-            // 2. Compute refunds (if you have a refunds table, otherwise 0 for now)
-            const total_refunds = 0; 
-
-            // 3. Upsert into daily_stats
-            await connection.query(`
-                INSERT INTO daily_stats 
-                    (date, total_orders, total_revenue, total_items_sold, total_discount, total_refunds, new_customers)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-                ON DUPLICATE KEY UPDATE 
-                    total_orders = VALUES(total_orders),
-                    total_revenue = VALUES(total_revenue),
-                    total_items_sold = VALUES(total_items_sold),
-                    total_discount = VALUES(total_discount),
-                    total_refunds = VALUES(total_refunds),
-                    new_customers = VALUES(new_customers)
-            `, [
-                date, stats.total_orders || 0, stats.total_revenue || 0, stats.total_items_sold || 0,
-                stats.total_discount || 0, total_refunds, stats.new_customers || 0
-            ]);
-
-            await connection.commit();
-            return true;
-        } catch (error) {
-            await connection.rollback();
-            console.error(`Error updating daily stats for ${date}:`, error);
-            throw error;
-        } finally {
-            connection.release();
+    _getDateFilter: (options, alias = 'o') => {
+        const { range = '30days', startDate, endDate } = options;
+        let start, end;
+        
+        if (startDate && endDate) {
+            start = startDate;
+            end = endDate;
+        } else {
+            end = 'CURDATE()';
+            if (range === 'today') start = 'CURDATE()';
+            else if (range === '7days') start = 'DATE_SUB(CURDATE(), INTERVAL 7 DAY)';
+            else if (range === '90days') start = 'DATE_SUB(CURDATE(), INTERVAL 90 DAY)';
+            else if (range === 'thisMonth') start = "DATE_FORMAT(CURDATE(), '%Y-%m-01')";
+            else start = 'DATE_SUB(CURDATE(), INTERVAL 30 DAY)';
         }
+
+        const startExpr = (startDate && endDate) ? '?' : start;
+        const endExpr = (startDate && endDate) ? '?' : end;
+        const params = (startDate && endDate) ? [start, end] : [];
+        
+        return {
+            where: `${alias}.created_at BETWEEN ${startExpr} AND DATE_ADD(${endExpr}, INTERVAL 1 DAY)`,
+            params
+        };
     },
 
     /**
-     * Fast retrieval for KPI cards with comparison indicators.
+     * KPI Summary with range support.
      */
-    getSummaryStats: async () => {
-        // We get Today's live stats (Fast query) and compare with Yesterday (from daily_stats)
-        const today = new Date().toISOString().split('T')[0];
-        const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
-
-        // Today's Live (Faster than scanning everything)
-        const liveSql = `
+    getSummaryStats: async (options = {}) => {
+        const filter = analyticsService._getDateFilter(options);
+        const subFilter = analyticsService._getDateFilter(options, 'o2');
+        
+        const finalParams = [...subFilter.params, ...filter.params];
+        
+        const finalSql = `
             SELECT 
                 COUNT(*) as orders,
-                SUM(CASE WHEN payment_status IN ('Paid', 'success', 'Completed') THEN total_amount ELSE 0 END) as revenue,
-                (SELECT COUNT(DISTINCT user_id) FROM orders WHERE DATE(created_at) = CURDATE() AND status != 'Cancelled') as customers
+                SUM(CASE WHEN o.payment_status IN ('Paid', 'success', 'Completed') THEN o.total_amount ELSE 0 END) as revenue,
+                (SELECT COUNT(DISTINCT user_id) FROM orders o2 WHERE ${subFilter.where} AND o2.status != 'Cancelled') as customers
             FROM orders o
-            WHERE DATE(created_at) = CURDATE()
-            AND status != 'Cancelled'
+            WHERE ${filter.where}
+            AND o.status != 'Cancelled'
         `;
-        const [liveRows] = await db.query(liveSql);
-        const live = liveRows[0];
-
-        // Historical Aggregates for comparison
-        let yesterdayStats = {};
-        const [historicalRows] = await db.query(`
-            SELECT * FROM daily_stats WHERE date = ?
-        `, [yesterday]);
         
-        if (historicalRows.length > 0) {
-            yesterdayStats = {
-                total_revenue: historicalRows[0].total_revenue,
-                total_orders: historicalRows[0].total_orders
-            };
-        } else {
-            // FALLBACK: Live query for yesterday if stats record is missing
-            const fallbackSql = `
-                SELECT 
-                    COUNT(*) as total_orders,
-                    SUM(CASE WHEN payment_status IN ('Paid', 'success', 'Completed') THEN total_amount ELSE 0 END) as total_revenue
-                FROM orders 
-                WHERE DATE(created_at) = DATE_SUB(CURDATE(), INTERVAL 1 DAY)
-                AND status != 'Cancelled'
-            `;
-            const [fallbackRows] = await db.query(fallbackSql);
-            yesterdayStats = fallbackRows[0];
-        }
-        
-        const calculateGrowth = (curr, prev) => {
-            if (!prev || prev == 0) return curr > 0 ? 100 : 0;
-            return parseFloat((((curr - prev) / prev) * 100).toFixed(1));
-        };
+        const [rows] = await db.query(finalSql, finalParams);
+        const current = rows[0];
 
         return {
             today: {
-                revenue: parseFloat(live.revenue || 0),
-                orders: parseInt(live.orders || 0),
-                customers: parseInt(live.customers || 0)
+                revenue: parseFloat(current.revenue || 0),
+                orders: parseInt(current.orders || 0),
+                customers: parseInt(current.customers || 0)
             },
-            yesterday: {
-                revenue: parseFloat(yesterdayStats.total_revenue || 0),
-                orders: parseInt(yesterdayStats.total_orders || 0)
-            },
-            growth: {
-                revenue: calculateGrowth(live.revenue, yesterdayStats.total_revenue),
-                orders: calculateGrowth(live.orders, yesterdayStats.total_orders)
-            }
+            growth: { revenue: 0, orders: 0 }
         };
     },
 
     /**
-     * Serves chart data from the pre-aggregated table.
+     * Trend data with range support.
      */
-    getTrendData: async (days = 30) => {
+    getTrendData: async (options = {}) => {
+        const filter = analyticsService._getDateFilter(options);
+        
         const sql = `
             SELECT 
-                DATE(created_at) as date, 
+                DATE(o.created_at) as date, 
                 SUM(CASE WHEN payment_status IN ('Paid', 'success', 'Completed') THEN total_amount ELSE 0 END) as revenue,
-                COUNT(CASE WHEN status != 'Cancelled' THEN 1 END) as orders
-            FROM orders
-            WHERE created_at >= DATE_SUB(CURDATE(), INTERVAL ? DAY)
-            GROUP BY DATE(created_at)
-            ORDER BY DATE(created_at) ASC
+                COUNT(CASE WHEN o.status != 'Cancelled' THEN 1 END) as orders
+            FROM orders o
+            WHERE ${filter.where}
+            GROUP BY DATE(o.created_at)
+            ORDER BY DATE(o.created_at) ASC
         `;
-        const [rows] = await db.query(sql, [parseInt(days)]);
+        
+        const [rows] = await db.query(sql, filter.params);
         
         return rows.map(row => ({
             date: row.date.toISOString().split('T')[0],
@@ -150,61 +89,112 @@ const analyticsService = {
     },
 
     /**
-     * Actionable business insights based on concrete logic.
+     * Top Products with range support.
+     */
+    getTopProducts: async (options = {}) => {
+        const filter = analyticsService._getDateFilter(options);
+        
+        const sql = `
+            SELECT 
+                oi.product_name as name,
+                SUM(oi.quantity) as unitsSold,
+                SUM(oi.quantity * oi.price) as revenue
+            FROM order_items oi
+            JOIN orders o ON oi.order_id = o.order_id
+            WHERE o.payment_status IN ('Paid', 'success', 'Completed')
+              AND ${filter.where}
+            GROUP BY oi.product_id, oi.product_name
+            ORDER BY unitsSold DESC
+            LIMIT 10
+        `;
+        const [rows] = await db.query(sql, filter.params);
+        
+        // Category Breakdown
+        const categorySql = `
+            SELECT c.name as category, SUM(oi.quantity * oi.price) as revenue
+            FROM order_items oi
+            JOIN products p ON oi.product_id = p.product_id
+            JOIN sub_categories sc ON p.sub_category_id = sc.sub_category_id
+            JOIN categories c ON sc.category_id = c.category_id
+            JOIN orders o ON oi.order_id = o.order_id
+            WHERE o.payment_status IN ('Paid', 'success', 'Completed')
+              AND ${filter.where}
+            GROUP BY c.name
+        `;
+        const [categories] = await db.query(categorySql, filter.params);
+
+        return { topProducts: rows, categories };
+    },
+
+    /**
+     * Customer Analytics with range support.
+     */
+    getCustomerAnalytics: async (options = {}) => {
+        const geography = await analyticsService.getSalesByGeography(options);
+        const filter = analyticsService._getDateFilter(options);
+
+        const leaderboardSql = `
+            SELECT u.name, u.email, COUNT(o.order_id) as totalOrders, SUM(o.total_amount) as totalSpent
+            FROM users u
+            JOIN orders o ON u.user_id = o.user_id
+            WHERE o.payment_status IN ('Paid', 'success', 'Completed')
+              AND ${filter.where}
+            GROUP BY u.user_id
+            ORDER BY totalSpent DESC
+            LIMIT 10
+        `;
+        const [leaderboard] = await db.query(leaderboardSql, filter.params);
+
+        return { geography, leaderboard };
+    },
+
+    /**
+     * Insights logic.
      */
     getSmartInsights: async () => {
         const insights = [];
-
-        // 1. Sales Drop Alert
-        const summary = await analyticsService.getSummaryStats();
-        if (summary.growth.revenue < -20 && summary.today.revenue > 0) {
-            insights.push({
-                type: 'warning',
-                title: 'Sales Drop Detected',
-                message: `Revenue is down ${Math.abs(summary.growth.revenue)}% compared to yesterday.`
-            });
-        }
-
-        // 2. Trending Products (Top sold in last 7 days vs previous 7)
         const trendingSql = `
             SELECT product_name, SUM(quantity) as units
             FROM order_items oi
             JOIN orders o ON oi.order_id = o.order_id
-            WHERE o.created_at >= DATE_SUB(CURDATE(), INTERVAL 3 DAY)
+            WHERE o.created_at >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
             AND o.payment_status IN ('Paid', 'success', 'Completed')
             GROUP BY product_name
             ORDER BY units DESC
-            LIMIT 3
+            LIMIT 2
         `;
         const [trending] = await db.query(trendingSql);
         trending.forEach(p => {
             insights.push({
                 type: 'info',
-                title: 'Trending Product',
-                message: `${p.product_name} is performing well with ${p.units} units sold recently.`
+                title: 'Trending Now',
+                message: `${p.product_name} has high demand lately (${p.units} sold this week).`
             });
         });
 
         return insights;
     },
 
-
-    getSalesByGeography: async () => {
+    /**
+     * Geography data with range support.
+     */
+    getSalesByGeography: async (options = {}) => {
+        const filter = analyticsService._getDateFilter(options);
+        
         const sql = `
             SELECT 
-                LOWER(TRIM(state)) as state_raw, 
+                LOWER(TRIM(JSON_UNQUOTE(JSON_EXTRACT(shipping_address, '$.state')))) as state_raw, 
                 COUNT(*) as orders,
                 SUM(total_amount) as revenue
-            FROM order_addresses oa
-            JOIN orders o ON oa.order_id = o.order_id
-            WHERE o.payment_status = 'Paid'
+            FROM orders o
+            WHERE ${filter.where}
+            AND o.payment_status IN ('Paid', 'success', 'Completed')
             GROUP BY state_raw
             ORDER BY revenue DESC
             LIMIT 10
         `;
-        const [rows] = await db.query(sql);
+        const [rows] = await db.query(sql, filter.params);
         
-        // Basic normalization map could be added here
         return rows.map(r => ({
             state: r.state_raw ? r.state_raw.charAt(0).toUpperCase() + r.state_raw.slice(1) : 'Unknown',
             orders: r.orders,

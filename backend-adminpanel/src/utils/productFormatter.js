@@ -95,8 +95,7 @@ const formatProductDetail = (product, variants, subCategoryAttributes = [], rela
                 selling_price: v.sellingPrice
             },
             stock: {
-                status: v.stock > 0 ? 'in_stock' : 'out_of_stock',
-                quantity: v.stock
+                status: v.stock > 0 ? 'in_stock' : 'out_of_stock'
             },
             images: {
                 primary: getFullUrl(primaryImage ? (primaryImage.url || primaryImage.image_url) : null),
@@ -154,7 +153,7 @@ const formatProductDetail = (product, variants, subCategoryAttributes = [], rela
         );
     }
 
-    const inStockVariant = formattedVariants.find(v => v.stock.quantity > 0);
+    const inStockVariant = formattedVariants.find(v => v.stock.status === 'in_stock');
     if (!selectedVariant) selectedVariant = inStockVariant || formattedVariants[0] || null;
     
     // 5. Pricing (based on selected variant)
@@ -228,8 +227,7 @@ const formatProductDetail = (product, variants, subCategoryAttributes = [], rela
         trust_badges,
         services,
         stock_meta: {
-            low_stock_text: selectedVariant?.stock.quantity > 0 && selectedVariant.stock.quantity <= 5 ? `Only ${selectedVariant.stock.quantity} left` : "",
-            urgency_text: selectedVariant?.stock.quantity > 0 && selectedVariant.stock.quantity <= 3 ? "Selling fast! Don't miss out." : ""
+            urgency_text: product.stock_meta?.urgencyText || ""
         },
         specifications,
         category: {

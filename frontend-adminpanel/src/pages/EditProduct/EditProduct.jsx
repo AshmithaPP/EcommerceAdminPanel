@@ -769,8 +769,6 @@ const EditProduct = () => {
                         </div>
                         <div className={styles.inlineGridWide}>
                           <InputBox label="SKU" value={v.sku} onChange={e => updateVariant(vIdx, 'sku', e.target.value)} Icon={Tag} />
-                          <InputBox label="Stock" type="number" value={v.stock} onChange={e => updateVariant(vIdx, 'stock', e.target.value)} Icon={PackageIcon} />
-                          <InputBox label="Alert Level" type="number" value={v.low_stock_threshold} onChange={e => updateVariant(vIdx, 'low_stock_threshold', e.target.value)} Icon={Info} />
                           <InputBox label="MRP" type="text" value={v.mrp} onChange={e => updateVariant(vIdx, 'mrp', e.target.value)} Icon={Star} />
                           <InputBox label="Selling Price" type="text" value={v.sellingPrice} onChange={e => updateVariant(vIdx, 'sellingPrice', e.target.value)} Icon={Percent} />
 
@@ -898,13 +896,6 @@ const EditProduct = () => {
                 Icon={IndianRupee}
               />
               <InputBox
-                label="Low Stock Alert Text"
-                value={productData.stockMeta?.lowStockText}
-                onChange={(e) => setProductData({ stockMeta: { ...productData.stockMeta, lowStockText: e.target.value } })}
-                placeholder="Only 5 left!"
-                Icon={PackageIcon}
-              />
-              <InputBox
                 label="Urgency Text"
                 value={productData.stockMeta?.urgencyText}
                 onChange={(e) => setProductData({ stockMeta: { ...productData.stockMeta, urgencyText: e.target.value } })}
@@ -928,12 +919,19 @@ const EditProduct = () => {
                   <MapPin size={14} /> <span>Origin Details</span>
                 </div>
                 <div className={styles.kvInputs}>
-                  <InputBox placeholder="City" id="edit-origin-city" defaultValue={productData.originInfo?.city} />
-                  <InputBox placeholder="State" id="edit-origin-state" defaultValue={productData.originInfo?.state} />
+                  <InputBox 
+                    placeholder="City" 
+                    value={productData.originInfo?.city || ''} 
+                    onChange={(e) => setProductData({ originInfo: { ...productData.originInfo, city: e.target.value } })}
+                  />
+                  <InputBox 
+                    placeholder="State" 
+                    value={productData.originInfo?.state || ''} 
+                    onChange={(e) => setProductData({ originInfo: { ...productData.originInfo, state: e.target.value } })}
+                  />
                   <button className={styles.actionBtn} onClick={() => {
-                    const city = document.getElementById('edit-origin-city').value;
-                    const state = document.getElementById('edit-origin-state').value;
-                    setProductData({ originInfo: { madeIn: 'India', city, state } });
+                    setProductData({ originInfo: { ...productData.originInfo, madeIn: 'India' } });
+                    showToast.success('Origin details updated');
                   }}>Apply Origin</button>
                 </div>
               </div>

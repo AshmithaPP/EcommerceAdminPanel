@@ -20,16 +20,17 @@ const getStockStatus = (quantity, threshold) => {
   return { label: 'In Stock', cls: 'success' };
 };
 
-const getHistoryActionBadge = (action) => {
-  const clsMap = {
-    'order_created': 'order',
-    'order_cancelled': 'danger',
-    'admin_purchase': 'success',
-    'admin_set': 'warning',
+const getHistoryActionBadge = (action, newStock) => {
+  const config = {
+    'admin_purchase': { label: 'Restocked', cls: 'success' },
+    'admin_set': { label: newStock === 0 ? 'Sold Out' : 'Manual Update', cls: newStock === 0 ? 'danger' : 'warning' },
+    'order_created': { label: 'Order Purchase', cls: 'info' },
+    'order_cancelled': { label: 'Order Cancelled', cls: 'secondary' },
+    'return_added': { label: 'Returned', cls: 'purple' },
   };
-  const cls = clsMap[action.toLowerCase()] || 'primary';
-  const label = action.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
-  return <span className={`${styles.actionBadge} ${styles[`badge_${cls}`]}`}>{label}</span>;
+
+  const item = config[action.toLowerCase()] || { label: action.replace('_', ' '), cls: 'primary' };
+  return <span className={`${styles.badge} ${styles[`badge_${item.cls}`]}`}>{item.label}</span>;
 };
 
 // ── Main Page ────────────────────────────────────────────────────────
@@ -62,6 +63,7 @@ const InventoryList = () => {
   const [inputValue, setInputValue] = useState('');
   const [thresholdValue, setThresholdValue] = useState('');
   const [reason, setReason] = useState('');
+  const [refId, setRefId] = useState('');
 
   // Trigger fetch when pagination changes
   useEffect(() => {
@@ -90,7 +92,7 @@ const InventoryList = () => {
     } else {
       setInputValue(type === 'SET' ? item.quantity : '');
       setThresholdValue(item.low_stock_threshold || 10);
-      setReason(type === 'SET' ? 'Inventory correction' : 'New purchase');
+      setReason(type === 'SET' ? 'Inventory correction' : 'New stock added');
     }
   };
 
@@ -99,6 +101,7 @@ const InventoryList = () => {
     setActionType(null);
     setInputValue('');
     setReason('');
+    setRefId('');
   };
 
   const handleSave = async () => {
@@ -109,12 +112,14 @@ const InventoryList = () => {
       success = await restock(selectedVariant.variant_id, {
         quantity: parseInt(inputValue),
         reason,
+        reference_id: refId,
         threshold: parseInt(thresholdValue)
       });
     } else {
       success = await setStock(selectedVariant.variant_id, {
         stock: parseInt(inputValue),
         reason,
+        reference_id: refId,
         threshold: parseInt(thresholdValue)
       });
     }
@@ -219,20 +224,22 @@ const InventoryList = () => {
 
   const historyColumns = [
     {
-      label: 'Action & Date',
-      key: 'action',
-      width: '35%',
-      render: (row) => (
-        <div className={styles.historyActionCell}>
-          {getHistoryActionBadge(row.action)}
-          <span className={styles.historyDate}>{formatDate(row.created_at)}</span>
-        </div>
-      )
+      label: 'Date & Time',
+      key: 'date',
+      width: '20%',
+      render: (row) => <span className={styles.historyDate}>{formatDate(row.created_at)}</span>
     },
     {
-      label: 'Adjustment',
+      label: 'Action',
+      key: 'action',
+      width: '15%',
+      render: (row) => getHistoryActionBadge(row.action, row.new_stock)
+    },
+    {
+      label: 'Qty Change',
       key: 'qty',
-      width: '20%',
+      width: '10%',
+      align: 'center',
       render: (row) => (
         <span className={`${styles.historyQty} ${row.quantity >= 0 ? styles.qtyPos : styles.qtyNeg}`}>
           {row.quantity > 0 ? '+' : ''}{row.quantity}
@@ -240,23 +247,42 @@ const InventoryList = () => {
       )
     },
     {
-      label: 'Flow',
+      label: 'Stock Flow',
       key: 'flow',
-      width: '15%',
+      width: '12%',
+      align: 'center',
       render: (row) => (
         <span className={styles.historyFlow}>{row.previous_stock} → {row.new_stock}</span>
       )
     },
     {
-      label: 'Reason / Ref',
+      label: 'Reason',
       key: 'reason',
-      width: '30%',
-      render: (row) => (
-        <div className={styles.historyReasonCell}>
-          {row.reason && <div className={styles.reasonText}>{row.reason}</div>}
-          {row.reference_id && <div className={styles.refText}>Ref: {row.reference_id}</div>}
-        </div>
+      width: '18%',
+      render: (row) => row.reason ? (
+        <span className={styles.reasonText}>{row.reason}</span>
+      ) : (
+        <span className={styles.mutedDash}>—</span>
       )
+    },
+    {
+      label: 'Ref ID',
+      key: 'ref',
+      width: '15%',
+      render: (row) => row.reference_id ? (
+        <span className={styles.refText}>{row.reference_id}</span>
+      ) : (
+        <span className={styles.mutedDash}>—</span>
+      )
+    },
+    {
+      label: 'By',
+      key: 'by',
+      width: '10%',
+      render: (row) => {
+        const isOrder = row.action.toLowerCase().includes('order');
+        return <span className={styles.byText}>{isOrder ? 'Customer' : 'Admin'}</span>;
+      }
     }
   ];
 
@@ -300,13 +326,15 @@ const InventoryList = () => {
           actions={headerActions}
           emptyMessage={loading ? "Loading inventory..." : "No inventory records found."}
         />
-        {!loading && total > limit && (
-          <Pagination
-            totalItems={total}
-            itemsPerPage={limit}
-            currentPage={page}
-            onPageChange={setPage}
-          />
+        {!loading && (
+          <div className={styles.tableFooter}>
+            <Pagination
+              totalItems={total}
+              itemsPerPage={limit}
+              currentPage={page}
+              onPageChange={setPage}
+            />
+          </div>
         )}
       </div>
 
@@ -370,15 +398,27 @@ const InventoryList = () => {
                     </div>
                   </div>
 
-                  <div className={styles.formGroup}>
-                    <label className={styles.formLabel}>Reason / Reference</label>
-                    <input
-                      type="text"
-                      className={styles.formInput}
-                      value={reason}
-                      onChange={(e) => setReason(e.target.value)}
-                      placeholder="e.g. Restock from supplier, Damaged goods..."
-                    />
+                  <div className={styles.formGrid2}>
+                    <div className={styles.formGroup}>
+                      <label className={styles.formLabel}>Reason</label>
+                      <input
+                        type="text"
+                        className={styles.formInput}
+                        value={reason}
+                        onChange={(e) => setReason(e.target.value)}
+                        placeholder="e.g. Supplier restock"
+                      />
+                    </div>
+                    <div className={styles.formGroup}>
+                      <label className={styles.formLabel}>Ref ID</label>
+                      <input
+                        type="text"
+                        className={styles.formInput}
+                        value={refId}
+                        onChange={(e) => setRefId(e.target.value)}
+                        placeholder="e.g. PUR-101, ORD-202"
+                      />
+                    </div>
                   </div>
 
                   <div className={styles.modalActions}>

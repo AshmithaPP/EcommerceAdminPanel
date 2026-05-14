@@ -188,8 +188,6 @@ const useProductFormStore = create((set, get) => ({
             variants: [...variants, {
                 variant_id: null,
                 sku: '',
-                stock: '0',
-                low_stock_threshold: '3',
                 mrp: '',
                 sellingPrice: '',
                 attributeValues: {},
@@ -294,8 +292,6 @@ const useProductFormStore = create((set, get) => ({
                 sku: generatedSku,
                 mrp: variants[0]?.mrp || '',
                 sellingPrice: variants[0]?.sellingPrice || '',
-                stock: variants[0]?.stock || '0',
-                low_stock_threshold: variants[0]?.low_stock_threshold || '3',
                 attributeValues,
                 images: vImages.slice(0, 5)
             };
@@ -388,8 +384,6 @@ const useProductFormStore = create((set, get) => ({
                 variants: variants.map((v, vIdx) => ({
                     ...v,
                     price: v.sellingPrice,
-                    initial_stock: v.stock || 0,
-                    low_stock_threshold: v.low_stock_threshold || 3,
                     attributes: Object.entries(v.attributeValues || {})
                         .filter(([_, val]) => val !== null)
                         .map(([attrId, val]) => ({

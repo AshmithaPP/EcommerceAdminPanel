@@ -74,10 +74,15 @@ const paymentController = {
                     status: 'success'
                 });
 
-                // 3. Update Order Status
+                // 3. Update Order Status via Service (triggers stock deduction)
                 const payment = await Payment.findByGatewayOrderId(razorpay_order_id);
                 if (payment) {
-                    await Order.updateStatus(payment.order_id, 'paid', 'success');
+                    const orderService = require('../services/orderService');
+                    await orderService.updatePaymentStatus(payment.order_id, {
+                        status: 'paid',
+                        payment_status: 'success',
+                        transaction_id: razorpay_payment_id
+                    });
                     
                     // 4. Clear Cart (FINAL STEP)
                     const cartService = require('../services/cartService');

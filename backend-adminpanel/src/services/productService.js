@@ -209,8 +209,8 @@ const productService = {
                     ...gstFields
                 }, connection);
 
-                // Initialize Inventory for the new variant
-                await inventoryService.initializeInventory(variantId, variantData.initial_stock || 0, variantData.low_stock_threshold || 5, connection);
+                // Initialize Inventory for the new variant with defaults (managed in Inventory section)
+                await inventoryService.initializeInventory(variantId, 0, 5, connection);
 
                 // Insert Variant Attributes
                 if (variantData.attributes && variantData.attributes.length > 0) {
@@ -710,15 +710,7 @@ const productService = {
                             status: vData.status !== undefined ? vData.status : 1
                         }, connection);
 
-                        // Update inventory threshold if provided
-                        if (vData.low_stock_threshold !== undefined) {
-                            await inventoryService.updateLowStockThreshold(vData.variant_id, vData.low_stock_threshold, connection);
-                        }
-
-                        // Update stock level if provided
-                        if (vData.stock !== undefined) {
-                            await inventoryService.setStockLevel(vData.variant_id, vData.stock, 'Admin update', null, null, connection);
-                        }
+                        // Stock and threshold updates removed (managed in Inventory section)
 
                         // Sync Variant Attributes
                         if (vData.attributes) {
@@ -751,8 +743,8 @@ const productService = {
                             ...gstFields
                         }, connection);
 
-                        // Initialize Inventory for the new variant
-                        await inventoryService.initializeInventory(newVid, vData.initial_stock || 0, vData.low_stock_threshold !== undefined ? vData.low_stock_threshold : 5, connection);
+                        // Initialize Inventory for the new variant with defaults
+                        await inventoryService.initializeInventory(newVid, 0, 5, connection);
 
                         if (vData.attributes && vData.attributes.length > 0) {
                             await Product.addVariantAttributes(newVid, vData.attributes, connection);

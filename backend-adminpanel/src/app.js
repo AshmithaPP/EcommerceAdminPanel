@@ -25,6 +25,7 @@ const addressRoutes = require('./routes/addressRoutes');
 const orderRoutes = require('./routes/orderRoutes');
 const paymentRoutes = require('./routes/paymentRoutes');
 const adminOrderRoutes = require('./routes/adminOrderRoutes');
+const shippingRoutes = require('./routes/shippingRoutes');
 const db = require('./config/database');
 
 // --- Auto Migration: Ensure Address Table Exists ---
@@ -262,6 +263,7 @@ app.use('/api/addresses', addressRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/admin/orders', adminOrderRoutes);
+app.use('/api/shipping', shippingRoutes);
 
 // Admin Payments List
 app.get('/api/admin/payments', protect, authorize('admin', 'superadmin'), paymentController.getAllPayments);

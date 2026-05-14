@@ -42,7 +42,12 @@ const Dashboard = () => {
   const recentOrders = useDashboardStore(state => state.recentOrders);
   const alerts = useDashboardStore(state => state.alerts);
   const orderStatusBreakdown = useDashboardStore(state => state.orderStatusBreakdown);
-  const [filterType, setFilterType] = useState('30days');
+  const [activeFilter, setActiveFilter] = useState({ 
+    type: '30days', 
+    isCustom: false,
+    dates: null 
+  });
+
   const [customRange, setCustomRange] = useState(() => {
     const now = new Date();
     const year = now.getFullYear();
@@ -53,7 +58,6 @@ const Dashboard = () => {
       end: `${year}-${month}-${today}`
     };
   });
-  const [isCustom, setIsCustom] = useState(false);
 
   // Store Actions
   const fetchInitialData = useDashboardStore(state => state.fetchInitialData);
@@ -62,26 +66,29 @@ const Dashboard = () => {
   const inventoryHealth = useDashboardStore(state => state.inventoryHealth);
 
   useEffect(() => {
-    const filters = isCustom 
-      ? { startDate: customRange.start, endDate: customRange.end }
-      : { range: filterType };
+    const filters = activeFilter.isCustom 
+      ? { startDate: activeFilter.dates.start, endDate: activeFilter.dates.end }
+      : { range: activeFilter.type };
 
-    if (isCustom && (!customRange.start || !customRange.end)) return;
+    if (activeFilter.isCustom && (!activeFilter.dates.start || !activeFilter.dates.end)) return;
 
     fetchInitialData(filters);
     fetchAnalyticsData(filters);
     fetchAdvancedAnalytics(); // This stays live (no filter)
-  }, [filterType, customRange, isCustom, fetchInitialData, fetchAnalyticsData, fetchAdvancedAnalytics]);
+  }, [activeFilter, fetchInitialData, fetchAnalyticsData, fetchAdvancedAnalytics]);
 
   const handleQuickFilter = (type) => {
-    setIsCustom(false);
-    setFilterType(type);
+    setActiveFilter({ type, isCustom: false, dates: null });
   };
 
   const handleCustomSubmit = (e) => {
     e.preventDefault();
     if (customRange.start && customRange.end) {
-      setIsCustom(true);
+      setActiveFilter({ 
+        type: 'custom', 
+        isCustom: true, 
+        dates: { ...customRange } 
+      });
     }
   };
 
@@ -130,13 +137,13 @@ const Dashboard = () => {
 
   // Generate data based on timeframe
   const getDaysCount = () => {
-    if (isCustom && customRange.start && customRange.end) {
-      const diffTime = Math.abs(new Date(customRange.end) - new Date(customRange.start));
+    if (activeFilter.isCustom && activeFilter.dates?.start && activeFilter.dates?.end) {
+      const diffTime = Math.abs(new Date(activeFilter.dates.end) - new Date(activeFilter.dates.start));
       return Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
     }
-    if (filterType === 'today') return 1;
-    if (filterType === '7days') return 7;
-    if (filterType === 'thisMonth') {
+    if (activeFilter.type === 'today') return 1;
+    if (activeFilter.type === '7days') return 7;
+    if (activeFilter.type === 'thisMonth') {
         const d = new Date();
         return d.getDate();
     }
@@ -145,7 +152,7 @@ const Dashboard = () => {
 
   const chartData = [];
   const daysLimit = getDaysCount();
-  const baseDate = isCustom ? new Date(customRange.end) : new Date();
+  const baseDate = activeFilter.isCustom ? new Date(activeFilter.dates.end) : new Date();
 
   for (let i = daysLimit - 1; i >= 0; i--) {
     const d = new Date(baseDate);
@@ -219,7 +226,7 @@ const Dashboard = () => {
           ].map((btn) => (
             <button
               key={btn.id}
-              className={`${styles.filterBtn} ${(!isCustom && filterType === btn.id) ? styles.activeFilter : ''}`}
+              className={`${styles.filterBtn} ${(!activeFilter.isCustom && activeFilter.type === btn.id) ? styles.activeFilter : ''}`}
               onClick={() => handleQuickFilter(btn.id)}
             >
               {btn.label}
@@ -303,11 +310,11 @@ const Dashboard = () => {
           <div className={styles.chartCardWrapper}>
             <TrendChart
               title="Revenue Trend"
-              subtitle={isCustom ? `Performance from ${customRange.start} to ${customRange.end}` : `Daily revenue performance for the selected period`}
+              subtitle={activeFilter.isCustom ? `Performance from ${activeFilter.dates.start} to ${activeFilter.dates.end}` : `Daily revenue performance for the selected period`}
               mainValue={formatCurrency(salesTrend.comparison.current_revenue)}
               growth={salesTrend.comparison.growth_percentage}
               data={chartData}
-              timeframe={isCustom ? 'Custom Range' : filterType}
+              timeframe={activeFilter.isCustom ? 'Custom Range' : activeFilter.type}
               loading={chartsLoading}
             />
           </div>

@@ -234,9 +234,32 @@
   color: var(--primary, #4361EE);
 }
 
-.badge_order {
-  background: var(--status-info-bg, #E6F1FB);
-  color: var(--status-info, #3B82F6);
+.badge_order, .badge_info {
+  background: #E6F1FB;
+  color: #3B82F6;
+}
+
+.badge_purple {
+  background: #F3E8FF;
+  color: #9333EA;
+}
+
+.badge_secondary {
+  background: #F1F5F9;
+  color: #64748B;
+}
+
+.byText {
+  font-family: var(--font-inter, sans-serif);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--on-surface, #1A202C);
+}
+
+.mutedDash {
+  color: var(--muted-text, #7A89B0);
+  opacity: 0.4;
+  font-weight: 400;
 }
 
 /* Action Buttons */
@@ -526,4 +549,21 @@
   .searchWrapper { flex-grow: 1; min-width: 150px; }
   
   .historyFlow { display: block; margin-top: 4px; }
+}
+
+.tableFooter {
+  width: 100%;
+  padding: 1.25rem 0;
+  margin-top: 0.5rem;
+  border-top: 1px solid var(--border-default, #D8DCF0);
+}
+
+.paginationInfo {
+  font-family: var(--font-inter, sans-serif);
+  font-size: 12px;
+  color: var(--muted-text, #7A89B0);
+}
+
+.paginationInfo b {
+  color: var(--heading-text, #0D1B3E);
 }

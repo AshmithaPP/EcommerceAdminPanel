@@ -11,13 +11,17 @@
 }
 
 .inStock {
-  background-color: #16a34a; /* Success Green */
+  background-color: #16a34a; /* Green-600 🟢 */
+}
+
+.limitedStock {
+  background-color: #eab308; /* Yellow-500 🟡 */
 }
 
 .lowStock {
-  background-color: #f59e0b; /* Warning Amber */
+  background-color: #f97316; /* Orange-500 🟠 */
 }
 
 .outOfStock {
-  background-color: #dc2626; /* Danger Red */
+  background-color: #dc2626; /* Red-600 🔴 */
 }

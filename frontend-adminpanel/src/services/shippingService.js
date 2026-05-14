@@ -1,7 +1,7 @@
 import { privateApi } from './api';
 
 const shippingService = {
-    // Shipment APIs
+    // Shipment APIs (Core Logistics)
     getShipments: async (params) => {
         const response = await privateApi.get('/shipments', { params });
         return response.data;
@@ -27,7 +27,34 @@ const shippingService = {
         return response.data;
     },
 
+    // Shipping Zone Management (Admin Settings)
+    getAllZones: async () => {
+        const response = await privateApi.get('/shipping/zones');
+        return response.data;
+    },
 
+    createZone: async (zoneData) => {
+        const response = await privateApi.post('/shipping/zones', zoneData);
+        return response.data;
+    },
+
+    updateZone: async (id, zoneData) => {
+        const response = await privateApi.put(`/shipping/zones/${id}`, zoneData);
+        return response.data;
+    },
+
+    deleteZone: async (id) => {
+        const response = await privateApi.delete(`/shipping/zones/${id}`);
+        return response.data;
+    },
+
+    // Shipping Calculation (Checkout Flow)
+    calculateShipping: async (state, subtotal) => {
+        const response = await privateApi.get('/shipping/calculate', {
+            params: { state, subtotal }
+        });
+        return response.data;
+    }
 };
 
 export default shippingService;

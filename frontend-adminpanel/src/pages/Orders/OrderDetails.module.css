@@ -465,15 +465,23 @@
 }
 
 .productThumb {
-  width: 42px;
-  height: 42px;
-  border-radius: 6px;
+  width: 50px;
+  height: 50px;
+  border-radius: 8px;
   background: var(--input-bg, #EEF0F8);
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
   border: 1px solid var(--border-default, #D8DCF0);
+  overflow: hidden;
+}
+
+.thumbImg {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
 }
 
 .productName {
@@ -539,6 +547,39 @@
 
 .discountVal {
   color: var(--status-danger, #E24B4A);
+}
+
+/* GST Styles */
+.gstLabel {
+  font-family: var(--font-inter, sans-serif);
+  font-size: 11.5px;
+  color: var(--muted-text, #7A89B0);
+  font-weight: 500;
+}
+
+.gstValue {
+  font-family: var(--font-inter, sans-serif);
+  font-size: 11.5px;
+  color: var(--on-surface, #1A202C);
+  font-weight: 600;
+}
+
+.gstBreakdown {
+  margin-top: -0.25rem;
+  margin-bottom: 0.5rem;
+  padding-left: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  border-left: 2px solid var(--border-default, #D8DCF0);
+}
+
+.breakdownRow {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10.5px;
+  color: var(--muted-text, #7A89B0);
+  font-family: var(--font-inter, sans-serif);
 }
 
 .summaryDivider {

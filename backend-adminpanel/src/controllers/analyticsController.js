@@ -3,7 +3,7 @@ const analyticsService = require('../services/analyticsService');
 const analyticsController = {
     getSummary: async (req, res, next) => {
         try {
-            const summary = await analyticsService.getSummaryStats();
+            const summary = await analyticsService.getSummaryStats(req.query);
             const insights = await analyticsService.getSmartInsights();
             res.status(200).json({
                 success: true,
@@ -19,8 +19,7 @@ const analyticsController = {
 
     getTrends: async (req, res, next) => {
         try {
-            const { period = 30 } = req.query;
-            const trends = await analyticsService.getTrendData(period);
+            const trends = await analyticsService.getTrendData(req.query);
             res.status(200).json({
                 success: true,
                 data: trends
@@ -32,41 +31,8 @@ const analyticsController = {
 
     getProducts: async (req, res, next) => {
         try {
-            // Re-using some dashboard logic or adding new ones
-            const sql = `
-                SELECT 
-                    oi.product_name as name,
-                    SUM(oi.quantity) as unitsSold,
-                    SUM(oi.quantity * oi.price) as revenue
-                FROM order_items oi
-                JOIN orders o ON oi.order_id = o.order_id
-                WHERE o.payment_status IN ('Paid', 'success', 'Completed')
-                GROUP BY oi.product_id, oi.product_name
-                ORDER BY unitsSold DESC
-                LIMIT 10
-            `;
-            const [topProducts] = await require('../config/database').query(sql);
-
-            // Category Breakdown
-            const categorySql = `
-                SELECT c.name as category, SUM(oi.quantity * oi.price) as revenue
-                FROM order_items oi
-                JOIN products p ON oi.product_id = p.product_id
-                JOIN sub_categories sc ON p.sub_category_id = sc.sub_category_id
-                JOIN categories c ON sc.category_id = c.category_id
-                JOIN orders o ON oi.order_id = o.order_id
-                WHERE o.payment_status IN ('Paid', 'success', 'Completed')
-                GROUP BY c.name
-            `;
-            const [categories] = await require('../config/database').query(categorySql);
-
-            res.status(200).json({
-                success: true,
-                data: {
-                    topProducts,
-                    categories
-                }
-            });
+            const data = await analyticsService.getTopProducts(req.query);
+            res.status(200).json({ success: true, data });
         } catch (error) {
             next(error);
         }
@@ -74,26 +40,8 @@ const analyticsController = {
 
     getCustomers: async (req, res, next) => {
         try {
-            const geography = await analyticsService.getSalesByGeography();
-            
-            const leaderboardSql = `
-                SELECT u.name, u.email, COUNT(o.order_id) as totalOrders, SUM(o.total_amount) as totalSpent
-                FROM users u
-                JOIN orders o ON u.user_id = o.user_id
-                WHERE o.payment_status IN ('Paid', 'success', 'Completed')
-                GROUP BY u.user_id
-                ORDER BY totalSpent DESC
-                LIMIT 10
-            `;
-            const [leaderboard] = await require('../config/database').query(leaderboardSql);
-
-            res.status(200).json({
-                success: true,
-                data: {
-                    geography,
-                    leaderboard
-                }
-            });
+            const data = await analyticsService.getCustomerAnalytics(req.query);
+            res.status(200).json({ success: true, data });
         } catch (error) {
             next(error);
         }

@@ -9,6 +9,7 @@ import {
   Download,
   Loader2,
   Calendar,
+  ChevronRight,
   IndianRupee,
   ShoppingBag,
   Users,
@@ -126,7 +127,23 @@ const SalesView = ({ data }) => {
 
 const Analytics = () => {
   const [activeTab, setActiveTab] = useState('sales');
-  const [timeRange, setTimeRange] = useState('30 Days');
+  const [customRange, setCustomRange] = useState(() => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const today = String(now.getDate()).padStart(2, '0');
+    return {
+      start: `${year}-${month}-01`,
+      end: `${year}-${month}-${today}`
+    };
+  });
+  
+  // Single source of truth for the active filter
+  const [activeFilter, setActiveFilter] = useState({ 
+    type: '30days', 
+    isCustom: false,
+    dates: null 
+  });
   const [loading, setLoading] = useState(true);
   const [summary, setSummary] = useState(null);
   const [trendData, setTrendData] = useState([]);
@@ -139,7 +156,10 @@ const Analytics = () => {
       return;
     }
     try {
-      const title = `Analytics Report - ${activeTab.toUpperCase()} (${timeRange})`;
+      const rangeLabel = activeFilter.isCustom 
+        ? `${activeFilter.dates.start} to ${activeFilter.dates.end}` 
+        : activeFilter.type;
+      const title = `Analytics Report - ${activeTab.toUpperCase()} (${rangeLabel})`;
       ExportManager.exportToPDF(trendData, title, `SilkCurator_${activeTab}_Report`);
     } catch (err) {
       console.error('Export failed:', err);
@@ -148,14 +168,17 @@ const Analytics = () => {
   };
 
   useEffect(() => {
-    const loadInitialData = async () => {
+    const loadData = async () => {
       setLoading(true);
       setError(null);
       try {
-        const days = timeRange === '7 Days' ? 7 : timeRange === '90 Days' ? 90 : 30;
+        const filters = activeFilter.isCustom 
+          ? { startDate: activeFilter.dates.start, endDate: activeFilter.dates.end }
+          : { range: activeFilter.type };
+
         const [summaryRes, trendsRes] = await Promise.all([
-          analyticsService.getSummary(),
-          analyticsService.getTrends(days)
+          analyticsService.getSummary(filters),
+          analyticsService.getTrends(filters)
         ]);
         
         if (summaryRes.success) setSummary(summaryRes.data);
@@ -167,8 +190,23 @@ const Analytics = () => {
         setLoading(false);
       }
     };
-    loadInitialData();
-  }, [timeRange]);
+    loadData();
+  }, [activeFilter]);
+
+  const handleQuickFilter = (type) => {
+    setActiveFilter({ type, isCustom: false, dates: null });
+  };
+
+  const handleCustomSubmit = (e) => {
+    e.preventDefault();
+    if (customRange.start && customRange.end) {
+      setActiveFilter({ 
+        type: 'custom', 
+        isCustom: true, 
+        dates: { ...customRange } 
+      });
+    }
+  };
 
   const formatCurrency = (val) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(val || 0);
 
@@ -188,30 +226,61 @@ const Analytics = () => {
 
   return (
     <div className="page-container">
-      <header className={styles.header}>
-        <div style={{ display: 'flex', gap: '0.75rem', marginLeft: 'auto', alignItems: 'center' }}>
-          <div className={styles.timeFilter}>
-            {['7 Days', '30 Days', '90 Days'].map(range => (
-              <button 
-                key={range}
-                className={`${styles.filterBtn} ${timeRange === range ? styles.filterBtnActive : ''}`}
-                onClick={() => setTimeRange(range)}
-              >
-                {range}
-              </button>
-            ))}
-          </div>
-          <button className={styles.exportBtn} onClick={handleExport}>
-            <Download size={16} />
-            <span>Reports</span>
-          </button>
+      <div className={styles.topHeader}>
+        <button className={styles.exportBtn} onClick={handleExport}>
+          <Download size={16} />
+          <span>Generate Reports</span>
+        </button>
+      </div>
+
+      <div className={styles.filterSection}>
+        <div className={styles.quickFilters}>
+          {[
+            { id: 'today', label: 'Today' },
+            { id: '7days', label: '7 Days' },
+            { id: '30days', label: '30 Days' },
+            { id: 'thisMonth', label: 'This Month' }
+          ].map((btn) => (
+            <button
+              key={btn.id}
+              className={`${styles.filterBtn} ${(!activeFilter.isCustom && activeFilter.type === btn.id) ? styles.activeFilter : ''}`}
+              onClick={() => handleQuickFilter(btn.id)}
+            >
+              {btn.label}
+            </button>
+          ))}
         </div>
-      </header>
+
+        <div className={styles.customFilter}>
+          <form className={styles.dateForm} onSubmit={handleCustomSubmit}>
+            <div className={styles.dateInputWrapper}>
+              <Calendar size={14} className={styles.dateIcon} />
+              <input 
+                type="date" 
+                className={styles.dateInput}
+                value={customRange.start}
+                onChange={(e) => setCustomRange({...customRange, start: e.target.value})}
+              />
+            </div>
+            <ChevronRight size={14} className={styles.separator} />
+            <div className={styles.dateInputWrapper}>
+              <Calendar size={14} className={styles.dateIcon} />
+              <input 
+                type="date" 
+                className={styles.dateInput}
+                value={customRange.end}
+                onChange={(e) => setCustomRange({...customRange, end: e.target.value})}
+              />
+            </div>
+            <button type="submit" className={styles.applyBtn}>Apply Range</button>
+          </form>
+        </div>
+      </div>
 
       <div className={styles.dashboardHero}>
         <div className={styles.kpiColumn}>
           <StatCard 
-            label={`${timeRange} Revenue`} 
+            label={`${activeFilter.isCustom ? 'Range' : activeFilter.type} Revenue`} 
             value={formatCurrency(rangeTotals.revenue)} 
             trend={summary?.growth?.revenue >= 0 ? "up" : "down"}
             icon={<IndianRupee size={20} />}
@@ -221,7 +290,7 @@ const Analytics = () => {
             sparklineData={trendData.length > 0 ? trendData.map(d => d.revenue) : [0, 5, 2, 8, 4, 10, 6]}
           />
           <StatCard 
-            label={`${timeRange} Orders`} 
+            label={`${activeFilter.isCustom ? 'Range' : activeFilter.type} Orders`} 
             value={rangeTotals.orders.toString()} 
             trend={summary?.growth?.orders >= 0 ? "up" : "down"}
             icon={<ShoppingBag size={20} />}
@@ -319,8 +388,16 @@ const Analytics = () => {
         <main className={styles.tabContent}>
           <Suspense fallback={<TabLoader />}>
             {activeTab === 'sales' && <SalesView data={trendData} />}
-            {activeTab === 'products' && <ProductsTab />}
-            {activeTab === 'customers' && <CustomersTab />}
+            {activeTab === 'products' && (
+              <ProductsTab 
+                filters={activeFilter.isCustom ? { startDate: activeFilter.dates.start, endDate: activeFilter.dates.end } : { range: activeFilter.type }} 
+              />
+            )}
+            {activeTab === 'customers' && (
+              <CustomersTab 
+                filters={activeFilter.isCustom ? { startDate: activeFilter.dates.start, endDate: activeFilter.dates.end } : { range: activeFilter.type }} 
+              />
+            )}
           </Suspense>
         </main>
       </div>
@@ -343,13 +420,14 @@ const OverviewTab = ({ data }) => {
   return null;
 };
 
-const ProductsTab = () => {
+const ProductsTab = ({ filters }) => {
   const [data, setData] = useState(null);
   const COLORS = ['#6366f1', '#8b5cf6', '#ec4899', '#f43f5e', '#f59e0b', '#10b981'];
 
   useEffect(() => {
-    analyticsService.getProducts().then(res => setData(res.data));
-  }, []);
+    setData(null); // Show loader on filter change
+    analyticsService.getProducts(filters).then(res => setData(res.data));
+  }, [filters]);
 
   if (!data) return <TabLoader />;
 
@@ -400,12 +478,13 @@ const ProductsTab = () => {
   );
 };
 
-const CustomersTab = () => {
+const CustomersTab = ({ filters }) => {
   const [data, setData] = useState(null);
 
   useEffect(() => {
-    analyticsService.getCustomers().then(res => setData(res.data));
-  }, []);
+    setData(null); // Show loader on filter change
+    analyticsService.getCustomers(filters).then(res => setData(res.data));
+  }, [filters]);
 
   if (!data) return <TabLoader />;
 

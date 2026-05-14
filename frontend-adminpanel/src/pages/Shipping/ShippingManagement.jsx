@@ -23,24 +23,108 @@ const ShippingManagement = () => {
   } = useShippingStore();
 
   const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
-  const [updateStatusData, setUpdateStatusData] = useState({ status: '', location: '', comment: '' });
+  const [updateStatusData, setUpdateStatusData] = useState({ 
+    status: '', 
+    location: '', 
+    comment: '',
+    courier_name: '',
+    tracking_id: ''
+  });
+
+  // Zone Form State
+  const [isZoneModalOpen, setIsZoneModalOpen] = useState(false);
+  const [editingZone, setEditingZone] = useState(null);
+  const [zoneForm, setZoneForm] = useState({
+    zone_name: '',
+    states: [],
+    shipping_charge: '',
+    free_shipping_above: '',
+    estimated_days: '3-5 Days',
+    status: true
+  });
+
+  const {
+    zones,
+    loadingZones,
+    fetchZones,
+    addZone,
+    updateZone,
+    deleteZone
+  } = useShippingStore();
+
+  const allIndianStates = [
+    "Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chhattisgarh", "Goa", "Gujarat", "Haryana", 
+    "Himachal Pradesh", "Jharkhand", "Karnataka", "Kerala", "Madhya Pradesh", "Maharashtra", "Manipur", 
+    "Meghalaya", "Mizoram", "Nagaland", "Odisha", "Punjab", "Rajasthan", "Sikkim", "Tamil Nadu", 
+    "Telangana", "Tripura", "Uttar Pradesh", "Uttarakhand", "West Bengal", "Delhi"
+  ];
 
   // Trigger fetch when tab or pagination changes
   useEffect(() => {
-    fetchShipments();
-  }, [activeTab, page, fetchShipments]);
+    if (activeTab === 'ZONES') {
+      fetchZones();
+    } else {
+      fetchShipments();
+    }
+  }, [activeTab, page, fetchShipments, fetchZones]);
 
   // Cleanup on unmount
   useEffect(() => {
     return () => resetShippingState();
   }, [resetShippingState]);
 
+  const handleOpenZoneModal = (zone = null) => {
+    if (zone) {
+      setEditingZone(zone);
+      setZoneForm({
+        zone_name: zone.zone_name,
+        states: zone.states || [],
+        shipping_charge: zone.shipping_charge,
+        free_shipping_above: zone.free_shipping_above || '',
+        estimated_days: zone.estimated_days || '3-5 Days',
+        status: zone.status
+      });
+    } else {
+      setEditingZone(null);
+      setZoneForm({
+        zone_name: '',
+        states: [],
+        shipping_charge: '',
+        free_shipping_above: '',
+        estimated_days: '3-5 Days',
+        status: true
+      });
+    }
+    setIsZoneModalOpen(true);
+  };
+
+  const handleZoneSubmit = async (e) => {
+    e.preventDefault();
+    let success;
+    if (editingZone) {
+      success = await updateZone(editingZone.zone_id, zoneForm);
+    } else {
+      success = await addZone(zoneForm);
+    }
+    if (success) setIsZoneModalOpen(false);
+  };
+
+  const toggleState = (state) => {
+    const currentStates = zoneForm.states || [];
+    const newStates = currentStates.includes(state)
+      ? currentStates.filter(s => s !== state)
+      : [...currentStates, state];
+    setZoneForm({ ...zoneForm, states: newStates });
+  };
+
   const handleOpenStatusModal = (shipment) => {
     setSelectedShipment(shipment);
     setUpdateStatusData({ 
       status: shipment.status, 
       location: '', 
-      comment: '' 
+      comment: '',
+      courier_name: shipment.courier_name || '',
+      tracking_id: shipment.tracking_id || ''
     });
     setIsStatusModalOpen(true);
   };
@@ -61,7 +145,60 @@ const ShippingManagement = () => {
     return 'primary';
   };
 
-  const columns = [
+  const zoneColumns = [
+    {
+      label: 'Zone Name',
+      key: 'zone_name',
+      width: '20%',
+      render: (row) => <span className={styles.zoneName}>{row.zone_name}</span>
+    },
+    {
+      label: 'States',
+      key: 'states',
+      width: '35%',
+      render: (row) => (
+        <div className={styles.statesList}>
+          {(row.states || []).map(s => <span key={s} className={styles.stateTagSmall}>{s}</span>)}
+        </div>
+      )
+    },
+    {
+      label: 'Estimation',
+      key: 'estimated_days',
+      width: '15%',
+      render: (row) => <span className={styles.textMuted}>{row.estimated_days || '3-5 Days'}</span>
+    },
+    {
+      label: 'Charge',
+      key: 'shipping_charge',
+      width: '15%',
+      render: (row) => <span className={styles.chargeValue}>₹{row.shipping_charge}</span>
+    },
+    {
+      label: 'Free Above',
+      key: 'free_shipping_above',
+      width: '15%',
+      render: (row) => (
+        <span className={styles.freeLimit}>
+          {row.free_shipping_above ? `₹${row.free_shipping_above}` : 'No Limit'}
+        </span>
+      )
+    },
+    {
+      label: 'Actions',
+      key: 'actions',
+      width: '15%',
+      align: 'right',
+      render: (row) => (
+        <div className={styles.actionRow}>
+          <button className={styles.iconBtn} onClick={() => handleOpenZoneModal(row)}>Edit</button>
+          <button className={`${styles.iconBtn} ${styles.deleteBtn}`} onClick={() => deleteZone(row.zone_id)}>Delete</button>
+        </div>
+      )
+    }
+  ];
+
+  const columns = activeTab === 'ZONES' ? zoneColumns : [
     {
       label: 'Order Info',
       key: 'order',
@@ -144,21 +281,26 @@ const ShippingManagement = () => {
           </button>
         ))}
       </div>
+      {activeTab === 'ZONES' && (
+        <button className={styles.addZoneBtn} onClick={() => handleOpenZoneModal()}>
+          + Add New Zone
+        </button>
+      )}
     </div>
   );
 
   return (
     <div className="page-container">
-      {loading && <div className={styles.loadingBar} />}
+      {(loading || loadingZones) && <div className={styles.loadingBar} />}
       <div className={styles.tableContainer}>
         <DataTable
-          title="Logistics & Shipping"
+          title={activeTab === 'ZONES' ? "Shipping Zones & Rates" : "Logistics & Shipping"}
           columns={columns}
-          data={shipments}
+          data={activeTab === 'ZONES' ? zones : shipments}
           actions={headerActions}
-          emptyMessage={loading ? "Loading shipments..." : "No shipments found in this category."}
+          emptyMessage={(loading || loadingZones) ? "Loading..." : "Nothing found here."}
         />
-        {!loading && total > limit && (
+        {activeTab !== 'ZONES' && !loading && total > limit && (
            <Pagination
              totalItems={total}
              itemsPerPage={limit}
@@ -167,6 +309,89 @@ const ShippingManagement = () => {
            />
         )}
       </div>
+
+      {/* Zone Modal */}
+      {isZoneModalOpen && (
+        <div className={styles.modalOverlay} onClick={() => setIsZoneModalOpen(false)}>
+          <div className={`${styles.modalCard} ${styles.zoneModal}`} onClick={e => e.stopPropagation()}>
+            <div className={styles.modalHeader}>
+              <h3 className={styles.modalTitle}>{editingZone ? 'Edit Shipping Zone' : 'Add New Shipping Zone'}</h3>
+              <p className={styles.modalSubtitle}>Define states and their corresponding shipping charges</p>
+            </div>
+            
+            <form onSubmit={handleZoneSubmit} className={styles.modalBody}>
+              <div className={styles.formGroup}>
+                <label className={styles.formLabel}>Zone Name</label>
+                <input 
+                  type="text" 
+                  required
+                  placeholder="e.g. South India Local"
+                  className={styles.formInput}
+                  value={zoneForm.zone_name}
+                  onChange={e => setZoneForm({...zoneForm, zone_name: e.target.value})}
+                />
+              </div>
+
+              <div className={styles.formGroup}>
+                <label className={styles.formLabel}>Select States</label>
+                <div className={styles.statesSelector}>
+                  {allIndianStates.map(state => (
+                    <button
+                      key={state}
+                      type="button"
+                      className={`${styles.stateTag} ${(zoneForm.states || []).includes(state) ? styles.stateTagActive : ''}`}
+                      onClick={() => toggleState(state)}
+                    >
+                      {state}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className={styles.formGrid}>
+                <div className={styles.formGroup}>
+                  <label className={styles.formLabel}>Shipping Charge (₹)</label>
+                  <input 
+                    type="number" 
+                    required
+                    placeholder="50"
+                    className={styles.formInput}
+                    value={zoneForm.shipping_charge}
+                    onChange={e => setZoneForm({...zoneForm, shipping_charge: e.target.value})}
+                  />
+                </div>
+                <div className={styles.formGroup}>
+                  <label className={styles.formLabel}>Free Shipping Above (₹)</label>
+                  <input 
+                    type="number" 
+                    placeholder="e.g. 2000"
+                    className={styles.formInput}
+                    value={zoneForm.free_shipping_above}
+                    onChange={e => setZoneForm({...zoneForm, free_shipping_above: e.target.value})}
+                  />
+                </div>
+                <div className={styles.formGroup}>
+                  <label className={styles.formLabel}>Estimated Delivery</label>
+                  <input 
+                    type="text" 
+                    placeholder="e.g. 3-5 Days"
+                    className={styles.formInput}
+                    value={zoneForm.estimated_days}
+                    onChange={e => setZoneForm({...zoneForm, estimated_days: e.target.value})}
+                  />
+                </div>
+              </div>
+
+              <div className={styles.modalActions}>
+                <button type="button" className={styles.cancelBtn} onClick={() => setIsZoneModalOpen(false)}>Cancel</button>
+                <button type="submit" className={styles.saveBtn} disabled={actionLoading}>
+                  {actionLoading ? 'Saving...' : 'Save Zone'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Status Update Modal */}
       {isStatusModalOpen && (
@@ -192,6 +417,29 @@ const ShippingManagement = () => {
                   <option value="RTO">RTO</option>
                 </select>
               </div>
+              <div className={styles.formGrid}>
+                <div className={styles.formGroup}>
+                  <label className={styles.formLabel}>Courier Name</label>
+                  <input 
+                    type="text" 
+                    placeholder="e.g. Delhivery"
+                    value={updateStatusData.courier_name}
+                    onChange={(e) => setUpdateStatusData({...updateStatusData, courier_name: e.target.value})}
+                    className={styles.formInput}
+                  />
+                </div>
+                <div className={styles.formGroup}>
+                  <label className={styles.formLabel}>Tracking ID</label>
+                  <input 
+                    type="text" 
+                    placeholder="e.g. TRK123456"
+                    value={updateStatusData.tracking_id}
+                    onChange={(e) => setUpdateStatusData({...updateStatusData, tracking_id: e.target.value})}
+                    className={styles.formInput}
+                  />
+                </div>
+              </div>
+
               <div className={styles.formGroup}>
                 <label className={styles.formLabel}>Current Location (Optional)</label>
                 <input 

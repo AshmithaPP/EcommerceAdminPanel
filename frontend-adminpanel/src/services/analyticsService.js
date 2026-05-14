@@ -1,13 +1,13 @@
 import { privateApi } from './api';
 
 const analyticsService = {
-  getSummary: async () => {
-    const response = await privateApi.get('/analytics/summary');
+  getSummary: async (params = {}) => {
+    const response = await privateApi.get('/analytics/summary', { params });
     return response.data;
   },
 
-  getTrends: async (period = 30) => {
-    const response = await privateApi.get(`/analytics/trends?period=${period}`);
+  getTrends: async (params = {}) => {
+    const response = await privateApi.get('/analytics/trends', { params });
     return response.data;
   },
 
@@ -16,8 +16,8 @@ const analyticsService = {
     return response.data;
   },
 
-  getCustomers: async () => {
-    const response = await privateApi.get('/analytics/customers');
+  getCustomers: async (params = {}) => {
+    const response = await privateApi.get('/analytics/customers', { params });
     return response.data;
   },
 

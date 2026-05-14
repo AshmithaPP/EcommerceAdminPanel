@@ -10,7 +10,9 @@ const Order = {
             const orderId = uuidv4();
             const {
                 user_id, address_id, subtotal, discount,
-                delivery_fee, total_amount, payment_method, shipping_address, coupon_id
+                delivery_fee, total_amount, payment_method, shipping_address, coupon_id,
+                gst_rate, gst_amount, cgst_amount, sgst_amount, igst_amount,
+                amount_without_gst, amount_with_gst, shipping_zone
             } = orderData;
 
             // 1. Insert Order
@@ -18,15 +20,20 @@ const Order = {
             const orderSql = `
                 INSERT INTO orders (
                     order_id, order_number, user_id, address_id, subtotal, discount, 
-                    delivery_fee, total_amount, payment_method, shipping_address, coupon_id
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    delivery_fee, shipping_zone, total_amount, payment_method, shipping_address, coupon_id,
+                    gst_rate, gst_amount, cgst_amount, sgst_amount, igst_amount,
+                    amount_without_gst, amount_with_gst
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             `;
             await connection.query(orderSql, [
                 orderId, orderNumber, user_id, address_id, subtotal, discount,
-                delivery_fee, total_amount, payment_method, JSON.stringify(shipping_address), coupon_id || null
+                delivery_fee, shipping_zone || null, total_amount, payment_method, JSON.stringify(shipping_address), coupon_id || null,
+                gst_rate || 0, gst_amount || 0, cgst_amount || 0, sgst_amount || 0, igst_amount || 0,
+                amount_without_gst || 0, amount_with_gst || 0
             ]);
 
             // 2. Insert Order Items
+            const Inventory = require('./inventoryModel');
             for (const item of items) {
                 const orderItemId = uuidv4();
                 const itemSql = `
@@ -42,20 +49,9 @@ const Order = {
                     item.quantity, item.price, item.image_url || null
                 ]);
 
-                // 3. Update Inventory (Deduct Stock)
-                if (item.variant_id) {
-                    await connection.query(
-                        'UPDATE inventory_levels SET quantity = quantity - ? WHERE variant_id = ?',
-                        [item.quantity, item.variant_id]
-                    );
-                } else {
-                    // Fallback for base products if they have inventory entries directly
-                    await connection.query(
-                        'UPDATE inventory_levels SET quantity = quantity - ? WHERE product_id = ? AND variant_id IS NULL',
-                        [item.quantity, item.product_id]
-                    );
-                }
             }
+            // 3. Inventory update removed from here. 
+            // Stock will now be deducted only after successful payment confirmation.
 
             await connection.commit();
 
@@ -111,9 +107,14 @@ const Order = {
         return order;
     },
 
-    updateStatus: async (orderId, status, paymentStatus, transactionId = null, gateway = 'razorpay') => {
+    updateStatus: async (orderId, status, paymentStatus, transactionId = null, gateway = 'razorpay', connection = null) => {
         const sql = 'UPDATE orders SET status = ?, payment_status = ?, transaction_id = ?, payment_gateway = ? WHERE order_id = ?';
-        await db.query(sql, [status, paymentStatus, transactionId, gateway, orderId]);
+        const params = [status, paymentStatus, transactionId, gateway, orderId];
+        if (connection) {
+            await connection.query(sql, params);
+        } else {
+            await db.query(sql, params);
+        }
     },
 
     findAllByUserId: async (userId, page = 1, limit = 10) => {
@@ -129,39 +130,134 @@ const Order = {
         return rows;
     },
 
-    cancelOrder: async (orderId, userId) => {
-        const [result] = await db.query(
-            `UPDATE orders SET status = 'cancelled', cancelled_at = CURRENT_TIMESTAMP 
-             WHERE order_id = ? AND user_id = ? AND status IN ('pending', 'paid', 'processing')`,
-            [orderId, userId]
-        );
-        return result.affectedRows > 0;
+    cancelOrder: async (order_id, userId) => {
+        const connection = await db.getConnection();
+        await connection.beginTransaction();
+
+        try {
+            // 1. Check if order exists and is cancellable
+            const [orders] = await connection.query(
+                'SELECT order_number, status FROM orders WHERE order_id = ? AND user_id = ?',
+                [order_id, userId]
+            );
+
+            if (orders.length === 0) return false;
+            const order = orders[0];
+
+            if (!['pending', 'paid', 'processing'].includes(order.status)) {
+                await connection.rollback();
+                return false;
+            }
+
+            // 2. Fetch items to restore stock
+            const [items] = await connection.query(
+                'SELECT variant_id, product_id, quantity FROM order_items WHERE order_id = ?',
+                [order_id]
+            );
+
+            // 3. Update Order Status
+            await connection.query(
+                "UPDATE orders SET status = 'cancelled', cancelled_at = CURRENT_TIMESTAMP WHERE order_id = ?",
+                [order_id]
+            );
+
+            // 4. Restore Inventory & Log History
+            const Inventory = require('./inventoryModel');
+            for (const item of items) {
+                if (item.variant_id) {
+                    await Inventory.adjustStock(
+                        item.variant_id,
+                        item.quantity,
+                        'ORDER_CANCELLED',
+                        order.order_number,
+                        'Order cancelled by customer',
+                        connection
+                    );
+                } else {
+                    // Fallback for base products
+                    await connection.query(
+                        'UPDATE inventory_levels SET quantity = quantity + ? WHERE product_id = ? AND variant_id IS NULL',
+                        [item.quantity, item.product_id]
+                    );
+                }
+            }
+
+            await connection.commit();
+            return true;
+        } catch (error) {
+            await connection.rollback();
+            throw error;
+        } finally {
+            connection.release();
+        }
     },
 
     adminUpdateStatus: async (orderId, data) => {
         const { status, tracking_id, courier_name, estimated_delivery_date, message } = data;
-        const sql = `
-            UPDATE orders SET 
-                status = ?, 
-                tracking_id = ?, 
-                courier_name = ?, 
-                estimated_delivery_date = ? 
-            WHERE order_id = ?
-        `;
-        await db.query(sql, [
-            status,
-            tracking_id || null,
-            courier_name || null,
-            estimated_delivery_date || null,
-            orderId
-        ]);
+        const connection = await db.getConnection();
+        await connection.beginTransaction();
 
-        // Add timeline event
-        const timelineId = uuidv4();
-        await db.query(
-            'INSERT INTO order_timeline (timeline_id, order_id, status, message) VALUES (?, ?, ?, ?)',
-            [timelineId, orderId, status, message || `Order status updated to ${status}`]
-        );
+        try {
+            // 1. Fetch current status and items to handle stock restoration if cancelling
+            const [orders] = await connection.query('SELECT status, order_number FROM orders WHERE order_id = ?', [orderId]);
+            if (orders.length === 0) throw new Error('Order not found');
+            const oldStatus = orders[0].status;
+            const orderNumber = orders[0].order_number;
+
+            // 2. Update Order Record
+            const sql = `
+                UPDATE orders SET 
+                    status = ?, 
+                    tracking_id = ?, 
+                    courier_name = ?, 
+                    estimated_delivery_date = ? 
+                WHERE order_id = ?
+            `;
+            await connection.query(sql, [
+                status,
+                tracking_id || null,
+                courier_name || null,
+                estimated_delivery_date || null,
+                orderId
+            ]);
+
+            // 3. Stock Restoration Logic (If moving to cancelled from a non-cancelled state)
+            if (status === 'cancelled' && oldStatus !== 'cancelled') {
+                const [items] = await connection.query('SELECT variant_id, product_id, quantity FROM order_items WHERE order_id = ?', [orderId]);
+                const Inventory = require('./inventoryModel');
+                for (const item of items) {
+                    if (item.variant_id) {
+                        await Inventory.adjustStock(
+                            item.variant_id,
+                            item.quantity,
+                            'ORDER_CANCELLED',
+                            orderNumber,
+                            'Order cancelled by admin',
+                            connection
+                        );
+                    } else {
+                        await connection.query(
+                            'UPDATE inventory_levels SET quantity = quantity + ? WHERE product_id = ? AND variant_id IS NULL',
+                            [item.quantity, item.product_id]
+                        );
+                    }
+                }
+            }
+
+            // 4. Add timeline event
+            const timelineId = uuidv4();
+            await connection.query(
+                'INSERT INTO order_timeline (timeline_id, order_id, status, message) VALUES (?, ?, ?, ?)',
+                [timelineId, orderId, status, message || `Order status updated to ${status}`]
+            );
+
+            await connection.commit();
+        } catch (error) {
+            await connection.rollback();
+            throw error;
+        } finally {
+            connection.release();
+        }
     },
 
     updateShipping: async (orderId, shippingData) => {
