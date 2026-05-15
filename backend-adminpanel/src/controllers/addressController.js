@@ -4,7 +4,7 @@ const addressController = {
     addAddress: async (req, res, next) => {
         try {
             const userId = req.user.user_id;
-            const address = await Address.create(userId, req.body);
+            const address = await Address.create({ ...req.body, user_id: userId });
             res.status(201).json({
                 success: true,
                 message: 'Address added successfully',
@@ -18,7 +18,7 @@ const addressController = {
     getAddresses: async (req, res, next) => {
         try {
             const userId = req.user.user_id;
-            const addresses = await Address.findAllByUserId(userId);
+            const addresses = await Address.findByUserId(userId);
             res.status(200).json({
                 success: true,
                 addresses
@@ -42,7 +42,7 @@ const addressController = {
                 });
             }
 
-            const updated = await Address.update(address_id, userId, req.body);
+            const updated = await Address.update(address_id, req.body);
             res.status(200).json({
                 success: true,
                 message: 'Address updated successfully',
@@ -67,7 +67,7 @@ const addressController = {
                 });
             }
 
-            await Address.delete(address_id, userId);
+            await Address.delete(address_id);
             res.status(200).json({
                 success: true,
                 message: 'Address deleted successfully'

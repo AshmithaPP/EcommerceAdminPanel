@@ -109,7 +109,33 @@
   margin: 0;
 }
 
-.viewAllBtn:hover { opacity: 0.7; }
+.viewAllBtn {
+  background: var(--surface);
+  border: 1.5px solid var(--primary-light);
+  color: var(--primary);
+  padding: 0.45rem 0.9rem;
+  border-radius: 8px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.viewAllBtn:hover {
+  background: var(--primary);
+  color: #FFFFFF;
+  border-color: var(--primary);
+  transform: translateY(-1.5px);
+  box-shadow: 0 4px 12px rgba(94, 53, 176, 0.2);
+}
+
+.viewAllBtn:active {
+  transform: translateY(0);
+}
+
 
 .timeframeSelect {
   background-color: var(--surface);

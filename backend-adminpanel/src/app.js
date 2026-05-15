@@ -229,26 +229,35 @@ const allowedOrigins = [
     'https://mediumpurple-penguin-835175.hostingersite.com',
     'http://mediumpurple-penguin-835175.hostingersite.com',
     'https://www.mediumpurple-penguin-835175.hostingersite.com',
-    'http://www.mediumpurple-penguin-835175.hostingersite.com'
+    'http://www.mediumpurple-penguin-835175.hostingersite.com',
+    'https://ecommerce-admin-panel-two.vercel.app',
+    'http://ecommerce-admin-panel-two.vercel.app',
+    'https://ecommerce-admin-panel-two.vercel.app/',
+    'https://ecommerce-admin-panel-two-vercel.app',
+    'https://papayawhip-tarsier-553475.hostingersite.com',
+    'http://papayawhip-tarsier-553475.hostingersite.com'
 ];
-app.use(cors({
-    origin: function (origin, callback) {
-        if (!origin) return callback(null, true);
-        
-        // Remove trailing slash for comparison
-        const cleanOrigin = origin.endsWith('/') ? origin.slice(0, -1) : origin;
-        
-        if (allowedOrigins.includes(cleanOrigin)) {
-            return callback(null, true);
-        } else {
-            const msg = `CORS blocked: ${origin} is not in allowed list.`;
-            return callback(new Error(msg), false);
-        }
-    },
-    credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'x-guest-id']
-}));
+
+// Combined Manual CORS Middleware
+app.use((req, res, next) => {
+    const origin = req.headers.origin;
+    const cleanOrigin = origin && origin.endsWith('/') ? origin.slice(0, -1) : origin;
+
+    // Allow if in list OR if it's a vercel link
+    if (!origin || allowedOrigins.includes(cleanOrigin) || (origin && origin.includes('vercel.app'))) {
+        res.header('Access-Control-Allow-Origin', origin);
+    }
+
+    res.header('Access-Control-Allow-Credentials', 'true');
+    res.header('Access-Control-Allow-Methods', 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-guest-id');
+
+    // Instant preflight response
+    if (req.method === 'OPTIONS') {
+        return res.sendStatus(200);
+    }
+    next();
+});
 
 // Routes
 app.use('/api/auth', authRoutes);

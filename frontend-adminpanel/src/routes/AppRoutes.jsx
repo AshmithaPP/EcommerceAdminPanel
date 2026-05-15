@@ -1,29 +1,36 @@
-import React from 'react';
+import React, { lazy, Suspense } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
-import Dashboard from '../pages/Dashboard/Dashboard';
-import Analytics from '../pages/Analytics/Analytics';
-import Products from '../pages/Products/Products';
-import AddProduct from '../pages/AddProduct/AddProduct';
-import EditProduct from '../pages/EditProduct/EditProduct';
-import Categories from '../pages/Categories/CategoryManagement';
-import Orders from '../pages/Orders/Orders';
-import OrderDetails from '../pages/Orders/OrderDetails';
-import CustomerList from '../pages/Customers/CustomerList';
-import CustomerDetails from '../pages/Customers/CustomerDetails/CustomerDetails';
-import InventoryList from '../pages/Inventory/InventoryList';
-import PaymentManagement from '../pages/Payments/PaymentManagement';
-import ShippingManagement from '../pages/Shipping/ShippingManagement';
-import MarketingStudio from '../pages/coupon/CouponManagement';
-import AdminManagement from '../pages/Admins/AdminManagement';
-import Settings from '../pages/Settings/Settings';
-import ResetPassword from '../pages/Auth/ResetPassword';
-import HomepageManagement from '../pages/HomepageManagement/HomepageManagement';
-import BlogManagement from '../pages/Blogs/BlogManagement';
-import AttributeManagement from '../pages/Attributes/AttributeManagement';
+
+const Dashboard = lazy(() => import('../pages/Dashboard/Dashboard'));
+const Analytics = lazy(() => import('../pages/Analytics/Analytics'));
+const Products = lazy(() => import('../pages/Products/Products'));
+const AddProduct = lazy(() => import('../pages/AddProduct/AddProduct'));
+const EditProduct = lazy(() => import('../pages/EditProduct/EditProduct'));
+const Categories = lazy(() => import('../pages/Categories/CategoryManagement'));
+const Orders = lazy(() => import('../pages/Orders/Orders'));
+const OrderDetails = lazy(() => import('../pages/Orders/OrderDetails'));
+const CustomerList = lazy(() => import('../pages/Customers/CustomerList'));
+const CustomerDetails = lazy(() => import('../pages/Customers/CustomerDetails/CustomerDetails'));
+const InventoryList = lazy(() => import('../pages/Inventory/InventoryList'));
+const PaymentManagement = lazy(() => import('../pages/Payments/PaymentManagement'));
+const ShippingManagement = lazy(() => import('../pages/Shipping/ShippingManagement'));
+const MarketingStudio = lazy(() => import('../pages/coupon/CouponManagement'));
+const AdminManagement = lazy(() => import('../pages/Admins/AdminManagement'));
+const Settings = lazy(() => import('../pages/Settings/Settings'));
+const ResetPassword = lazy(() => import('../pages/Auth/ResetPassword'));
+const HomepageManagement = lazy(() => import('../pages/HomepageManagement/HomepageManagement'));
+const BlogManagement = lazy(() => import('../pages/Blogs/BlogManagement'));
+const AttributeManagement = lazy(() => import('../pages/Attributes/AttributeManagement'));
 
 const AppRoutes = () => {
   return (
-    <Routes>
+    <Suspense fallback={<div className="d-flex justify-content-center align-items-center vh-100">
+      <div className="spinner-border text-primary" role="status">
+        <span className="visually-hidden">Loading...</span>
+      </div>
+    </div>}>
+      <Routes>
+
       <Route path="/" element={<Navigate to="/dashboard" replace />} />
       <Route path="/dashboard" element={<Dashboard />} />
       <Route path="/analytics" element={<Analytics />} />
@@ -47,7 +54,8 @@ const AppRoutes = () => {
       <Route path="/reset-password" element={<ResetPassword />} />
       {/* 404 Route */}
       <Route path="*" element={<div className="text-center mt-5"><h4>Page Not Found</h4></div>} />
-    </Routes>
+      </Routes>
+    </Suspense>
   );
 };
 
