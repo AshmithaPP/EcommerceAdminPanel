@@ -1,6 +1,5 @@
 import axios from 'axios';
-
-const BASE_URL = 'http://localhost:5000/api';
+import { BASE_URL } from '../config/api';
 
 // Public instance for login/signup
 export const publicApi = axios.create({

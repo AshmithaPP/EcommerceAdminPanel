@@ -5,6 +5,7 @@ import styles from './OrderDetails.module.css';
 import DataTable from '../../components/ui/DataTable';
 import StatCard from '../../components/ui/StatCard';
 import useOrderStore from '../../store/orderStore';
+import { STORAGE_URL } from '../../config/api';
 
 // ── Helpers ──────────────────────────────────────────
 const formatCurrency = (amount) =>
@@ -119,7 +120,7 @@ const OrderDetails = () => {
         <div className={styles.productCell}>
           <div className={styles.productThumb}>
             {row.image_url ? (
-                <img src={row.image_url.startsWith('http') ? row.image_url : `http://localhost:5000${row.image_url}`} alt="" className={styles.thumbImg} />
+                <img src={row.image_url.startsWith('http') ? row.image_url : `${STORAGE_URL}${row.image_url}`} alt="" className={styles.thumbImg} />
             ) : (
                 <Package size={16} style={{ opacity: 0.3 }} />
             )}

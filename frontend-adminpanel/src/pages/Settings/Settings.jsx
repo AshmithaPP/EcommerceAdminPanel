@@ -15,7 +15,7 @@ import Modal from '../../components/ui/Modal';
 import Button from '../../components/ui/Button';
 import styles from './Settings.module.css';
 
-const STORAGE_URL = 'http://localhost:5000';
+import { STORAGE_URL } from '../../config/api';
 
 const SITE_INFO_FIELDS = [
   { key: 'site_url', name: 'Site URL', type: 'url' },

@@ -225,17 +225,25 @@ const allowedOrigins = [
     'http://localhost:5174',
     'http://127.0.0.1:5174',
     'http://localhost:3000',
-    'http://127.0.0.1:3000'
+    'http://127.0.0.1:3000',
+    'https://mediumpurple-penguin-835175.hostingersite.com',
+    'http://mediumpurple-penguin-835175.hostingersite.com',
+    'https://www.mediumpurple-penguin-835175.hostingersite.com',
+    'http://www.mediumpurple-penguin-835175.hostingersite.com'
 ];
 app.use(cors({
     origin: function (origin, callback) {
-        // Allow requests with no origin (like mobile apps or curl requests)
         if (!origin) return callback(null, true);
-        if (allowedOrigins.indexOf(origin) === -1) {
-            const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
+        
+        // Remove trailing slash for comparison
+        const cleanOrigin = origin.endsWith('/') ? origin.slice(0, -1) : origin;
+        
+        if (allowedOrigins.includes(cleanOrigin)) {
+            return callback(null, true);
+        } else {
+            const msg = `CORS blocked: ${origin} is not in allowed list.`;
             return callback(new Error(msg), false);
         }
-        return callback(null, true);
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],

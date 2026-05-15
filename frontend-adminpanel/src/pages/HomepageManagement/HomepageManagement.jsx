@@ -11,7 +11,7 @@ import SelectBox from '../../components/ui/SelectBox';
 import useHomeStore from '../../store/homeStore';
 import styles from './HomepageManagement.module.css';
 
-const STORAGE_URL = 'http://localhost:5000';
+import { STORAGE_URL } from '../../config/api';
 
 const getImageUrl = (url) => {
     if (!url) return null;

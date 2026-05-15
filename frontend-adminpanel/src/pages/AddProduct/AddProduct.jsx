@@ -42,7 +42,7 @@ import useProductFormStore from '../../store/productFormStore';
 import { calculateGSTFields } from '../../utils/pricing';
 import { showToast } from '../../utils/toast';
 
-const STORAGE_URL = 'http://localhost:5000';
+import { STORAGE_URL } from '../../config/api';
 
 const getImageUrl = (img) => {
   if (!img) return null;

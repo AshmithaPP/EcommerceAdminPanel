@@ -10,7 +10,7 @@ import styles from './Products.module.css';
 import useProductStore from '../../store/productStore';
 import { showToast } from '../../utils/toast';
 
-const STORAGE_URL = 'http://localhost:5000';
+import { STORAGE_URL } from '../../config/api';
 
 const getImageUrl = (url) => {
   if (!url) return null;

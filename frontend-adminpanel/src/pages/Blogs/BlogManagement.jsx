@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { privateApi } from '../../services/api';
 import { Edit2, Trash2, Plus, Upload, Check, AlertCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { STORAGE_URL } from '../../config/api';
 
 import Button from '../../components/ui/Button';
 import Badge from '../../components/ui/Badge';
@@ -247,7 +248,7 @@ const BlogManagement = () => {
                                         <img 
                                             src={formData.image?.startsWith('http') || formData.image_url?.startsWith('http') 
                                                 ? (formData.image || formData.image_url) 
-                                                : `http://localhost:5000${formData.image || formData.image_url}`} 
+                                                : `${STORAGE_URL}${formData.image || formData.image_url}`} 
                                             alt="Preview" 
                                         />
                                     </div>
