@@ -59,6 +59,8 @@ const Dashboard = () => {
     };
   });
 
+  const todayStr = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD format
+
   // Store Actions
   const fetchInitialData = useDashboardStore(state => state.fetchInitialData);
   const fetchAnalyticsData = useDashboardStore(state => state.fetchAnalyticsData);
@@ -84,6 +86,10 @@ const Dashboard = () => {
   const handleCustomSubmit = (e) => {
     e.preventDefault();
     if (customRange.start && customRange.end) {
+      if (customRange.start > todayStr || customRange.end > todayStr) {
+        alert("Future dates are not allowed");
+        return;
+      }
       setActiveFilter({ 
         type: 'custom', 
         isCustom: true, 
@@ -242,6 +248,7 @@ const Dashboard = () => {
                 type="date" 
                 className={styles.dateInput}
                 value={customRange.start}
+                max={todayStr}
                 onChange={(e) => setCustomRange({...customRange, start: e.target.value})}
               />
             </div>
@@ -252,6 +259,7 @@ const Dashboard = () => {
                 type="date" 
                 className={styles.dateInput}
                 value={customRange.end}
+                max={todayStr}
                 onChange={(e) => setCustomRange({...customRange, end: e.target.value})}
               />
             </div>

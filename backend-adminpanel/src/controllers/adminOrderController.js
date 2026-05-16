@@ -4,7 +4,7 @@ const db = require('../config/database');
 const adminOrderController = {
     getAllOrders: async (req, res, next) => {
         try {
-            const { status, page = 1, limit = 20 } = req.query;
+            const { status, search, page = 1, limit = 20 } = req.query;
             const offset = (page - 1) * limit;
 
             let sql = `
@@ -13,22 +13,43 @@ const adminOrderController = {
                 FROM orders o
                 LEFT JOIN users u ON o.user_id = u.user_id
                 LEFT JOIN payments p ON o.order_id = p.order_id AND p.status = 'success'
+                WHERE 1=1
             `;
             const params = [];
 
-            if (status) {
-                sql += ' WHERE o.status = ?';
-                params.push(status);
+            if (status && status !== 'All') {
+                sql += ' AND o.status = ?';
+                params.push(status.toLowerCase());
             }
+
+            if (search) {
+                sql += ' AND (o.order_number LIKE ? OR u.name LIKE ? OR u.email LIKE ?)';
+                params.push(`%${search}%`, `%${search}%`, `%${search}%`);
+            }
+
+            // Get total count for pagination with same filters
+            let countSql = `
+                SELECT COUNT(*) as total 
+                FROM orders o 
+                LEFT JOIN users u ON o.user_id = u.user_id 
+                WHERE 1=1
+            `;
+            const countParams = [];
+            if (status && status !== 'All') {
+                countSql += ' AND o.status = ?';
+                countParams.push(status.toLowerCase());
+            }
+            if (search) {
+                countSql += ' AND (o.order_number LIKE ? OR u.name LIKE ? OR u.email LIKE ?)';
+                countParams.push(`%${search}%`, `%${search}%`, `%${search}%`);
+            }
+            const [countRows] = await db.query(countSql, countParams);
 
             sql += ' ORDER BY o.created_at DESC LIMIT ? OFFSET ?';
             params.push(parseInt(limit), parseInt(offset));
 
             const [orders] = await db.query(sql, params);
             
-            // Total count for pagination
-            const [countRows] = await db.query('SELECT COUNT(*) as total FROM orders');
-
             res.status(200).json({
                 success: true,
                 orders,

@@ -342,19 +342,20 @@ const OrderDetails = () => {
                 <span className={styles.discountVal}>-{formatCurrency(order.discount)}</span>
               </div>
 
-              {/* GST Breakdown */}
-              {order.gst_rate > 0 && (
+              {/* GST & Financial Breakdown */}
+              <div className={styles.summaryRow}>
+                <span className={styles.gstLabel}>Taxable Value</span>
+                <span className={styles.gstValue}>{formatCurrency(order.amount_without_gst || (parseFloat(order.subtotal) - parseFloat(order.discount)))}</span>
+              </div>
+
+              {parseFloat(order.gst_rate) >= 0 && (
                 <>
-                  <div className={styles.summaryRow}>
-                    <span className={styles.gstLabel}>Taxable Value</span>
-                    <span className={styles.gstValue}>{formatCurrency(order.amount_without_gst)}</span>
-                  </div>
                   <div className={styles.summaryRow}>
                     <span className={styles.gstLabel}>GST ({order.gst_rate}%)</span>
                     <span className={styles.gstValue}>{formatCurrency(order.gst_amount)}</span>
                   </div>
                   <div className={styles.gstBreakdown}>
-                    {order.igst_amount > 0 ? (
+                    {parseFloat(order.igst_amount) > 0 ? (
                       <div className={styles.breakdownRow}>
                         <span>IGST</span>
                         <span>{formatCurrency(order.igst_amount)}</span>
@@ -362,11 +363,11 @@ const OrderDetails = () => {
                     ) : (
                       <>
                         <div className={styles.breakdownRow}>
-                          <span>CGST ({order.gst_rate / 2}%)</span>
+                          <span>CGST ({parseFloat(order.gst_rate) / 2}%)</span>
                           <span>{formatCurrency(order.cgst_amount)}</span>
                         </div>
                         <div className={styles.breakdownRow}>
-                          <span>SGST ({order.gst_rate / 2}%)</span>
+                          <span>SGST ({parseFloat(order.gst_rate) / 2}%)</span>
                           <span>{formatCurrency(order.sgst_amount)}</span>
                         </div>
                       </>

@@ -311,10 +311,11 @@
   background: rgba(13, 27, 62, 0.4);
   backdrop-filter: blur(2px);
   display: flex;
-  align-items: center;
+  align-items: flex-start; /* Allows scrolling from top if modal is too tall */
   justify-content: center;
   z-index: 1000;
-  padding: 1.5rem;
+  padding: 1rem;
+  overflow-y: auto;
   animation: fadeIn 0.15s ease-out;
 }
 
@@ -327,7 +328,9 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  max-height: 90vh;
+  max-height: calc(100vh - 2rem);
+  margin: auto; /* Centers the modal vertically when content is small */
+  flex-shrink: 0;
 }
 
 .modalWide {
@@ -335,7 +338,7 @@
 }
 
 .modalHeader {
-  padding: 1.25rem 1.5rem;
+  padding: 1rem 1.25rem;
   background-color: var(--table-header-bg, #E8ECF8);
   border-bottom: 1px solid var(--border-default, #D8DCF0);
   display: flex;
@@ -373,8 +376,9 @@
 }
 
 .modalBody {
-  padding: 1.5rem;
+  padding: 1.25rem;
   overflow-y: auto;
+  flex: 1;
 }
 
 /* Form */
@@ -386,8 +390,8 @@
 
 .formGrid2 {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 1.25rem;
+  grid-template-columns: 1fr;
+  gap: 1rem;
 }
 
 .formGroup {
@@ -549,6 +553,36 @@
   .searchWrapper { flex-grow: 1; min-width: 150px; }
   
   .historyFlow { display: block; margin-top: 4px; }
+  
+  /* Modal responsiveness */
+  .modalCard {
+    max-width: 95%;
+    margin: 10px;
+  }
+  
+  .formGrid2 {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .modalHeader {
+    padding: 1rem;
+  }
+  
+  .modalBody {
+    padding: 1rem;
+  }
+  
+  .modalActions {
+    flex-direction: column-reverse;
+  }
+  
+  .modalActions button {
+    width: 100%;
+    padding: 0.75rem;
+  }
 }
 
 .tableFooter {

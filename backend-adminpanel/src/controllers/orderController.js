@@ -84,8 +84,18 @@ const orderController = {
                 let image_url = null;
                 if (item.variant_id) {
                     const variant = await Product.getVariantById(item.variant_id);
-                    if (!variant || variant.stock < item.quantity) {
-                        return res.status(400).json({ success: false, message: `Not enough stock for variant` });
+                    if (!variant) {
+                        return res.status(400).json({ 
+                            success: false, 
+                            message: `Variant not found or inactive: ${item.variant_id}` 
+                        });
+                    }
+                    const variantStock = variant.stock ?? 0;
+                    if (variantStock < item.quantity) {
+                        return res.status(400).json({ 
+                            success: false, 
+                            message: `Not enough stock for variant ${variant.sku}. Available: ${variantStock}, Requested: ${item.quantity}` 
+                        });
                     }
                     price = parseFloat(variant.finalPrice || variant.sellingPrice || variant.price || 0);
                     variant_sku = variant.sku;
@@ -104,8 +114,18 @@ const orderController = {
                     }
                 } else {
                     const product = await Product.findById(item.product_id);
-                    if (!product || product.stock < item.quantity) {
-                        return res.status(400).json({ success: false, message: `Not enough stock for item` });
+                    if (!product) {
+                        return res.status(400).json({ 
+                            success: false, 
+                            message: `Product not found: ${item.product_id}` 
+                        });
+                    }
+                    const productStock = product.stock ?? 0;
+                    if (productStock < item.quantity) {
+                        return res.status(400).json({ 
+                            success: false, 
+                            message: `Not enough stock for item ${product.name}. Available: ${productStock}, Requested: ${item.quantity}` 
+                        });
                     }
                     price = parseFloat(product.price || 0);
                     product_name = product.name;
@@ -154,10 +174,29 @@ const orderController = {
                 }
             }
 
-            const delivery_fee = subtotal > 1000 ? 0 : 50;
+            const delivery_fee = cart.summary.shipping_charge || 0;
             const total_amount = subtotal - discount + delivery_fee;
 
-            // 5. Create Order
+            // 5. GST Calculations (Recalculate based on applied discount)
+            const gst_rate = parseFloat(cart.summary.gst_rate || 5);
+            const totalBeforeShipping = Math.max(0, subtotal - discount);
+            const amount_without_gst = parseFloat((totalBeforeShipping / (1 + (gst_rate / 100))).toFixed(2));
+            const gst_amount = parseFloat((totalBeforeShipping - amount_without_gst).toFixed(2));
+            
+            const SELLER_STATE = "Tamil Nadu";
+            const isSameState = finalAddress.state?.toLowerCase().trim().includes(SELLER_STATE.toLowerCase());
+            
+            let cgst_amount = 0, sgst_amount = 0, igst_amount = 0;
+            if (isSameState) {
+                cgst_amount = parseFloat((gst_amount / 2).toFixed(2));
+                sgst_amount = parseFloat((gst_amount - cgst_amount).toFixed(2));
+            } else {
+                igst_amount = gst_amount;
+            }
+
+            const isCOD = payment_method?.toUpperCase() === 'COD';
+
+            // 6. Create Order
             const result = await Order.create({
                 user_id: userId,
                 address_id: address_id || null,
@@ -167,7 +206,17 @@ const orderController = {
                 total_amount,
                 coupon_id,
                 payment_method: payment_method || 'razorpay',
-                shipping_address: finalAddress
+                shipping_address: finalAddress,
+                gst_rate,
+                gst_amount,
+                cgst_amount,
+                sgst_amount,
+                igst_amount,
+                amount_without_gst,
+                amount_with_gst: totalBeforeShipping,
+                shipping_zone: cart.summary.shipping_zone,
+                status: isCOD ? 'pending' : 'pending', // Both start as pending, but COD is ready for stock deduction
+                payment_status: isCOD ? 'Pending' : 'Pending'
             }, items);
 
             // 6. Post-Creation Logic

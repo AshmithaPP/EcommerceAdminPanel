@@ -55,12 +55,14 @@ const Orders = () => {
   };
 
   const getPaymentVariant = (status) => {
-    switch (status) {
-      case 'Paid':           return 'paid';
-      case 'Partially Paid': return 'partial';
-      case 'Pending':        return 'pending';
-      case 'Unpaid':         return 'unpaid';
-      case 'Failed':         return 'unpaid';
+    const s = status?.toLowerCase();
+    switch (s) {
+      case 'paid':           return 'paid';
+      case 'success':        return 'paid';
+      case 'partially paid': return 'partial';
+      case 'pending':        return 'pending';
+      case 'unpaid':         return 'unpaid';
+      case 'failed':         return 'unpaid';
       default:               return '';
     }
   };
@@ -108,13 +110,21 @@ const Orders = () => {
       ),
     },
     {
+      label: 'Method',
+      key: 'payment_method',
+      width: '100px',
+      render: (row) => (
+        <span className={styles.methodText}>{row.payment_method?.toUpperCase()}</span>
+      ),
+    },
+    {
       label: 'Payment Status',
       key: 'payment_status',
       width: '140px',
       align: 'center',
       render: (row) => (
         <span className={`${styles.badge} ${styles[`badge_${getPaymentVariant(row.payment_status)}`]}`}>
-          {row.payment_status}
+          {row.payment_status || 'Pending'}
         </span>
       ),
     },

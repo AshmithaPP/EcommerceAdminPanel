@@ -12,7 +12,8 @@ const Order = {
                 user_id, address_id, subtotal, discount,
                 delivery_fee, total_amount, payment_method, shipping_address, coupon_id,
                 gst_rate, gst_amount, cgst_amount, sgst_amount, igst_amount,
-                amount_without_gst, amount_with_gst, shipping_zone
+                amount_without_gst, amount_with_gst, shipping_zone,
+                status, payment_status
             } = orderData;
 
             // 1. Insert Order
@@ -22,14 +23,15 @@ const Order = {
                     order_id, order_number, user_id, address_id, subtotal, discount, 
                     delivery_fee, shipping_zone, total_amount, payment_method, shipping_address, coupon_id,
                     gst_rate, gst_amount, cgst_amount, sgst_amount, igst_amount,
-                    amount_without_gst, amount_with_gst
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    amount_without_gst, amount_with_gst, status, payment_status
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             `;
             await connection.query(orderSql, [
                 orderId, orderNumber, user_id, address_id, subtotal, discount,
                 delivery_fee, shipping_zone || null, total_amount, payment_method, JSON.stringify(shipping_address), coupon_id || null,
                 gst_rate || 0, gst_amount || 0, cgst_amount || 0, sgst_amount || 0, igst_amount || 0,
-                amount_without_gst || 0, amount_with_gst || 0
+                amount_without_gst || 0, amount_with_gst || 0,
+                status || 'pending', payment_status || 'pending'
             ]);
 
             // 2. Insert Order Items
@@ -100,7 +102,25 @@ const Order = {
         const order = orders[0];
         if (order) {
             if (typeof order.items === 'string') order.items = JSON.parse(order.items);
-            if (typeof order.timeline === 'string') order.timeline = JSON.parse(order.timeline);
+            let timeline = [];
+            if (typeof order.timeline === 'string') {
+                timeline = JSON.parse(order.timeline);
+            } else if (Array.isArray(order.timeline)) {
+                timeline = order.timeline;
+            }
+            
+            // Virtual Timeline Correction: Ensure current status is reflected in timeline if missing
+            const hasStatusInTimeline = timeline.some(t => t.status?.toLowerCase() === order.status?.toLowerCase());
+            if (!hasStatusInTimeline && order.status !== 'pending') {
+                timeline.push({
+                    status: order.status,
+                    message: `Order status moved to ${order.status}`,
+                    created_at: order.updated_at || order.created_at,
+                    is_virtual: true
+                });
+            }
+            order.timeline = timeline;
+
             if (typeof order.shipping_address === 'string') order.shipping_address = JSON.parse(order.shipping_address);
         }
 
@@ -110,11 +130,16 @@ const Order = {
     updateStatus: async (orderId, status, paymentStatus, transactionId = null, gateway = 'razorpay', connection = null) => {
         const sql = 'UPDATE orders SET status = ?, payment_status = ?, transaction_id = ?, payment_gateway = ? WHERE order_id = ?';
         const params = [status, paymentStatus, transactionId, gateway, orderId];
-        if (connection) {
-            await connection.query(sql, params);
-        } else {
-            await db.query(sql, params);
-        }
+        const conn = connection || db;
+        
+        await conn.query(sql, params);
+
+        // Add timeline event
+        const timelineId = uuidv4();
+        await conn.query(
+            'INSERT INTO order_timeline (timeline_id, order_id, status, message) VALUES (?, ?, ?, ?)',
+            [timelineId, orderId, status, `Payment confirmed. Status updated to ${status}.`]
+        );
     },
 
     findAllByUserId: async (userId, page = 1, limit = 10) => {
@@ -182,6 +207,13 @@ const Order = {
                 }
             }
 
+            // 5. Add timeline event
+            const timelineId = uuidv4();
+            await connection.query(
+                'INSERT INTO order_timeline (timeline_id, order_id, status, message) VALUES (?, ?, ?, ?)',
+                [timelineId, order_id, 'cancelled', 'Order cancelled by customer']
+            );
+
             await connection.commit();
             return true;
         } catch (error) {
@@ -198,11 +230,12 @@ const Order = {
         await connection.beginTransaction();
 
         try {
-            // 1. Fetch current status and items to handle stock restoration if cancelling
-            const [orders] = await connection.query('SELECT status, order_number FROM orders WHERE order_id = ?', [orderId]);
+            // 1. Fetch current details
+            const [orders] = await connection.query('SELECT status, order_number, payment_method FROM orders WHERE order_id = ?', [orderId]);
             if (orders.length === 0) throw new Error('Order not found');
             const oldStatus = orders[0].status;
             const orderNumber = orders[0].order_number;
+            const paymentMethod = orders[0].payment_method;
 
             // 2. Update Order Record
             const sql = `
@@ -220,6 +253,18 @@ const Order = {
                 estimated_delivery_date || null,
                 orderId
             ]);
+
+            // Special Case: COD order delivered should mark payment as Paid
+            if (status === 'delivered' && paymentMethod?.toUpperCase() === 'COD') {
+                await connection.query('UPDATE orders SET payment_status = "Paid" WHERE order_id = ?', [orderId]);
+                
+                // Add an extra timeline event for the payment confirmation
+                const payTimelineId = uuidv4();
+                await connection.query(
+                    'INSERT INTO order_timeline (timeline_id, order_id, status, message) VALUES (?, ?, ?, ?)',
+                    [payTimelineId, orderId, 'paid', 'Payment collected (Cash on Delivery)']
+                );
+            }
 
             // 3. Stock Restoration Logic (If moving to cancelled from a non-cancelled state)
             if (status === 'cancelled' && oldStatus !== 'cancelled') {
