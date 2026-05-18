@@ -59,6 +59,42 @@ const Payment = {
             payments,
             total: countRows[0].total
         };
+    },
+
+    getReportData: async (startDate, endDate) => {
+        const sql = `
+            SELECT 
+                p.payment_id as 'Invoice No',
+                o.order_number as 'Order ID',
+                p.gateway_payment_id as 'Transaction ID',
+                DATE_FORMAT(p.created_at, '%Y-%m-%d %H:%i:%s') as 'Payment Date & Time',
+                u.name as 'Customer Name',
+                u.email as 'Customer Email',
+                u.phone as 'Customer Mobile',
+                o.payment_method as 'Payment Method',
+                p.gateway as 'Payment Gateway',
+                p.status as 'Payment Status',
+                o.subtotal as 'Subtotal',
+                o.discount as 'Discount',
+                o.delivery_fee as 'Shipping Charge',
+                o.gst_amount as 'GST/Tax',
+                o.total_amount as 'Total Amount',
+                0 as 'Refund Amount',
+                'INR' as 'Currency',
+                DATE_FORMAT(p.created_at, '%Y-%m-%d %H:%i:%s') as 'Created Date',
+                DATE_FORMAT(p.updated_at, '%Y-%m-%d %H:%i:%s') as 'Updated Date',
+                o.status as 'Order Status',
+                o.status as 'Delivery Status',
+                o.coupon_id as 'Coupon Code Used',
+                p.gateway_order_id as 'Gateway Reference ID'
+            FROM payments p
+            JOIN orders o ON p.order_id = o.order_id
+            JOIN users u ON o.user_id = u.user_id
+            WHERE DATE(p.created_at) >= ? AND DATE(p.created_at) <= ?
+            ORDER BY p.created_at DESC
+        `;
+        const [rows] = await db.query(sql, [startDate, endDate]);
+        return rows;
     }
 };
 

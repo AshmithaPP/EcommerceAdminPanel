@@ -1,5 +1,6 @@
 const Inventory = require('../models/inventoryModel');
 const db = require('../config/database');
+const { sendLowStockEmail } = require('../utils/emailService');
 
 const inventoryService = {
     // === Initialize Inventory for New Variant ===
@@ -82,6 +83,57 @@ const inventoryService = {
                     conn
                 );
                 results.push(result);
+            }
+
+            if (!connection) await conn.commit();
+            return { success: true, orderId, results };
+        } catch (error) {
+            if (!connection) await conn.rollback();
+            throw error;
+        } finally {
+            if (!connection) conn.release();
+        }
+    },
+
+    /**
+     * Restore stock immediately when an order is cancelled.
+     * Log: ORDER_CANCELLED
+     */
+    completeOrderStockDeduction: async (orderItems, orderId, connection = null) => {
+        const conn = connection || await db.getConnection();
+        try {
+            if (!connection) await conn.beginTransaction();
+
+            const results = [];
+            for (const item of orderItems) {
+                const { variant_id, quantity } = item;
+                // adjustStock internally reduces if we pass negative
+                const result = await Inventory.adjustStock(
+                    variant_id, 
+                    -Math.abs(quantity), 
+                    'ORDER_COMPLETED', 
+                    orderId, 
+                    'Stock deducted after successful payment', 
+                    conn
+                );
+                
+                results.push(result);
+
+                // --- Low Stock Email Trigger ---
+                try {
+                    // Fetch current updated inventory for this variant to check thresholds
+                    const currentInv = await Inventory.getInventoryWithProductDetails(variant_id);
+                    if (currentInv && currentInv.low_stock_threshold !== null) {
+                        // Check if it hit the threshold
+                        if (currentInv.quantity <= currentInv.low_stock_threshold) {
+                            // Basic debounce logic could be added here if needed
+                            await sendLowStockEmail(currentInv);
+                        }
+                    }
+                } catch (emailErr) {
+                    console.error('Failed to trigger low stock email:', emailErr);
+                    // Do not fail the transaction if email fails
+                }
             }
 
             if (!connection) await conn.commit();

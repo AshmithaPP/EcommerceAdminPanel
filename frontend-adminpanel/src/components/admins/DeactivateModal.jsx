@@ -1,8 +1,18 @@
 import React from 'react';
 import styles from '../../pages/Admins/AdminManagement.module.css';
+import useAdminStore from '../../store/adminStore';
 
-const DeactivateModal = ({ isOpen, onClose, adminName, adminId }) => {
+const DeactivateModal = ({ isOpen, onClose, adminName, adminId, currentStatus }) => {
+  const { toggleStatus, loading } = useAdminStore();
+
   if (!isOpen) return null;
+
+  const handleConfirm = async () => {
+    const success = await toggleStatus(adminId, currentStatus);
+    if (success) {
+      onClose();
+    }
+  };
 
   return (
     <div className={styles.overlay} onClick={onClose}>
@@ -13,21 +23,28 @@ const DeactivateModal = ({ isOpen, onClose, adminName, adminId }) => {
               warning
             </span>
           </div>
-          <h3>Deactivate {adminName}?</h3>
+          <h3>{currentStatus === 1 ? 'Suspend' : 'Reactivate'} {adminName}?</h3>
           <p className={styles.warnDesc}>
-            This will immediately revoke their access to the curator panel and all pending curation assignments. This action will be logged in the atelier audit trails.
+            {currentStatus === 1
+              ? 'This will immediately revoke their access to the curator panel, blocking all actions. This action is fully reversible.'
+              : 'This will restore their access to the curator panel with all their previously assigned permissions.'}
           </p>
           <div className={styles.warnActions}>
-            <button className={styles.revokeBtn} onClick={onClose}>
-              Revoke Access Now
+            <button 
+              className={styles.revokeBtn} 
+              onClick={handleConfirm}
+              disabled={loading}
+              style={{ background: currentStatus === 1 ? 'var(--danger-color, #ef4444)' : 'var(--success-color, #10b981)' }}
+            >
+              {loading ? 'Processing...' : currentStatus === 1 ? 'Suspend Access' : 'Restore Access'}
             </button>
-            <button className={styles.cancelBtn} onClick={onClose}>
+            <button className={styles.cancelBtn} onClick={onClose} disabled={loading}>
               Return to Registry
             </button>
           </div>
         </div>
         <div className={styles.modalFooter}>
-          <p className={styles.footerId}>Curator ID: {adminId || 'SC-ADM-2940'}</p>
+          <p className={styles.footerId}>Curator ID: {adminId}</p>
         </div>
       </div>
     </div>

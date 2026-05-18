@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Edit2, Trash2 } from 'lucide-react';
 import Badge from '../../components/ui/Badge';
@@ -9,6 +9,7 @@ import Pagination from '../../components/ui/Pagination';
 import styles from './Products.module.css';
 import useProductStore from '../../store/productStore';
 import { showToast } from '../../utils/toast';
+import { AuthContext } from '../../context/AuthContext';
 
 import { STORAGE_URL } from '../../config/api';
 
@@ -21,6 +22,12 @@ const getImageUrl = (url) => {
 
 const Products = () => {
   const navigate = useNavigate();
+  const { user } = useContext(AuthContext);
+
+  // Permission Checks
+  const canAdd = user?.role === 'superadmin' || user?.role === 'admin' || user?.permissions?.products?.includes('add');
+  const canEdit = user?.role === 'superadmin' || user?.role === 'admin' || user?.permissions?.products?.includes('edit');
+  const canDelete = user?.role === 'superadmin' || user?.role === 'admin' || user?.permissions?.products?.includes('delete');
 
   // Store Selectors
   const products = useProductStore(state => state.products);
@@ -87,7 +94,7 @@ const Products = () => {
       <div className={styles.tableCard}>
         <DataTable
           title="Product Inventory"
-          onAdd={() => navigate('/products/add')}
+          onAdd={canAdd ? () => navigate('/products/add') : undefined}
           data={products}
           columns={[
             {
@@ -163,35 +170,40 @@ const Products = () => {
               align: 'center',
               render: (row) => (
                 <Toggle
+                  disabled={!canEdit}
                   checked={!!row.is_featured}
-                  onChange={() => useProductStore.getState().toggleFeatured(row.product_id)}
+                  onChange={() => canEdit && useProductStore.getState().toggleFeatured(row.product_id)}
                 />
               )
             },
-            {
+            ...(canEdit || canDelete ? [{
               label: 'Actions',
               key: 'actions',
               align: 'left',
               width: '120px',
               render: (row) => (
                 <div className={styles.actions}>
-                  <button
-                    className={styles.actionBtn}
-                    onClick={() => navigate(`/products/edit/${row.product_id}`)}
-                    title="Edit"
-                  >
-                    <Edit2 size={16} />
-                  </button>
-                  <button
-                    className={styles.actionBtn}
-                    onClick={() => handleDeleteProduct(row.product_id, row.name)}
-                    title="Delete"
-                  >
-                    <Trash2 size={16} />
-                  </button>
+                  {canEdit && (
+                    <button
+                      className={styles.actionBtn}
+                      onClick={() => navigate(`/products/edit/${row.product_id}`)}
+                      title="Edit"
+                    >
+                      <Edit2 size={16} />
+                    </button>
+                  )}
+                  {canDelete && (
+                    <button
+                      className={styles.actionBtn}
+                      onClick={() => handleDeleteProduct(row.product_id, row.name)}
+                      title="Delete"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  )}
                 </div>
               )
-            }
+            }] : [])
           ]}
         />
 
@@ -223,15 +235,19 @@ const Products = () => {
                 <span className={styles.mobileCategory}>{product.category_name} &gt; {product.sub_category_name}</span>
               </div>
               <div className={styles.mobileCardActions}>
-                <button className={styles.actionBtn} onClick={() => navigate(`/products/edit/${product.product_id}`)}>
-                  <Edit2 size={15} />
-                </button>
-                <button
-                  className={styles.actionBtn}
-                  onClick={() => handleDeleteProduct(product.product_id, product.name)}
-                >
-                  <Trash2 size={15} />
-                </button>
+                {canEdit && (
+                  <button className={styles.actionBtn} onClick={() => navigate(`/products/edit/${product.product_id}`)}>
+                    <Edit2 size={15} />
+                  </button>
+                )}
+                {canDelete && (
+                  <button
+                    className={styles.actionBtn}
+                    onClick={() => handleDeleteProduct(product.product_id, product.name)}
+                  >
+                    <Trash2 size={15} />
+                  </button>
+                )}
               </div>
             </div>
             <div className={styles.mobileCardBottom}>
@@ -247,8 +263,9 @@ const Products = () => {
               <div className={styles.mobileToggleRow}>
                 <span className={styles.mobileToggleLabel}>Available</span>
                 <Toggle
+                  disabled={!canEdit}
                   checked={product.availability !== undefined ? product.availability : true}
-                  onChange={() => toggleAvailability(product.product_id)}
+                  onChange={() => canEdit && toggleAvailability(product.product_id)}
                 />
               </div>
             </div>

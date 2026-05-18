@@ -59,6 +59,30 @@ const paymentController = {
         } catch (error) {
             next(error);
         }
+    },
+
+    downloadReport: async (req, res, next) => {
+        try {
+            const { startDate, endDate } = req.query;
+            if (!startDate || !endDate) {
+                const error = new Error('startDate and endDate are required');
+                error.statusCode = 400;
+                throw error;
+            }
+            
+            // Format dates slightly if they are just YYYY-MM-DD
+            const start = `${startDate} 00:00:00`;
+            const end = `${endDate} 23:59:59`;
+            
+            const data = await PaymentService.getReportData(start, end);
+            
+            res.status(200).json({
+                success: true,
+                data
+            });
+        } catch (error) {
+            next(error);
+        }
     }
 };
 

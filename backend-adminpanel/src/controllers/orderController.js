@@ -7,9 +7,25 @@ const db = require('../config/database');
 const orderController = {
     createOrder: async (req, res, next) => {
         try {
-            const userId = req.user.user_id;
+            const userId = req.user ? req.user.user_id : null;
             const guestId = req.headers['x-guest-id'];
             const { address_id, payment_method, address: guestAddress } = req.body;
+
+            // Validation for guest checkouts
+            if (!userId) {
+                if (!guestAddress) {
+                    return res.status(400).json({ success: false, message: 'Shipping address and customer details are required for guest checkout.' });
+                }
+                if (!guestAddress.full_name || !guestAddress.full_name.trim()) {
+                    return res.status(400).json({ success: false, message: 'Full Name is required for guest checkout.' });
+                }
+                if (!guestAddress.phone || !guestAddress.phone.trim()) {
+                    return res.status(400).json({ success: false, message: 'Phone number is required for guest checkout.' });
+                }
+                if (!guestAddress.address_line1 || !guestAddress.address_line1.trim()) {
+                    return res.status(400).json({ success: false, message: 'Address is required for guest checkout.' });
+                }
+            }
 
             console.log('📦 Create Order Request:', {
                 userId,
@@ -199,6 +215,10 @@ const orderController = {
             // 6. Create Order
             const result = await Order.create({
                 user_id: userId,
+                guest_id: guestId || null,
+                guest_name: userId ? null : (finalAddress.full_name || null),
+                guest_phone: userId ? null : (finalAddress.phone || null),
+                guest_email: userId ? null : (finalAddress.email || null),
                 address_id: address_id || null,
                 subtotal,
                 discount,
@@ -219,7 +239,13 @@ const orderController = {
                 payment_status: isCOD ? 'Pending' : 'Pending'
             }, items);
 
-            // 6. Post-Creation Logic
+            // 6. Finalize Coupon Usage if applicable
+            if (coupon_id && discount > 0) {
+                const couponService = require('../services/couponService');
+                await couponService.finalizeCouponUsage(coupon_id, userId, result.order_id, discount);
+            }
+
+            // 7. Post-Creation Logic
             const orderService = require('../services/orderService');
             if (payment_method !== 'razorpay') {
                 console.log('🧹 Clearing cart and deducting stock for direct/COD order...');
@@ -251,8 +277,15 @@ const orderController = {
             }
 
             // Security check
-            if (order.user_id !== req.user.user_id) {
-                return res.status(403).json({ success: false, message: 'Unauthorized' });
+            if (order.user_id) {
+                if (!req.user || order.user_id !== req.user.user_id) {
+                    return res.status(403).json({ success: false, message: 'Unauthorized' });
+                }
+            } else {
+                const guestId = req.headers['x-guest-id'];
+                if (order.guest_id && guestId && order.guest_id !== guestId) {
+                    return res.status(403).json({ success: false, message: 'Unauthorized' });
+                }
             }
 
             res.status(200).json({
@@ -333,9 +366,91 @@ const orderController = {
                 tracking: {
                     id: order.tracking_id,
                     courier: order.courier_name,
+                    tracking_url: order.tracking_url || 'https://www.stcourier.com/track/shipment',
+                    shipment_status: order.shipment_status || 'Pending',
+                    shipped_at: order.shipped_at || null,
                     estimated_delivery: order.estimated_delivery_date
                 },
                 timeline
+            });
+        } catch (error) {
+            next(error);
+        }
+    },
+
+    trackGuestOrder: async (req, res, next) => {
+        try {
+            const { orderId, phone } = req.query;
+            if (!orderId || !phone) {
+                return res.status(400).json({ success: false, message: 'Order ID and Phone Number are required' });
+            }
+
+            const cleanOrderId = orderId.trim().replace(/^#/, '');
+
+            const [orders] = await db.query(
+                `SELECT * FROM orders WHERE (order_id = ? OR order_number = ?)`, 
+                [cleanOrderId, cleanOrderId]
+            );
+
+            if (orders.length === 0) {
+                return res.status(404).json({ success: false, message: 'Order not found' });
+            }
+
+            const orderObj = orders[0];
+
+            let shippingAddress = {};
+            try {
+                shippingAddress = typeof orderObj.shipping_address === 'string' 
+                    ? JSON.parse(orderObj.shipping_address) 
+                    : orderObj.shipping_address;
+            } catch (e) {}
+
+            const dbPhone = orderObj.guest_phone || shippingAddress.phone || '';
+            
+            const normInputPhone = phone.trim().replace(/\D/g, '').slice(-10);
+            const normDbPhone = dbPhone.trim().replace(/\D/g, '').slice(-10);
+
+            if (normInputPhone !== normDbPhone) {
+                return res.status(403).json({ success: false, message: 'Unauthorized. Phone number does not match this order.' });
+            }
+
+            const order = await Order.findById(orderObj.order_id);
+
+            const timeline = [
+                { status: 'Order Placed', date: order.created_at }
+            ];
+
+            if (order.payment_status === 'success') {
+                timeline.push({ status: 'Payment Verified', date: order.updated_at });
+            }
+            if (['processing', 'shipped', 'delivered'].includes(order.status)) {
+                timeline.push({ status: 'Processing', date: order.updated_at });
+            }
+            if (['shipped', 'delivered'].includes(order.status)) {
+                timeline.push({ status: 'Shipped', date: order.updated_at });
+            }
+            if (order.status === 'delivered') {
+                timeline.push({ status: 'Delivered', date: order.updated_at });
+            }
+            if (order.status === 'cancelled') {
+                timeline.push({ status: 'Cancelled', date: order.cancelled_at });
+            }
+
+            res.status(200).json({
+                success: true,
+                order_id: order.order_id,
+                order_number: order.order_number,
+                status: order.status,
+                payment_status: order.payment_status,
+                delivery_status: order.shipment_status || 'Pending',
+                items: order.items,
+                timeline,
+                shipping_address: order.shipping_address,
+                tracking: {
+                    courier: order.courier_name,
+                    id: order.tracking_id,
+                    tracking_url: order.tracking_url
+                }
             });
         } catch (error) {
             next(error);

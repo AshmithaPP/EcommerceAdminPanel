@@ -90,6 +90,15 @@ const orderService = {
             }
 
             await connection.commit();
+
+            // Online Payment Invoice Generation (After Transaction Commit)
+            if (successStatuses.includes(payment_status)) {
+                const invoiceService = require('./invoiceService');
+                invoiceService.generateInvoice(orderId).catch(err => {
+                    console.error(`❌ Automated Online Invoice Generation failed for order ${orderId}:`, err);
+                });
+            }
+
             return { success: true, message: `Payment status updated to ${payment_status}` };
         } catch (error) {
             await connection.rollback();
@@ -130,7 +139,15 @@ const orderService = {
             // 4. Mark as deducted
             await conn.query('UPDATE orders SET is_stock_deducted = 1 WHERE order_id = ?', [orderId]);
 
-            if (!connection) await conn.commit();
+            if (!connection) {
+                await conn.commit();
+
+                // COD/Direct Invoice Generation (After Transaction Commit)
+                const invoiceService = require('./invoiceService');
+                invoiceService.generateInvoice(orderId).catch(err => {
+                    console.error(`❌ Automated COD Invoice Generation failed for order ${orderId}:`, err);
+                });
+            }
             return true;
         } catch (error) {
             if (!connection) await conn.rollback();

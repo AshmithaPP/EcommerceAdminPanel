@@ -9,7 +9,10 @@ const adminOrderController = {
 
             let sql = `
                 SELECT o.*, u.name as customer_name, u.email as customer_email,
-                COALESCE(o.transaction_id, p.gateway_payment_id) as transaction_id
+                CASE 
+                    WHEN LOWER(o.payment_method) = 'cod' THEN 'N/A (Cash on Delivery)'
+                    ELSE COALESCE(o.transaction_id, p.gateway_payment_id)
+                END as transaction_id
                 FROM orders o
                 LEFT JOIN users u ON o.user_id = u.user_id
                 LEFT JOIN payments p ON o.order_id = p.order_id AND p.status = 'success'
@@ -70,7 +73,11 @@ const adminOrderController = {
             
             // JOIN with payments to get transaction_id if missing in orders table (legacy/fallback)
             const [orderRows] = await db.query(`
-                SELECT o.*, COALESCE(o.transaction_id, p.gateway_payment_id) as transaction_id
+                SELECT o.*, 
+                CASE 
+                    WHEN LOWER(o.payment_method) = 'cod' THEN 'N/A (Cash on Delivery)'
+                    ELSE COALESCE(o.transaction_id, p.gateway_payment_id)
+                END as transaction_id
                 FROM orders o
                 LEFT JOIN payments p ON o.order_id = p.order_id AND p.status = 'success'
                 WHERE o.order_id = ?
@@ -123,6 +130,11 @@ const adminOrderController = {
                 return res.status(400).json({ success: false, message: 'Cannot cancel order after it has been shipped' });
             }
 
+            // Prevention: Cannot mark as shipped without a Tracking ID
+            if (status === 'shipped' && !currentOrder.tracking_id) {
+                return res.status(400).json({ success: false, message: 'Tracking ID is required before marking order as Shipped' });
+            }
+
             await Order.adminUpdateStatus(order_id, {
                 status,
                 tracking_id: currentOrder.tracking_id,
@@ -158,6 +170,61 @@ const adminOrderController = {
             res.status(200).json({
                 success: true,
                 message: 'Shipping details updated and order marked as SHIPPED'
+            });
+        } catch (error) {
+            next(error);
+        }
+    },
+
+    getShipmentDetails: async (req, res, next) => {
+        try {
+            const { order_id } = req.params;
+            const order = await Order.findById(order_id);
+            if (!order) {
+                return res.status(404).json({ success: false, message: 'Order not found' });
+            }
+            res.status(200).json({
+                success: true,
+                data: {
+                    courier_name: order.courier_name || '',
+                    tracking_id: order.tracking_id || '',
+                    tracking_url: order.tracking_url || 'https://www.stcourier.com/track/shipment',
+                    shipment_status: order.shipment_status || 'Pending',
+                    shipped_at: order.shipped_at || null,
+                    estimated_delivery_date: order.estimated_delivery_date ? new Date(order.estimated_delivery_date).toISOString().split('T')[0] : ''
+                }
+            });
+        } catch (error) {
+            next(error);
+        }
+    },
+
+    updateShipmentDetails: async (req, res, next) => {
+        try {
+            const { order_id } = req.params;
+            const { courier_name, tracking_id, tracking_url, shipment_status, estimated_delivery_date } = req.body;
+
+            // Manual Validation:
+            const statusLower = shipment_status?.toLowerCase();
+            if (statusLower === 'shipped' && !tracking_id) {
+                return res.status(400).json({ success: false, message: 'Tracking ID is required when status is Shipped' });
+            }
+
+            if (statusLower !== 'pending' && (!courier_name || !tracking_id)) {
+                return res.status(400).json({ success: false, message: 'Courier Name and Tracking ID are required' });
+            }
+
+            await Order.updateShipment(order_id, {
+                courier_name,
+                tracking_id,
+                tracking_url,
+                shipment_status,
+                estimated_delivery_date
+            });
+
+            res.status(200).json({
+                success: true,
+                message: `Shipment details updated and status marked as ${shipment_status}`
             });
         } catch (error) {
             next(error);

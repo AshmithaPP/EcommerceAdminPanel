@@ -13,21 +13,24 @@ const Order = {
                 delivery_fee, total_amount, payment_method, shipping_address, coupon_id,
                 gst_rate, gst_amount, cgst_amount, sgst_amount, igst_amount,
                 amount_without_gst, amount_with_gst, shipping_zone,
-                status, payment_status
+                status, payment_status,
+                guest_id, guest_name, guest_phone, guest_email
             } = orderData;
 
             // 1. Insert Order
             const orderNumber = `ORD${Date.now().toString().slice(-8)}${Math.floor(100 + Math.random() * 900)}`;
             const orderSql = `
                 INSERT INTO orders (
-                    order_id, order_number, user_id, address_id, subtotal, discount, 
+                    order_id, order_number, user_id, guest_id, guest_name, guest_phone, guest_email,
+                    address_id, subtotal, discount, 
                     delivery_fee, shipping_zone, total_amount, payment_method, shipping_address, coupon_id,
                     gst_rate, gst_amount, cgst_amount, sgst_amount, igst_amount,
                     amount_without_gst, amount_with_gst, status, payment_status
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             `;
             await connection.query(orderSql, [
-                orderId, orderNumber, user_id, address_id, subtotal, discount,
+                orderId, orderNumber, user_id || null, guest_id || null, guest_name || null, guest_phone || null, guest_email || null,
+                address_id, subtotal, discount,
                 delivery_fee, shipping_zone || null, total_amount, payment_method, JSON.stringify(shipping_address), coupon_id || null,
                 gst_rate || 0, gst_amount || 0, cgst_amount || 0, sgst_amount || 0, igst_amount || 0,
                 amount_without_gst || 0, amount_with_gst || 0,
@@ -350,6 +353,82 @@ const Order = {
             console.error('❌ Failed to create shipment record:', err.message);
             // Don't fail the whole request if shipment record creation fails, 
             // but log it for debugging.
+        }
+    },
+
+    updateShipment: async (orderId, shipmentData) => {
+        const { courier_name, tracking_id, tracking_url, shipment_status, estimated_delivery_date } = shipmentData;
+        
+        // Validation: tracking_id required when shipment_status = Shipped
+        if (shipment_status?.toLowerCase() === 'shipped' && !tracking_id) {
+            throw new Error('Tracking ID is required when status is Shipped');
+        }
+
+        // Prevent empty courier details when status is anything but Pending
+        if (shipment_status?.toLowerCase() !== 'pending' && (!courier_name || !tracking_id)) {
+            throw new Error('Courier Name and Tracking ID are required for status: ' + shipment_status);
+        }
+
+        // 1. Fetch current order to check shipped_at status
+        const [orders] = await db.query('SELECT shipped_at, status FROM orders WHERE order_id = ?', [orderId]);
+        if (orders.length === 0) throw new Error('Order not found');
+        const currentShippedAt = orders[0].shipped_at;
+        
+        let shippedAtVal = currentShippedAt;
+        if (shipment_status?.toLowerCase() === 'shipped' && !currentShippedAt) {
+            shippedAtVal = new Date().toISOString().slice(0, 19).replace('T', ' ');
+        }
+
+        // Map shipment status to main order status
+        let orderStatus = orders[0].status;
+        const statusLower = shipment_status?.toLowerCase();
+        if (statusLower === 'pending') orderStatus = 'pending';
+        else if (statusLower === 'packed') orderStatus = 'processing';
+        else if (statusLower === 'shipped') orderStatus = 'shipped';
+        else if (statusLower === 'out for delivery') orderStatus = 'shipped';
+        else if (statusLower === 'delivered') orderStatus = 'delivered';
+
+        const sql = `
+            UPDATE orders SET 
+                courier_name = ?, 
+                tracking_id = ?, 
+                tracking_url = ?, 
+                shipment_status = ?, 
+                shipped_at = ?,
+                status = ?,
+                estimated_delivery_date = ?
+            WHERE order_id = ?
+        `;
+        await db.query(sql, [
+            courier_name || null,
+            tracking_id || null,
+            tracking_url || 'https://www.stcourier.com/track/shipment',
+            shipment_status || 'Pending',
+            shippedAtVal || null,
+            orderStatus,
+            estimated_delivery_date || null,
+            orderId
+        ]);
+
+        // Add timeline event
+        const timelineId = uuidv4();
+        const timelineMsg = `Shipment status updated to: ${shipment_status}. Courier: ${courier_name || 'N/A'}, Tracking ID: ${tracking_id || 'N/A'}`;
+        await db.query(
+            'INSERT INTO order_timeline (timeline_id, order_id, status, message) VALUES (?, ?, ?, ?)',
+            [timelineId, orderId, orderStatus, timelineMsg]
+        );
+
+        // Special Case: COD order delivered should mark payment as Paid
+        if (statusLower === 'delivered') {
+            const [orderCheck] = await db.query('SELECT payment_method FROM orders WHERE order_id = ?', [orderId]);
+            if (orderCheck[0]?.payment_method?.toUpperCase() === 'COD') {
+                await db.query('UPDATE orders SET payment_status = "Paid" WHERE order_id = ?', [orderId]);
+                const payTimelineId = uuidv4();
+                await db.query(
+                    'INSERT INTO order_timeline (timeline_id, order_id, status, message) VALUES (?, ?, ?, ?)',
+                    [payTimelineId, orderId, 'paid', 'Payment collected (Cash on Delivery)']
+                );
+            }
         }
     }
 };

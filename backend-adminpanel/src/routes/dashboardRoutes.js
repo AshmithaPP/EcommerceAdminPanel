@@ -3,9 +3,24 @@ const router = express.Router();
 const dashboardController = require('../controllers/dashboardController');
 const { protect, authorize } = require('../middlewares/authMiddleware');
 
+const checkDashboardAccess = (req, res, next) => {
+    if (req.user.role === 'superadmin' || req.user.role === 'admin') {
+        return next();
+    }
+    if (req.user.role === 'subadmin') {
+        const perms = req.user.permissions || {};
+        if (perms.dashboard && perms.dashboard.includes('view')) {
+            return next();
+        }
+    }
+    const error = new Error(`User role ${req.user.role} is not authorized to access this route`);
+    error.statusCode = 403;
+    return next(error);
+};
+
 // Protect all dashboard routes
 router.use(protect);
-router.use(authorize('admin', 'superadmin'));
+router.use(checkDashboardAccess);
 
 // Core APIs
 router.get('/overview', dashboardController.getOverview);

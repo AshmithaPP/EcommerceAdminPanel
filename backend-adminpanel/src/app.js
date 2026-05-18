@@ -25,7 +25,9 @@ const addressRoutes = require('./routes/addressRoutes');
 const orderRoutes = require('./routes/orderRoutes');
 const paymentRoutes = require('./routes/paymentRoutes');
 const adminOrderRoutes = require('./routes/adminOrderRoutes');
+const adminUserRoutes = require('./routes/adminUserRoutes');
 const shippingRoutes = require('./routes/shippingRoutes');
+const invoiceRoutes = require('./routes/invoiceRoutes');
 const db = require('./config/database');
 
 // --- Auto Migration: Ensure Address Table Exists ---
@@ -59,7 +61,11 @@ const db = require('./config/database');
             CREATE TABLE IF NOT EXISTS orders (
                 order_id VARCHAR(36) PRIMARY KEY,
                 order_number VARCHAR(20) UNIQUE NOT NULL,
-                user_id VARCHAR(36) NOT NULL,
+                user_id VARCHAR(36) NULL,
+                guest_id VARCHAR(50) NULL,
+                guest_name VARCHAR(255) NULL,
+                guest_phone VARCHAR(20) NULL,
+                guest_email VARCHAR(255) NULL,
                 address_id VARCHAR(36),
                 subtotal DECIMAL(10,2) NOT NULL,
                 discount DECIMAL(10,2) DEFAULT 0,
@@ -74,8 +80,7 @@ const db = require('./config/database');
                 estimated_delivery_date DATE,
                 cancelled_at TIMESTAMP,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-                FOREIGN KEY (user_id) REFERENCES users(user_id)
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
             ) ENGINE=InnoDB;
         `);
 
@@ -89,8 +94,17 @@ const db = require('./config/database');
             { name: 'coupon_id', type: 'VARCHAR(36) AFTER total_amount' },
             { name: 'tracking_id', type: 'VARCHAR(100) AFTER shipping_address' },
             { name: 'courier_name', type: 'VARCHAR(100) AFTER tracking_id' },
-            { name: 'estimated_delivery_date', type: 'DATE AFTER courier_name' }
+            { name: 'estimated_delivery_date', type: 'DATE AFTER courier_name' },
+            { name: 'guest_id', type: 'VARCHAR(50) NULL AFTER user_id' },
+            { name: 'guest_name', type: 'VARCHAR(255) NULL AFTER guest_id' },
+            { name: 'guest_phone', type: 'VARCHAR(20) NULL AFTER guest_name' },
+            { name: 'guest_email', type: 'VARCHAR(255) NULL AFTER guest_phone' }
         ];
+
+        // Ensure user_id is nullable (for guest checkout support)
+        try {
+            await db.query('ALTER TABLE orders MODIFY user_id VARCHAR(36) NULL');
+        } catch (e) { /* already nullable */ }
 
         for (const col of columnsToAdd) {
             try {
@@ -195,6 +209,11 @@ const db = require('./config/database');
         `);
         console.log('✅ Order timeline table check complete');
 
+        // --- Migration: Make coupon_usages.user_id nullable for guest checkout ---
+        try {
+            await db.query('ALTER TABLE coupon_usages MODIFY user_id char(36) NULL');
+        } catch (e) { /* already nullable or table doesn't exist */ }
+
         // --- Migration: Database Optimization Indexes ---
         try {
             await db.query('CREATE INDEX idx_orders_created_at ON orders(created_at)');
@@ -280,10 +299,13 @@ app.use('/api/addresses', addressRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/admin/orders', adminOrderRoutes);
+app.use('/api/admin/users', adminUserRoutes);
 app.use('/api/shipping', shippingRoutes);
+app.use('/api/invoices', invoiceRoutes);
 
 // Admin Payments List
 app.get('/api/admin/payments', protect, authorize('admin', 'superadmin'), paymentController.getAllPayments);
+app.get('/api/admin/payments/report', protect, authorize('admin', 'superadmin'), paymentController.downloadReport);
 
 // Health check route
 app.get('/health', (req, res) => {

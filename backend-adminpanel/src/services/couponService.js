@@ -144,6 +144,16 @@ const couponService = {
         await Coupon.recordUsage({ coupon_id: couponId, user_id: userId, order_id: orderId, discount_applied: discountApplied }, connection);
     },
 
+    finalizeCouponUsage: async (couponId, userId, orderId, discountApplied, connection) => {
+        await Coupon.incrementUsageCount(couponId, connection);
+        await Coupon.recordUsage({ 
+            coupon_id: couponId, 
+            user_id: userId, 
+            order_id: orderId, 
+            discount_applied: discountApplied 
+        }, connection);
+    },
+
     getCouponUsageHistory: async (couponId) => {
         return await Coupon.getUsageHistory(couponId);
     },

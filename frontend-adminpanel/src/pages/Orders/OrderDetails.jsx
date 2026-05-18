@@ -1,11 +1,13 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useContext } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { User, MapPin, CreditCard, Package, Clock, CheckCircle, Truck, AlertCircle, ExternalLink } from 'lucide-react';
+import { User, MapPin, CreditCard, Package, Clock, CheckCircle, Truck, AlertCircle, ExternalLink, Download, Mail } from 'lucide-react';
 import styles from './OrderDetails.module.css';
 import DataTable from '../../components/ui/DataTable';
 import StatCard from '../../components/ui/StatCard';
 import useOrderStore from '../../store/orderStore';
 import { STORAGE_URL } from '../../config/api';
+import { showToast } from '../../utils/toast';
+import { AuthContext } from '../../context/AuthContext';
 
 // ── Helpers ──────────────────────────────────────────
 const formatCurrency = (amount) =>
@@ -42,6 +44,11 @@ const PaymentBadge = ({ status }) => {
 // ── Component ─────────────────────────────────────────
 const OrderDetails = () => {
   const { id } = useParams();
+  const { user } = useContext(AuthContext);
+
+  const canUpdateOrder = user?.role === 'superadmin' || user?.role === 'admin' || user?.permissions?.orders?.includes('update');
+  const canUpdateShipping = user?.role === 'superadmin' || user?.role === 'admin' || user?.permissions?.shipping?.includes('update');
+
   const {
     selectedOrder: order,
     orderLoading: loading,
@@ -49,12 +56,17 @@ const OrderDetails = () => {
     fetchOrderDetails,
     updateOrderStatus,
     updateShippingDetails,
-    resetOrderState
+    updateShipmentDetails,
+    resetOrderState,
+    downloadInvoice,
+    resendInvoiceEmail
   } = useOrderStore();
 
   const [shippingForm, setShippingForm] = useState({
     tracking_id: '',
     courier_name: '',
+    tracking_url: 'https://www.stcourier.com/track/shipment',
+    shipment_status: 'Pending',
     estimated_delivery_date: ''
   });
 
@@ -68,6 +80,8 @@ const OrderDetails = () => {
       setShippingForm({
         tracking_id: order.tracking_id || '',
         courier_name: order.courier_name || '',
+        tracking_url: order.tracking_url || 'https://www.stcourier.com/track/shipment',
+        shipment_status: order.shipment_status || 'Pending',
         estimated_delivery_date: order.estimated_delivery_date ? new Date(order.estimated_delivery_date).toISOString().split('T')[0] : ''
       });
     }
@@ -75,6 +89,10 @@ const OrderDetails = () => {
 
   const handleStatusChange = (e) => {
     const newStatus = e.target.value;
+    if (newStatus === 'shipped' && !order.tracking_id) {
+        showToast.error('Tracking ID required before marking as shipped. Please update the Courier & Shipment Tracking section first!');
+        return;
+    }
     if (window.confirm(`Are you sure you want to change status to ${newStatus}?`)) {
         updateOrderStatus(id, { status: newStatus });
     }
@@ -82,7 +100,7 @@ const OrderDetails = () => {
 
   const handleShippingSubmit = (e) => {
     e.preventDefault();
-    updateShippingDetails(id, shippingForm);
+    updateShipmentDetails(id, shippingForm);
   };
 
   if (loading) {
@@ -171,13 +189,34 @@ const OrderDetails = () => {
           </div>
         </div>
         <div className={styles.topBarRight}>
+           <div className={styles.invoiceActions}>
+               <button 
+                   onClick={() => downloadInvoice(order.order_id, order.order_number)}
+                   className={styles.invoiceBtn}
+                   disabled={actionLoading}
+                   title="Download Customer Invoice PDF"
+               >
+                   <Download size={14} />
+                   <span>Download Invoice</span>
+               </button>
+               <button 
+                   onClick={() => resendInvoiceEmail(order.order_id)}
+                   className={styles.invoiceBtnOutline}
+                   disabled={actionLoading}
+                   title="Resend Invoice PDF via Email"
+               >
+                   <Mail size={14} />
+                   <span>Resend Invoice</span>
+               </button>
+           </div>
+
            <div className={styles.statusDropdownContainer}>
                 <label className={styles.dropdownLabel}>Change Status:</label>
                 <select 
                     className={styles.statusSelect} 
                     value={order.status} 
                     onChange={handleStatusChange}
-                    disabled={actionLoading}
+                    disabled={actionLoading || !canUpdateOrder}
                 >
                     <option value="pending">Pending</option>
                     <option value="paid">Paid</option>
@@ -268,7 +307,7 @@ const OrderDetails = () => {
           {/* Shipping Management Form */}
           <div className={styles.infoCard}>
             <div className={styles.infoCardHeader}>
-              <span className={styles.infoCardTitle}>SHIPPING & TRACKING</span>
+              <span className={styles.infoCardTitle}>COURIER & SHIPMENT TRACKING</span>
               <Truck size={14} className={styles.headerIcon} />
             </div>
             <div className={styles.infoCardBody}>
@@ -278,19 +317,46 @@ const OrderDetails = () => {
                     <label>Courier Name</label>
                     <input 
                         type="text" 
-                        placeholder="e.g. Delhivery, BlueDart"
+                        placeholder="e.g. ST Courier, Delhivery"
                         value={shippingForm.courier_name}
                         onChange={(e) => setShippingForm({...shippingForm, courier_name: e.target.value})}
+                        disabled={!canUpdateShipping}
                     />
                   </div>
                   <div className={styles.formGroup}>
-                    <label>Tracking ID</label>
+                    <label>Tracking ID / AWB Number</label>
                     <input 
                         type="text" 
-                        placeholder="e.g. TRK12345678"
+                        placeholder="e.g. 12345678"
                         value={shippingForm.tracking_id}
                         onChange={(e) => setShippingForm({...shippingForm, tracking_id: e.target.value})}
+                        disabled={!canUpdateShipping}
                     />
+                  </div>
+                  <div className={styles.formGroup}>
+                    <label>Tracking URL</label>
+                    <input 
+                        type="url" 
+                        placeholder="e.g. https://www.stcourier.com/track/shipment"
+                        value={shippingForm.tracking_url}
+                        onChange={(e) => setShippingForm({...shippingForm, tracking_url: e.target.value})}
+                        disabled={!canUpdateShipping}
+                    />
+                  </div>
+                  <div className={styles.formGroup}>
+                    <label>Shipment Status</label>
+                    <select 
+                        style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '13px', background: '#fff', color: '#1e293b' }}
+                        value={shippingForm.shipment_status}
+                        onChange={(e) => setShippingForm({...shippingForm, shipment_status: e.target.value})}
+                        disabled={!canUpdateShipping}
+                    >
+                      <option value="Pending">Pending</option>
+                      <option value="Packed">Packed</option>
+                      <option value="Shipped">Shipped</option>
+                      <option value="Out For Delivery">Out For Delivery</option>
+                      <option value="Delivered">Delivered</option>
+                    </select>
                   </div>
                   <div className={styles.formGroup}>
                     <label>Est. Delivery Date</label>
@@ -298,11 +364,19 @@ const OrderDetails = () => {
                         type="date"
                         value={shippingForm.estimated_delivery_date}
                         onChange={(e) => setShippingForm({...shippingForm, estimated_delivery_date: e.target.value})}
+                        disabled={!canUpdateShipping}
                     />
                   </div>
                 </div>
-                <button type="submit" className={styles.saveBtn} disabled={actionLoading}>
-                  {actionLoading ? 'Updating...' : 'Update Shipping & Mark Shipped'}
+
+                {order.shipped_at && (
+                  <div style={{ marginTop: '15px', padding: '10px', background: '#f8fafc', borderLeft: '3px solid #0284c7', borderRadius: '4px', fontSize: '12px', color: '#475569' }}>
+                    📅 <strong>Shipped At:</strong> {formatDate(order.shipped_at, true)}
+                  </div>
+                )}
+
+                <button type="submit" className={styles.saveBtn} disabled={actionLoading || !canUpdateShipping}>
+                  {actionLoading ? 'Updating Shipment...' : 'Save Shipment & Update Status'}
                 </button>
               </form>
             </div>

@@ -30,6 +30,20 @@ const protect = async (req, res, next) => {
             return next(error);
         }
 
+        if (user.status === 0) {
+            const error = new Error('Your account has been suspended.');
+            error.statusCode = 403;
+            return next(error);
+        }
+
+        if (user.permissions && typeof user.permissions === 'string') {
+            try {
+                user.permissions = JSON.parse(user.permissions);
+            } catch (e) {
+                user.permissions = null;
+            }
+        }
+
         req.user = user;
         next();
     } catch (error) {
@@ -48,6 +62,41 @@ const authorize = (...roles) => {
     };
 };
 
+const checkPermission = (moduleName, action) => {
+    return (req, res, next) => {
+        const user = req.user;
+        if (!user) {
+            const error = new Error('Authentication required');
+            error.statusCode = 401;
+            return next(error);
+        }
+
+        // Super Admin has absolute, unrestricted access to everything
+        if (user.role === 'superadmin') {
+            return next();
+        }
+
+        if (user.role === 'subadmin') {
+            let permissions = user.permissions;
+            if (typeof permissions === 'string') {
+                try {
+                    permissions = JSON.parse(permissions);
+                } catch (e) {
+                    permissions = null;
+                }
+            }
+
+            if (permissions && permissions[moduleName] && permissions[moduleName].includes(action)) {
+                return next();
+            }
+        }
+
+        const error = new Error(`Forbidden: You do not have permission to ${action} ${moduleName}`);
+        error.statusCode = 403;
+        return next(error);
+    };
+};
+
 const optionalProtect = async (req, res, next) => {
     let token;
 
@@ -55,7 +104,7 @@ const optionalProtect = async (req, res, next) => {
         token = req.headers.authorization.split(' ')[1];
     }
 
-    if (!token) {
+    if (!token || token === 'null' || token === 'undefined') {
         return next();
     }
 
@@ -75,4 +124,4 @@ const optionalProtect = async (req, res, next) => {
     }
 };
 
-module.exports = { protect, authorize, optionalProtect };
+module.exports = { protect, authorize, checkPermission, optionalProtect };

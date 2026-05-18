@@ -712,3 +712,56 @@
     align-items: flex-start;
   }
 }
+
+/* ── Invoice Action Buttons ── */
+.invoiceActions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.invoiceBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.4rem 0.85rem;
+  border: none;
+  border-radius: 6px;
+  background: var(--primary, #4361EE);
+  color: #fff;
+  font-family: var(--font-inter, sans-serif);
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(67, 97, 238, 0.25);
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.invoiceBtn:hover {
+  filter: brightness(1.08);
+  transform: translateY(-1px);
+}
+
+.invoiceBtnOutline {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.85rem;
+  border: 1px solid var(--border-default, #D8DCF0);
+  border-radius: 6px;
+  background: var(--card-bg, #fff);
+  color: var(--primary, #4361EE);
+  font-family: var(--font-inter, sans-serif);
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.invoiceBtnOutline:hover {
+  border-color: var(--primary, #4361EE);
+  background: rgba(67, 97, 238, 0.05);
+  transform: translateY(-1px);
+}

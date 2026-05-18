@@ -209,6 +209,10 @@ const formatProductDetail = (product, variants, subCategoryAttributes = [], rela
     return {
         product_id: product.product_id,
         name: product.name,
+        slug: product.slug,
+        meta_title: product.meta_title,
+        meta_description: product.meta_description,
+        meta_keywords: product.meta_keywords,
         description: product.description,
         brand: product.brand,
         breadcrumb,

@@ -7,6 +7,7 @@ const initialState = {
   // Settings Blocks
   siteInfo: {}, // Normalized: { [id]: { name, value, type } }
   storeSettings: { gst: 5, default_stock: 10 },
+  blogHero: { over_title: '', title: '', subtitle: '', button_text: '', image_url: '' },
 
   // Tracking
   initialLoading: true,
@@ -35,6 +36,7 @@ const useSettingsStore = create((set, get) => ({
         set({
           siteInfo: data.site_info || {},
           storeSettings: { ...initialState.storeSettings, ...data.store_settings },
+          blogHero: data.blog_hero || { over_title: '', title: '', subtitle: '', button_text: '', image_url: '' },
           hasChanges: false
         });
       }
@@ -54,7 +56,8 @@ const useSettingsStore = create((set, get) => ({
     try {
       const payload = {
         site_info: state.siteInfo,
-        store_settings: state.storeSettings
+        store_settings: state.storeSettings,
+        blog_hero: state.blogHero
       };
       console.log('Sending Save Payload to API:', payload);
 
@@ -104,6 +107,13 @@ const useSettingsStore = create((set, get) => ({
   updateStoreSettings: (partial) => {
     set(state => ({
       storeSettings: { ...state.storeSettings, ...partial },
+      hasChanges: true
+    }));
+  },
+
+  updateBlogHero: (partial) => {
+    set(state => ({
+      blogHero: { ...state.blogHero, ...partial },
       hasChanges: true
     }));
   },

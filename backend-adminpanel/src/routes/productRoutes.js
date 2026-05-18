@@ -9,25 +9,27 @@ const router = express.Router();
 // router.use(protect);
 
 // --- Admin Management APIs ---
-router.get('/raw', protect, productController.getProducts); 
-router.get('/check-slug/:slug', protect, productController.checkSlug);
-router.get('/id/:product_id', protect, productController.getProductById);
-router.post('/', protect, upload.any(), productController.createProduct);
-router.put('/:product_id', protect, upload.any(), productController.updateProduct);
-router.delete('/:product_id', protect, productController.deleteProduct);
+const { checkPermission } = require('../middlewares/authMiddleware');
+
+router.get('/raw', protect, checkPermission('products', 'view'), productController.getProducts); 
+router.get('/check-slug/:slug', protect, checkPermission('products', 'view'), productController.checkSlug);
+router.get('/id/:product_id', protect, checkPermission('products', 'view'), productController.getProductById);
+router.post('/', protect, checkPermission('products', 'add'), upload.any(), productController.createProduct);
+router.put('/:product_id', protect, checkPermission('products', 'edit'), upload.any(), productController.updateProduct);
+router.delete('/:product_id', protect, checkPermission('products', 'delete'), productController.deleteProduct);
 
 // --- User Side / Frontend APIs ---
 router.get('/', productController.getProductsFrontend);
 router.get('/:slug', productController.getProductBySlug);
 
 // Variant Management
-router.post('/:product_id/variants', protect, productController.addVariant);
-router.put('/variants/:variant_id', protect, productController.updateVariant);
-router.delete('/variants/:variant_id', protect, productController.deleteVariant);
+router.post('/:product_id/variants', protect, checkPermission('products', 'add'), productController.addVariant);
+router.put('/variants/:variant_id', protect, checkPermission('products', 'edit'), productController.updateVariant);
+router.delete('/variants/:variant_id', protect, checkPermission('products', 'delete'), productController.deleteVariant);
 
 // Variant Image Management
-router.post('/variants/:variant_id/images', protect, productController.addVariantImage);
-router.delete('/variants/images/:image_id', protect, productController.deleteVariantImage);
+router.post('/variants/:variant_id/images', protect, checkPermission('products', 'add'), productController.addVariantImage);
+router.delete('/variants/images/:image_id', protect, checkPermission('products', 'delete'), productController.deleteVariantImage);
 
 // Review Management
 router.use('/:product_id/reviews', reviewRoutes);

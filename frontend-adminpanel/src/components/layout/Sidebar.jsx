@@ -3,26 +3,38 @@ import { NavLink } from 'react-router-dom';
 import { AuthContext } from '../../context/AuthContext';
 import styles from './Sidebar.module.css';
 
-const menuItems = [
-  { name: 'Dashboard', icon: 'dashboard', path: '/dashboard' },
-  { name: 'Home Management', icon: 'home', path: '/homepage-management' },
-  { name: 'Analytics', icon: 'bar_chart', path: '/analytics' },
-  { name: 'Products', icon: 'inventory_2', path: '/products' },
-  { name: 'Categories', icon: 'category', path: '/categories' },
-  { name: 'Filters', icon: 'filter_alt', path: '/attributes' },
-  { name: 'Orders', icon: 'shopping_bag', path: '/orders' },
-  { name: 'Customers', icon: 'group', path: '/customers' },
-  { name: 'Payments', icon: 'payments', path: '/payments' },
-  { name: 'Inventory', icon: 'inventory_2', path: '/inventory' },
-  { name: 'Shipping', icon: 'local_shipping', path: '/shipping' },
-  { name: 'Coupons', icon: 'auto_awesome', path: '/marketing' },
-  { name: 'Blogs', icon: 'article', path: '/blogs' },
-  { name: 'Admins', icon: 'admin_panel_settings', path: '/admins' },
-  { name: 'Settings', icon: 'settings', path: '/settings' },
-];
+import { modulesRegistry, getPermissionKey } from '../../config/modulesRegistry';
 
 const Sidebar = ({ isCollapsed, isMobileOpen, setIsMobileOpen }) => {
   const closeMobile = () => setIsMobileOpen(false);
+  const { user } = useContext(AuthContext);
+
+  const filteredMenuItems = modulesRegistry.filter(item => {
+    if (!user) return false;
+    
+    // Super Admin has unrestricted access to everything
+    if (user.role === 'superadmin' || user.role === 'admin') {
+      return true;
+    }
+
+    // Sub Admin filtering
+    if (user.role === 'subadmin') {
+      // If the module is flagged as Super Admin only, sub-admins cannot see it
+      if (item.superAdminOnly) {
+        return false;
+      }
+
+      // Dynamically resolve permission key
+      const permKey = getPermissionKey(item.name);
+      const perms = user.permissions || {};
+      const actions = perms[permKey] || [];
+
+      // Render if the sub-admin has 'view' access for this module
+      return actions.includes('view') || actions.includes('update');
+    }
+
+    return false;
+  });
 
   return (
     <>
@@ -54,7 +66,7 @@ const Sidebar = ({ isCollapsed, isMobileOpen, setIsMobileOpen }) => {
 
         {/* Nav */}
         <nav className={styles.navMenu}>
-          {menuItems.map((item) => (
+          {filteredMenuItems.map((item) => (
             <NavLink
               key={item.name}
               to={item.path}

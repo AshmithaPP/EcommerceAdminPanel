@@ -407,6 +407,33 @@ const EditProduct = () => {
           </div>
         </section>
 
+        {/* SEO Optimization */}
+        <section className={styles.formSection}>
+          <div className={styles.sectionHeader}>
+            <Search size={16} className={styles.sectionIcon} />
+            <h3>SEO Optimization</h3>
+          </div>
+          <div className={styles.sectionContent}>
+            <div className={styles.formGrid2} style={{ gap: '1.5rem', display: 'grid', gridTemplateColumns: '1fr 1fr' }}>
+              <InputBox label="Meta Title" name="meta_title" value={productData.meta_title || ''} onChange={handleProductChange} placeholder="e.g. Buy Kanchipuram Silk Saree Online" Icon={FileText} />
+              <div style={{ position: 'relative' }}>
+                <InputBox label="URL Slug" name="slug" value={productData.slug || ''} onChange={handleProductChange} onBlur={(e) => checkSlugUniqueness(e.target.value)} placeholder="e.g. silk-saree" Icon={Tag} />
+                {slugValidation.message && (
+                  <span style={{ fontSize: '0.75rem', position: 'absolute', bottom: '-18px', left: '0', color: slugValidation.status === 'valid' ? 'green' : 'red' }}>
+                    {slugValidation.message}
+                  </span>
+                )}
+              </div>
+              <div className={styles.fullWidth} style={{ gridColumn: '1 / -1' }}>
+                <InputBox label="Meta Description" name="meta_description" value={productData.meta_description || ''} onChange={handleProductChange} placeholder="e.g. Shop latest kurthis with premium designs and best prices..." Icon={List} />
+              </div>
+              <div className={styles.fullWidth} style={{ gridColumn: '1 / -1' }}>
+                <InputBox label="SEO Keywords" name="meta_keywords" value={productData.meta_keywords || ''} onChange={handleProductChange} placeholder="Comma separated (e.g. silk, saree, wedding)" Icon={Tag} />
+              </div>
+            </div>
+          </div>
+        </section>
+
         {/* 2. Attributes */}
         <section className={styles.formSection}>
           <div className={styles.sectionHeader}>
@@ -875,6 +902,13 @@ const EditProduct = () => {
                 value={productData.meta_description || ''}
                 onChange={handleProductChange}
                 placeholder="SEO Description"
+              />
+              <InputBox
+                label="Meta Keywords"
+                name="meta_keywords"
+                value={productData.meta_keywords || ''}
+                onChange={handleProductChange}
+                placeholder="SEO Keywords (comma separated)"
               />
             </div>
           </section>

@@ -154,6 +154,74 @@ const useOrderStore = create((set, get) => ({
             set({ actionLoading: false });
         }
     },
+
+    updateShipmentDetails: async (id, payload) => {
+        set({ actionLoading: true, actionError: null });
+
+        try {
+            const result = await orderService.updateShipmentDetails(id, payload);
+
+            if (result.success) {
+                showToast.success('Shipment information updated successfully!');
+                
+                // Re-fetch details
+                const data = await orderService.getOrderById(id);
+                set({ selectedOrder: data });
+                
+                return true;
+            }
+            return false;
+        } catch (error) {
+            const msg = error.response?.data?.message || 'Failed to update shipment';
+            set({ actionError: msg });
+            showToast.error(msg);
+            return false;
+        } finally {
+            set({ actionLoading: false });
+        }
+    },
+
+    downloadInvoice: async (id, orderNumber) => {
+        set({ actionLoading: true, actionError: null });
+        try {
+            const response = await orderService.downloadInvoice(id);
+            const blob = new Blob([response.data], { type: 'application/pdf' });
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', `INV-${orderNumber || id}.pdf`);
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            window.URL.revokeObjectURL(url);
+            showToast.success('Invoice PDF downloaded successfully!');
+            return true;
+        } catch (error) {
+            console.error('Invoice download error:', error);
+            showToast.error('Failed to download invoice PDF.');
+            return false;
+        } finally {
+            set({ actionLoading: false });
+        }
+    },
+
+    resendInvoiceEmail: async (id) => {
+        set({ actionLoading: true, actionError: null });
+        try {
+            const result = await orderService.resendInvoice(id);
+            if (result.success) {
+                showToast.success(result.message || 'Invoice email resent successfully!');
+                return true;
+            }
+            return false;
+        } catch (error) {
+            const msg = error.response?.data?.message || 'Failed to resend invoice email';
+            showToast.error(msg);
+            return false;
+        } finally {
+            set({ actionLoading: false });
+        }
+    },
 }));
 
 export default useOrderStore;

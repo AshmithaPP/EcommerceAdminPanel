@@ -38,10 +38,24 @@ const getAllBlogs = async (req, res) => {
         }
         const [countResult] = await db.query(countQuery, countParams);
         const total = countResult[0].total;
+        
+        // --- Dynamic Blog Hero Settings ---
+        const [settingsRows] = await db.query("SELECT value FROM settings WHERE settings_key = 'blog_hero'");
+        let hero = {
+            over_title: "LEGACY OF THE LOOM",
+            title: "Timeless Tradition Woven in Silk",
+            subtitle: "Celebrating the heritage of authentic Kanchipuram silk sarees crafted by master weavers through generations of sacred geometry and golden threads.",
+            button_text: "Explore Collections",
+            image_url: "/uploads/blog_hero.png"
+        };
+        if (settingsRows.length > 0) {
+            hero = typeof settingsRows[0].value === 'string' ? JSON.parse(settingsRows[0].value) : settingsRows[0].value;
+        }
 
         res.status(200).json({
             success: true,
             data: blogs,
+            hero,
             pagination: {
                 total,
                 page: parseInt(page),
@@ -97,11 +111,11 @@ const getBlogById = async (req, res) => {
 // Admin: Create Blog
 const createBlog = async (req, res) => {
     try {
-        const { title, slug, content, author, image, category, excerpt, is_published, published_date } = req.body;
+        const { title, subtitle, slug, content, author, image, category, excerpt, is_published, published_date } = req.body;
         
         const [result] = await db.query(
-            'INSERT INTO blogs (title, slug, content, author, image, category, excerpt, is_published, published_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-            [title, slug, content, author, image, category, excerpt, is_published || false, published_date || new Date()]
+            'INSERT INTO blogs (title, subtitle, slug, content, author, image, category, excerpt, is_published, published_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [title, subtitle, slug, content, author, image, category, excerpt, is_published || false, published_date || new Date()]
         );
 
         res.status(201).json({
@@ -119,11 +133,11 @@ const createBlog = async (req, res) => {
 const updateBlog = async (req, res) => {
     try {
         const { id } = req.params;
-        const { title, slug, content, author, image, category, excerpt, is_published, published_date } = req.body;
+        const { title, subtitle, slug, content, author, image, category, excerpt, is_published, published_date } = req.body;
 
         await db.query(
-            'UPDATE blogs SET title = ?, slug = ?, content = ?, author = ?, image = ?, category = ?, excerpt = ?, is_published = ?, published_date = ? WHERE id = ?',
-            [title, slug, content, author, image, category, excerpt, is_published, published_date, id]
+            'UPDATE blogs SET title = ?, subtitle = ?, slug = ?, content = ?, author = ?, image = ?, category = ?, excerpt = ?, is_published = ?, published_date = ? WHERE id = ?',
+            [title, subtitle, slug, content, author, image, category, excerpt, is_published, published_date, id]
         );
 
         res.status(200).json({ success: true, message: 'Blog updated successfully' });

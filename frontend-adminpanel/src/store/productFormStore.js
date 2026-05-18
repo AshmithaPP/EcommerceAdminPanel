@@ -20,6 +20,7 @@ const useProductFormStore = create((set, get) => ({
         brand: '',
         meta_title: '',
         meta_description: '',
+        meta_keywords: '',
         slug: '',
         gstPercent: 5,
         priceIncludesGST: true,

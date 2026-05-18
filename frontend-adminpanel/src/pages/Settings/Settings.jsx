@@ -30,6 +30,7 @@ const Settings = () => {
   const {
     siteInfo,
     storeSettings,
+    blogHero,
     initialLoading,
     saving,
     uploading,
@@ -38,6 +39,7 @@ const Settings = () => {
     saveAllSettings,
     uploadAsset,
     updateStoreSettings,
+    updateBlogHero,
     setSiteInfo,
     resetStore
   } = useSettingsStore();
@@ -46,6 +48,7 @@ const Settings = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [tempSiteInfo, setTempSiteInfo] = useState({});
   const [tempStoreSettings, setTempStoreSettings] = useState({});
+  const [tempBlogHero, setTempBlogHero] = useState({});
 
   useEffect(() => {
     fetchSettings();
@@ -62,6 +65,7 @@ const Settings = () => {
   const handleEditAllSettings = () => {
     setTempSiteInfo({ ...siteInfo });
     setTempStoreSettings({ ...storeSettings });
+    setTempBlogHero({ ...blogHero });
     setIsModalOpen(true);
   };
 
@@ -69,6 +73,7 @@ const Settings = () => {
     console.log('Saving Modal Data to Store:', tempSiteInfo);
     setSiteInfo(tempSiteInfo);
     updateStoreSettings(tempStoreSettings);
+    updateBlogHero(tempBlogHero);
     setIsModalOpen(false);
   };
 
@@ -239,6 +244,46 @@ const Settings = () => {
           </div>
         </section>
 
+        {/* 3. Blog Hero Settings */}
+        <section className={styles.settingsCard} style={{ gridColumn: 'span 12' }}>
+          <header className={styles.sectionHeader}>
+            <h2 className={styles.sectionTitle}>
+              <Store size={14} /> Blog Page Hero settings
+            </h2>
+            <button className={styles.editAllBtn} onClick={handleEditAllSettings}>
+              <Edit2 size={12} /> Edit
+            </button>
+          </header>
+          <div className={styles.sectionContent}>
+            <div className={styles.inputGroup} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '1.5rem' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#64748b' }}>Over Title</span>
+                <span style={{ fontSize: '0.9rem', color: '#1e293b' }}>{blogHero.over_title || 'LEGACY OF THE LOOM'}</span>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#64748b' }}>Title</span>
+                <span style={{ fontSize: '0.9rem', color: '#1e293b' }}>{blogHero.title || 'Timeless Tradition Woven in Silk'}</span>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', gridColumn: 'span 2' }}>
+                <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#64748b' }}>Subtitle</span>
+                <span style={{ fontSize: '0.9rem', color: '#1e293b' }}>{blogHero.subtitle}</span>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#64748b' }}>Button Text</span>
+                <span style={{ fontSize: '0.9rem', color: '#1e293b' }}>{blogHero.button_text || 'Explore Collections'}</span>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#64748b' }}>Hero Image</span>
+                {blogHero.image_url ? (
+                  <img src={getImageUrl(blogHero.image_url)} alt="Hero Preview" style={{ height: 40, width: 'auto', borderRadius: 4, objectFit: 'contain', border: '1px solid #cbd5e1', background: '#f8fafc' }} />
+                ) : (
+                  <span style={{ fontSize: '0.9rem', color: '#94a3b8' }}>No Image</span>
+                )}
+              </div>
+            </div>
+          </div>
+        </section>
+
       </div>
 
       {/* Edit All Settings Modal */}
@@ -342,6 +387,73 @@ const Settings = () => {
                 onChange={(e) => setTempStoreSettings(prev => ({ ...prev, default_stock: e.target.value }))}
                 Icon={Package}
               />
+            </div>
+
+            {/* --- Blog Hero Section Divider --- */}
+            <div className={styles.modalSectionDivider}></div>
+            <div className={styles.modalSectionTitle}>Blog Page Hero Banner</div>
+            <div className={styles.modalHalfField}>
+              <InputBox 
+                label="Over Title" 
+                value={tempBlogHero.over_title || ''} 
+                onChange={(e) => setTempBlogHero(prev => ({ ...prev, over_title: e.target.value }))}
+              />
+            </div>
+            <div className={styles.modalHalfField}>
+              <InputBox 
+                label="Title" 
+                value={tempBlogHero.title || ''} 
+                onChange={(e) => setTempBlogHero(prev => ({ ...prev, title: e.target.value }))}
+              />
+            </div>
+            <div className={styles.modalFullField}>
+              <label className={styles.fieldLabel}>Subtitle</label>
+              <textarea 
+                className={styles.modalTextarea}
+                value={tempBlogHero.subtitle || ''} 
+                onChange={(e) => setTempBlogHero(prev => ({ ...prev, subtitle: e.target.value }))}
+                placeholder="Enter subtitle..."
+                rows={2}
+              />
+            </div>
+            <div className={styles.modalHalfField}>
+              <InputBox 
+                label="Button Text" 
+                value={tempBlogHero.button_text || ''} 
+                onChange={(e) => setTempBlogHero(prev => ({ ...prev, button_text: e.target.value }))}
+              />
+            </div>
+            <div className={styles.modalHalfField}>
+              <div className={styles.modalImageField}>
+                <label className={styles.fieldLabel}>Hero Image</label>
+                <div className={styles.modalImageRow}>
+                  <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                    {tempBlogHero.image_url ? (
+                      <img 
+                        src={getImageUrl(tempBlogHero.image_url)} 
+                        alt="Preview" 
+                        className={styles.modalImgMini} 
+                      />
+                    ) : (
+                      <div style={{ height: 50, width: 50, borderRadius: 6, background: '#f8fafc', border: '1px solid #D8DCF0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '8px', color: '#94a3b8' }}>
+                        No Image
+                      </div>
+                    )}
+                  </div>
+                  <label className={styles.modalUploadIcon}>
+                    {uploading.modal ? <Loader2 className="animate-spin" size={16} /> : <Upload size={16} />}
+                    Change
+                    <input type="file" hidden onChange={async (e) => {
+                      const file = e.target.files[0];
+                      if (!file) return;
+                      const url = await uploadAsset(file, 'modal');
+                      if (url) {
+                        setTempBlogHero(prev => ({ ...prev, image_url: url }));
+                      }
+                    }} accept="image/*" />
+                  </label>
+                </div>
+              </div>
             </div>
           </div>
         </div>

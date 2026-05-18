@@ -1,5 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Eye, CreditCard, Wallet, Landmark, Truck } from 'lucide-react';
+import { Eye, CreditCard, Wallet, Landmark, Truck, Download } from 'lucide-react';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import paymentService from '../../services/paymentService';
+import { showToast } from '../../utils/toast';
 import styles from './PaymentManagement.module.css';
 import DataTable from '../../components/ui/DataTable';
 import Pagination from '../../components/ui/Pagination';
@@ -56,6 +60,91 @@ const PaymentManagement = () => {
 
   const [localSearch, setLocalSearch] = useState(searchTerm);
   const filters = ['All', 'Success', 'Pending', 'Failed'];
+
+  // PDF Download State
+  const _todayObj = new Date();
+  const _firstDayObj = new Date(_todayObj.getFullYear(), _todayObj.getMonth(), 1);
+  const formatDateInput = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+  
+  const [startDate, setStartDate] = useState(formatDateInput(_firstDayObj));
+  const [endDate, setEndDate] = useState(formatDateInput(_todayObj));
+  const [isDownloading, setIsDownloading] = useState(false);
+  const today = formatDateInput(_todayObj);
+
+  const handleDownloadPdf = async () => {
+    if (!startDate || !endDate) {
+      showToast.error("Please select both From and To dates.");
+      return;
+    }
+    
+    if (new Date(startDate) > new Date(endDate)) {
+      showToast.error("From Date cannot be later than To Date.");
+      return;
+    }
+
+    try {
+      setIsDownloading(true);
+      const res = await paymentService.getReport(startDate, endDate);
+      const data = res.data;
+      
+      if (!data || data.length === 0) {
+        showToast.error("No payment records found for this date range.");
+        setIsDownloading(false);
+        return;
+      }
+
+      const doc = new jsPDF({ orientation: 'landscape', format: 'a2' });
+      
+      doc.setFontSize(20);
+      doc.text(`Payment Invoices Report (${startDate} to ${endDate})`, 14, 20);
+      
+      const columns = [
+        "Invoice No", "Order ID", "Transaction ID", "Payment Date & Time", 
+        "Customer Name", "Customer Email", "Customer Mobile", "Payment Method", 
+        "Payment Gateway", "Payment Status", "Subtotal", "Discount", 
+        "Shipping Charge", "GST/Tax", "Total Amount", "Refund Amount", 
+        "Currency", "Created Date", "Updated Date", "Order Status", 
+        "Delivery Status", "Coupon Code", "Gateway Ref ID"
+      ];
+      
+      const truncateId = (id) => id && id.length > 15 ? id.substring(0, 15) + '...' : id;
+
+      const rows = data.map(item => [
+        truncateId(item['Invoice No']), item['Order ID'], item['Transaction ID'], item['Payment Date & Time'],
+        item['Customer Name'], item['Customer Email'], item['Customer Mobile'], item['Payment Method'],
+        item['Payment Gateway'], item['Payment Status'], item['Subtotal'], item['Discount'],
+        item['Shipping Charge'], item['GST/Tax'], item['Total Amount'], item['Refund Amount'],
+        item['Currency'], item['Created Date'], item['Updated Date'], item['Order Status'],
+        item['Delivery Status'], truncateId(item['Coupon Code Used']) || 'N/A', item['Gateway Reference ID']
+      ]);
+
+      autoTable(doc, {
+        head: [columns],
+        body: rows,
+        startY: 28,
+        styles: { fontSize: 8, cellPadding: 3, overflow: 'linebreak', textColor: [50, 50, 50] },
+        headStyles: { fillColor: [67, 97, 238], textColor: 255, fontStyle: 'bold' },
+        alternateRowStyles: { fillColor: [248, 250, 252] },
+        columnStyles: {
+            0: { cellWidth: 30 }, // Invoice No
+            1: { cellWidth: 35 }, // Order ID
+            2: { cellWidth: 35 }, // Txn ID
+            3: { cellWidth: 25 }, // Date
+            4: { cellWidth: 30 }, // Name
+            5: { cellWidth: 45 }, // Email
+            22: { cellWidth: 45 } // Gateway Ref
+        },
+      });
+      
+      doc.save(`Payment_Report_${startDate}_to_${endDate}.pdf`);
+      showToast.success("PDF Downloaded successfully!");
+    } catch (error) {
+      showToast.error("Failed to download report.");
+      console.error(error);
+    } finally {
+      setIsDownloading(false);
+    }
+  };
 
   // Trigger fetch when pagination changes
   useEffect(() => {
@@ -141,29 +230,63 @@ const PaymentManagement = () => {
   ];
 
   const headerActions = (
-    <div className={styles.headerControls}>
-      <div className={styles.filterGroup}>
-        {filters.map((f) => (
-          <button
-            key={f}
-            className={`${styles.filterBtn} ${activeFilter === f ? styles.activeFilter : ''}`}
-            onClick={() => setFilter(f)}
-          >
-            {f}
-          </button>
-        ))}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', width: '100%', marginBottom: '1rem' }}>
+      {/* Date Filter & Download PDF Row */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap', background: '#f8fafc', padding: '0.75rem', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <label style={{ fontSize: '0.85rem', fontWeight: 500, color: '#475569' }}>From Date:</label>
+          <input 
+            type="date" 
+            value={startDate}
+            max={today}
+            onChange={(e) => setStartDate(e.target.value)}
+            style={{ padding: '0.4rem', border: '1px solid #cbd5e1', borderRadius: '4px', fontSize: '0.85rem' }}
+          />
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <label style={{ fontSize: '0.85rem', fontWeight: 500, color: '#475569' }}>To Date:</label>
+          <input 
+            type="date" 
+            value={endDate}
+            max={today}
+            onChange={(e) => setEndDate(e.target.value)}
+            style={{ padding: '0.4rem', border: '1px solid #cbd5e1', borderRadius: '4px', fontSize: '0.85rem' }}
+          />
+        </div>
+        <button 
+          onClick={handleDownloadPdf}
+          disabled={isDownloading}
+          style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.45rem 1rem', background: isDownloading ? '#94a3b8' : '#ef4444', color: 'white', border: 'none', borderRadius: '4px', cursor: isDownloading ? 'not-allowed' : 'pointer', fontSize: '0.85rem', fontWeight: 500, marginLeft: 'auto' }}
+        >
+          <Download size={14} />
+          {isDownloading ? 'Downloading...' : 'Download PDF'}
+        </button>
       </div>
-      <div className={styles.searchWrapper}>
-        <svg className={styles.searchIcon} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-          <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
-        </svg>
-        <input
-          type="text"
-          className={styles.searchInput}
-          placeholder="Search orders..."
-          value={localSearch}
-          onChange={(e) => setLocalSearch(e.target.value)}
-        />
+
+      <div className={styles.headerControls}>
+        <div className={styles.filterGroup}>
+          {filters.map((f) => (
+            <button
+              key={f}
+              className={`${styles.filterBtn} ${activeFilter === f ? styles.activeFilter : ''}`}
+              onClick={() => setFilter(f)}
+            >
+              {f}
+            </button>
+          ))}
+        </div>
+        <div className={styles.searchWrapper}>
+          <svg className={styles.searchIcon} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
+          </svg>
+          <input
+            type="text"
+            className={styles.searchInput}
+            placeholder="Search orders..."
+            value={localSearch}
+            onChange={(e) => setLocalSearch(e.target.value)}
+          />
+        </div>
       </div>
     </div>
   );

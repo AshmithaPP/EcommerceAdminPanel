@@ -1,5 +1,6 @@
 import React, { lazy, Suspense } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
+import ProtectedRoute from '../components/ProtectedRoute';
 
 const Dashboard = lazy(() => import('../pages/Dashboard/Dashboard'));
 const Analytics = lazy(() => import('../pages/Analytics/Analytics'));
@@ -31,29 +32,113 @@ const AppRoutes = () => {
     </div>}>
       <Routes>
 
-      <Route path="/" element={<Navigate to="/dashboard" replace />} />
-      <Route path="/dashboard" element={<Dashboard />} />
-      <Route path="/analytics" element={<Analytics />} />
-      <Route path="/inventory" element={<InventoryList />} />
-      <Route path="/products" element={<Products />} />
-      <Route path="/categories" element={<Categories />} />
-      <Route path="/products/add" element={<AddProduct />} />
-      <Route path="/products/edit/:id" element={<EditProduct />} />
-      <Route path="/orders" element={<Orders />} />
-      <Route path="/orders/:id" element={<OrderDetails />} />
-      <Route path="/customers" element={<CustomerList />} />
-      <Route path="/customers/:id" element={<CustomerDetails />} />
-      <Route path="/payments" element={<PaymentManagement />} />
-      <Route path="/shipping" element={<ShippingManagement />} />
-      <Route path="/marketing" element={<MarketingStudio />} />
-      <Route path="/admins" element={<AdminManagement />} />
-      <Route path="/settings" element={<Settings />} />
-      <Route path="/homepage-management" element={<HomepageManagement />} />
-      <Route path="/blogs" element={<BlogManagement />} />
-      <Route path="/attributes" element={<AttributeManagement />} />
-      <Route path="/reset-password" element={<ResetPassword />} />
-      {/* 404 Route */}
-      <Route path="*" element={<div className="text-center mt-5"><h4>Page Not Found</h4></div>} />
+        <Route path="/" element={<Navigate to="/dashboard" replace />} />
+        <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/analytics" element={<Analytics />} />
+        
+        {/* Products Management */}
+        <Route path="/products" element={
+          <ProtectedRoute module="products" action="view">
+            <Products />
+          </ProtectedRoute>
+        } />
+        <Route path="/products/add" element={
+          <ProtectedRoute module="products" action="add">
+            <AddProduct />
+          </ProtectedRoute>
+        } />
+        <Route path="/products/edit/:id" element={
+          <ProtectedRoute module="products" action="edit">
+            <EditProduct />
+          </ProtectedRoute>
+        } />
+        <Route path="/categories" element={
+          <ProtectedRoute module="products" action="view">
+            <Categories />
+          </ProtectedRoute>
+        } />
+        <Route path="/attributes" element={
+          <ProtectedRoute module="products" action="view">
+            <AttributeManagement />
+          </ProtectedRoute>
+        } />
+        <Route path="/inventory" element={
+          <ProtectedRoute module="products" action="view">
+            <InventoryList />
+          </ProtectedRoute>
+        } />
+
+        {/* Orders & Payments */}
+        <Route path="/orders" element={
+          <ProtectedRoute module="orders" action="view">
+            <Orders />
+          </ProtectedRoute>
+        } />
+        <Route path="/orders/:id" element={
+          <ProtectedRoute module="orders" action="view">
+            <OrderDetails />
+          </ProtectedRoute>
+        } />
+        <Route path="/payments" element={
+          <ProtectedRoute module="orders" action="view">
+            <PaymentManagement />
+          </ProtectedRoute>
+        } />
+
+        {/* Shipping Management */}
+        <Route path="/shipping" element={
+          <ProtectedRoute module="shipping" action="update">
+            <ShippingManagement />
+          </ProtectedRoute>
+        } />
+
+        {/* Customers */}
+        <Route path="/customers" element={
+          <ProtectedRoute module="customers" action="view">
+            <CustomerList />
+          </ProtectedRoute>
+        } />
+        <Route path="/customers/:id" element={
+          <ProtectedRoute module="customers" action="view">
+            <CustomerDetails />
+          </ProtectedRoute>
+        } />
+
+        {/* Marketing & Coupons */}
+        <Route path="/marketing" element={
+          <ProtectedRoute module="products" action="view">
+            <MarketingStudio />
+          </ProtectedRoute>
+        } />
+
+        {/* Blogs */}
+        <Route path="/blogs" element={
+          <ProtectedRoute module="products" action="view">
+            <BlogManagement />
+          </ProtectedRoute>
+        } />
+
+        {/* Restricted Core Modules (Super Admin Only) */}
+        <Route path="/admins" element={
+          <ProtectedRoute roles={['superadmin']}>
+            <AdminManagement />
+          </ProtectedRoute>
+        } />
+        <Route path="/settings" element={
+          <ProtectedRoute roles={['superadmin']}>
+            <Settings />
+          </ProtectedRoute>
+        } />
+        <Route path="/homepage-management" element={
+          <ProtectedRoute roles={['superadmin']}>
+            <HomepageManagement />
+          </ProtectedRoute>
+        } />
+
+        <Route path="/reset-password" element={<ResetPassword />} />
+        
+        {/* 404 Route */}
+        <Route path="*" element={<div className="text-center mt-5"><h4>Page Not Found</h4></div>} />
       </Routes>
     </Suspense>
   );

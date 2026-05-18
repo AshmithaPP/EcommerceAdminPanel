@@ -29,7 +29,7 @@ const productService = {
     createProduct: async (productData) => {
         const {
             name, sub_category_id, brand, variants, gstPercent, priceIncludesGST,
-            base_sku, meta_title, meta_description,
+            base_sku, meta_title, meta_description, meta_keywords,
             badge, tagline
         } = productData;
 
@@ -70,8 +70,8 @@ const productService = {
             }
         }
 
-        // 2. Generate Unique Slug
-        let slug = slugify(name);
+        // 2. Generate or Use Provided Slug
+        let slug = productData.slug ? slugify(productData.slug) : slugify(name);
         const existingBySlug = await Product.findBySlug(slug);
         if (existingBySlug) {
             slug = `${slug}-${Date.now()}`;
@@ -176,6 +176,7 @@ const productService = {
                 variant_config: variant_config,
                 meta_title: meta_title || null,
                 meta_description: meta_description || null,
+                meta_keywords: meta_keywords || null,
                 badge: badge || null,
                 tagline: tagline || null,
                 pricing_meta,
@@ -586,7 +587,7 @@ const productService = {
 
         const {
             name, sub_category_id, brand, video_url, gstPercent, priceIncludesGST,
-            base_sku, meta_title, meta_description,
+            base_sku, meta_title, meta_description, meta_keywords,
             badge, tagline
         } = productData;
 
@@ -633,14 +634,14 @@ const productService = {
             }
         }
 
-        // Handle Slug
-        let slug = existing.slug;
-        if (name && name !== existing.name) {
+        // Handle Slug (Use provided slug, otherwise fallback to existing, or regenerate if name changed)
+        let slug = productData.slug ? slugify(productData.slug) : existing.slug;
+        if (!productData.slug && name && name !== existing.name) {
             slug = slugify(name);
-            const existingBySlug = await Product.findBySlug(slug);
-            if (existingBySlug && existingBySlug.product_id !== productId) {
-                slug = `${slug}-${Date.now()}`;
-            }
+        }
+        const existingBySlug = await Product.findBySlug(slug);
+        if (existingBySlug && existingBySlug.product_id !== productId) {
+            slug = `${slug}-${Date.now()}`;
         }
 
         const connection = await db.getConnection();
@@ -661,6 +662,7 @@ const productService = {
                 variant_config: variant_config,
                 meta_title: meta_title !== undefined ? meta_title : existing.meta_title,
                 meta_description: meta_description !== undefined ? meta_description : existing.meta_description,
+                meta_keywords: meta_keywords !== undefined ? meta_keywords : existing.meta_keywords,
                 badge: badge !== undefined ? badge : existing.badge,
                 tagline: tagline !== undefined ? tagline : existing.tagline,
                 pricing_meta,

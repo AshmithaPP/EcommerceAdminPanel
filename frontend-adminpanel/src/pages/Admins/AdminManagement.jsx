@@ -1,51 +1,43 @@
-import React, { useState } from 'react';
-import { Plus, Search, Filter, Edit, Ban, CheckCircle } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Plus, Search, Filter, Edit, Ban, CheckCircle, Trash2 } from 'lucide-react';
 import styles from './AdminManagement.module.css';
 import DataTable from '../../components/ui/DataTable';
 import AddAdminModal from '../../components/admins/AddAdminModal';
 import DeactivateModal from '../../components/admins/DeactivateModal';
-
-const adminsData = [
-  {
-    id: 'SC-ADM-2940',
-    name: 'Arjun Kapoor',
-    email: 'arjun.k@silkcurator.com',
-    role: 'Super Admin',
-    status: 'Active',
-    lastLogin: '2 mins ago',
-    avatar: 'https://lh3.googleusercontent.com/aida-public/AB6AXuD65aih1ZWY7o3SoIjkbBo8jvQ5hvzD30Vcib4HkGp68Ny6ZkO7X0u_4aFQCHPNZhBdAhQ2QDzWeRmuavhWZS0wh9mak7Ola7AR2bBlgCu3yvfXExmZIg6GCtZdobVEQxEn1eRbHiyJEejB_2MnR3GOCAUXRihm_GZ8j3cKNMQIqSbiLxMNNUgzuAFi3iNOuhkoesHDMnGcSSNFN334QQQu-LWX2sFjUjgI8Bv5mgyw2u96GyYgRuzdBYnQUvdheFmYPCvp7faZrY8'
-  },
-  {
-    id: 'SC-ADM-3152',
-    name: 'Ananya Shah',
-    email: 'ananya.s@silkcurator.com',
-    role: 'Manager',
-    status: 'Active',
-    lastLogin: '4 hours ago',
-    avatar: 'https://lh3.googleusercontent.com/aida-public/AB6AXuD7jXl4omVr6yE7BUKgy6PVUzMgUh3tR1pylan-GeLPBKARXzLgNu7O7s4DJo0pVIixBcJq2_eud7uIPYQ_uXGgx7fVXZAYH_-qBYcK0ZKN88894s_8A8NwrvTAJ3Wegh3KNeBjb5Xa8EQ6x-7ozym5zGEXdDY0Hpqrxzd4ESR1IJ2bzjY_l7unnVPMJxiGbUzCZVZEFGNxVf7tnMFot53S1AyC0pTwoAqXA4R5I3krFAlarhvOgwfxQCYBmls1zFxrAajswjMTe6U'
-  },
-  {
-    id: 'SC-ADM-2891',
-    name: 'Rohan Mehta',
-    email: 'rohan.m@silkcurator.com',
-    role: 'Support',
-    status: 'Inactive',
-    lastLogin: 'Oct 12, 2023',
-    avatar: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDRRrxq-wF-o9rC421CVqfSBFuGU5b9QgXUZfBHc-HOw335p9K1r65GDvGgsbloGJZ-1qit4zKV--gtEy670Ll3LXZBo4Br_ZoND2z9cSSXLysthBMAAs0vqCH1-D70uBPl6y_rmpWM-CPOir49CO5pSfuMiuYqahLWFP_oYhIqd7xDpnMYgpPKxcO_eapLxJrcwawcIvuhjQ1BEw8hKW71QHS7JQKmtRkHGCP9slFBgpf8z5vrN7uYk-UA_1r9xmcqs4Ij22xoDYM'
-  }
-];
+import useAdminStore from '../../store/adminStore';
 
 const AdminManagement = () => {
+  const { admins, fetchAdmins, deleteAdmin, loading } = useAdminStore();
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [editAdminTarget, setEditAdminTarget] = useState(null);
   const [deactivateTarget, setDeactivateTarget] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [roleFilter, setRoleFilter] = useState('All');
+  const [statusFilter, setStatusFilter] = useState('All');
+
+  useEffect(() => {
+    fetchAdmins();
+  }, [fetchAdmins]);
 
   const getRoleClass = (role) => {
-    switch (role) {
-      case 'Super Admin': return styles.roleSuper;
-      case 'Manager': return styles.roleManager;
-      case 'Support': return styles.roleSupport;
-      default: return '';
+    switch (role?.toLowerCase()) {
+      case 'superadmin': return styles.roleSuper;
+      case 'subadmin': return styles.roleManager;
+      default: return styles.roleSupport;
+    }
+  };
+
+  const getRoleLabel = (role) => {
+    switch (role?.toLowerCase()) {
+      case 'superadmin': return 'Super Admin';
+      case 'subadmin': return 'Sub Admin';
+      default: return role || 'Sub Admin';
+    }
+  };
+
+  const handleDelete = async (id) => {
+    if (window.confirm('Are you sure you want to permanently delete this admin curator?')) {
+      await deleteAdmin(id);
     }
   };
 
@@ -54,17 +46,20 @@ const AdminManagement = () => {
       label: 'Admin Curator',
       key: 'admin',
       width: '35%',
-      render: (row) => (
-        <div className={styles.curatorCell}>
-          <div className={styles.avatar}>
-            <img src={row.avatar} alt={row.name} />
+      render: (row) => {
+        const avatarUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(row.name)}&background=random&color=fff&size=128`;
+        return (
+          <div className={styles.curatorCell}>
+            <div className={styles.avatar}>
+              <img src={avatarUrl} alt={row.name} />
+            </div>
+            <div>
+              <div className={styles.adminName}>{row.name}</div>
+              <div className={styles.adminEmail}>{row.email}</div>
+            </div>
           </div>
-          <div>
-            <div className={styles.adminName}>{row.name}</div>
-            <div className={styles.adminEmail}>{row.email}</div>
-          </div>
-        </div>
-      )
+        );
+      }
     },
     {
       label: 'Role',
@@ -72,7 +67,7 @@ const AdminManagement = () => {
       width: '15%',
       render: (row) => (
         <span className={`${styles.roleBadge} ${getRoleClass(row.role)}`}>
-          {row.role}
+          {getRoleLabel(row.role)}
         </span>
       )
     },
@@ -81,18 +76,24 @@ const AdminManagement = () => {
       key: 'status',
       width: '15%',
       render: (row) => (
-        <div className={`${styles.statusCell} ${row.status === 'Inactive' ? styles.statusInactive : ''}`}>
+        <div className={`${styles.statusCell} ${row.status === 0 ? styles.statusInactive : ''}`}>
           <span className={styles.statusDot}></span>
-          {row.status}
+          {row.status === 1 ? 'Active' : 'Inactive'}
         </div>
       )
     },
     {
-      label: 'Last Login',
-      key: 'lastLogin',
+      label: 'Joined Date',
+      key: 'created_at',
       width: '20%',
       render: (row) => (
-        <span className={styles.lastLoginText}>{row.lastLogin}</span>
+        <span className={styles.lastLoginText}>
+          {row.created_at ? new Date(row.created_at).toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric'
+          }) : 'Just now'}
+        </span>
       )
     },
     {
@@ -102,26 +103,55 @@ const AdminManagement = () => {
       align: 'right',
       render: (row) => (
         <div className={styles.actionCell}>
-          <button className={styles.iconBtn} title="Edit Admin">
+          <button 
+            className={styles.iconBtn} 
+            title="Edit Admin"
+            onClick={() => {
+              setEditAdminTarget(row);
+              setIsAddModalOpen(true);
+            }}
+          >
             <Edit size={16} />
           </button>
-          {row.status === 'Active' ? (
-            <button 
-              className={`${styles.iconBtn} ${styles.blockBtn}`}
-              onClick={() => setDeactivateTarget(row)}
-              title="Deactivate Admin"
-            >
-              <Ban size={16} />
-            </button>
-          ) : (
-            <button className={`${styles.iconBtn} ${styles.activateBtn}`} title="Reactivate Admin">
-              <CheckCircle size={16} />
-            </button>
-          )}
+          
+          <button 
+            className={`${styles.iconBtn} ${row.status === 1 ? styles.blockBtn : styles.activateBtn}`}
+            onClick={() => setDeactivateTarget(row)}
+            title={row.status === 1 ? 'Deactivate Admin' : 'Reactivate Admin'}
+          >
+            {row.status === 1 ? <Ban size={16} /> : <CheckCircle size={16} />}
+          </button>
+
+          <button 
+            className={`${styles.iconBtn} ${styles.blockBtn}`}
+            style={{ color: '#ef4444' }}
+            onClick={() => handleDelete(row.user_id)}
+            title="Delete Admin"
+          >
+            <Trash2 size={16} />
+          </button>
         </div>
       )
     }
   ];
+
+  // Filtering Logic
+  const filteredData = admins.filter(item => {
+    const matchesSearch = 
+      item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      item.email.toLowerCase().includes(searchTerm.toLowerCase());
+      
+    const matchesRole = 
+      roleFilter === 'All' || 
+      item.role.toLowerCase() === roleFilter.toLowerCase();
+      
+    const matchesStatus = 
+      statusFilter === 'All' || 
+      (statusFilter === 'Active' && item.status === 1) ||
+      (statusFilter === 'Inactive' && item.status === 0);
+
+    return matchesSearch && matchesRole && matchesStatus;
+  });
 
   const headerActions = (
     <div className={styles.headerControls}>
@@ -130,30 +160,39 @@ const AdminManagement = () => {
         <input 
           type="text" 
           className={styles.searchInput} 
-          placeholder="Search name, email, or ID..." 
+          placeholder="Search name or email..." 
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
         />
       </div>
       
-      <select className={styles.selectInput}>
-        <option>All Roles</option>
-        <option>Super Admin</option>
-        <option>Manager</option>
-        <option>Support</option>
+      <select 
+        className={styles.selectInput}
+        value={roleFilter}
+        onChange={(e) => setRoleFilter(e.target.value)}
+      >
+        <option value="All">All Roles</option>
+        <option value="superadmin">Super Admin</option>
+        <option value="subadmin">Sub Admin</option>
       </select>
       
-      <select className={styles.selectInput}>
-        <option>All Status</option>
-        <option>Active</option>
-        <option>Inactive</option>
+      <select 
+        className={styles.selectInput}
+        value={statusFilter}
+        onChange={(e) => setStatusFilter(e.target.value)}
+      >
+        <option value="All">All Status</option>
+        <option value="Active">Active</option>
+        <option value="Inactive">Inactive</option>
       </select>
-      
-      <button className={styles.filterBtn} title="More Filters">
-        <Filter size={16} />
-      </button>
 
-      <button className={styles.createBtn} onClick={() => setIsAddModalOpen(true)}>
+      <button 
+        className={styles.createBtn} 
+        onClick={() => {
+          setEditAdminTarget(null);
+          setIsAddModalOpen(true);
+        }}
+      >
         <Plus size={16} strokeWidth={2.5} />
         ADD CURATOR
       </button>
@@ -166,22 +205,28 @@ const AdminManagement = () => {
         <DataTable
           title="Team Management"
           columns={columns}
-          data={adminsData}
+          data={filteredData}
           actions={headerActions}
+          loading={loading}
           emptyMessage="No administrators found."
         />
       </div>
 
       <AddAdminModal 
         isOpen={isAddModalOpen} 
-        onClose={() => setIsAddModalOpen(false)} 
+        onClose={() => {
+          setIsAddModalOpen(false);
+          setEditAdminTarget(null);
+        }} 
+        editAdmin={editAdminTarget}
       />
 
       <DeactivateModal 
         isOpen={!!deactivateTarget} 
         onClose={() => setDeactivateTarget(null)}
         adminName={deactivateTarget?.name}
-        adminId={deactivateTarget?.id}
+        adminId={deactivateTarget?.user_id}
+        currentStatus={deactivateTarget?.status}
       />
     </div>
   );

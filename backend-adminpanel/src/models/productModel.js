@@ -7,24 +7,24 @@ const Product = {
     create: async (productData, connection = db) => {
         const { 
             product_id, name, slug, description, sub_category_id, brand, video_url, 
-            gstPercent, priceIncludesGST, base_sku, variant_config, meta_title, meta_description,
+            gstPercent, priceIncludesGST, base_sku, variant_config, meta_title, meta_description, meta_keywords,
             badge, tagline, pricing_meta, stock_meta, services, trust_badges, highlights, 
             care_instructions, additional_info, origin_info, stats, is_featured
         } = productData;
         const sql = `
             INSERT INTO products (
                 product_id, name, slug, description, sub_category_id, brand, video_url, 
-                gstPercent, priceIncludesGST, base_sku, variant_config, meta_title, meta_description,
+                gstPercent, priceIncludesGST, base_sku, variant_config, meta_title, meta_description, meta_keywords,
                 badge, tagline, pricing_meta, stock_meta, services, trust_badges, highlights, 
                 care_instructions, additional_info, origin_info, stats, is_featured
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
         await connection.query(sql, [
             product_id, name, slug, description, sub_category_id, brand,
             video_url || null, gstPercent || 0, priceIncludesGST !== undefined ? priceIncludesGST : 1,
             base_sku || null, variant_config ? JSON.stringify(variant_config) : null,
-            meta_title || null, meta_description || null,
+            meta_title || null, meta_description || null, meta_keywords || null,
             badge || null, tagline || null,
             pricing_meta ? JSON.stringify(pricing_meta) : null,
             stock_meta ? JSON.stringify(stock_meta) : null,
@@ -249,14 +249,14 @@ const Product = {
     update: async (productId, productData, connection = db) => {
         const { 
             name, slug, description, sub_category_id, brand, video_url, gstPercent, 
-            priceIncludesGST, base_sku, variant_config, meta_title, meta_description,
+            priceIncludesGST, base_sku, variant_config, meta_title, meta_description, meta_keywords,
             badge, tagline, pricing_meta, stock_meta, services, trust_badges, highlights, 
             care_instructions, additional_info, origin_info, stats, is_featured
         } = productData;
         const sql = `
             UPDATE products 
             SET name = ?, slug = ?, description = ?, sub_category_id = ?, brand = ?, video_url = ?, 
-                gstPercent = ?, priceIncludesGST = ?, base_sku = ?, variant_config = ?, meta_title = ?, meta_description = ?,
+                gstPercent = ?, priceIncludesGST = ?, base_sku = ?, variant_config = ?, meta_title = ?, meta_description = ?, meta_keywords = ?,
                 badge = ?, tagline = ?, pricing_meta = ?, stock_meta = ?, services = ?, trust_badges = ?, highlights = ?, 
                 care_instructions = ?, additional_info = ?, origin_info = ?, stats = ?, is_featured = ?
             WHERE product_id = ?
@@ -266,7 +266,7 @@ const Product = {
             video_url || null, gstPercent || 0,
             priceIncludesGST !== undefined ? priceIncludesGST : 1,
             base_sku || null, variant_config ? JSON.stringify(variant_config) : null,
-            meta_title || null, meta_description || null,
+            meta_title || null, meta_description || null, meta_keywords || null,
             badge || null, tagline || null,
             pricing_meta ? JSON.stringify(pricing_meta) : null,
             stock_meta ? JSON.stringify(stock_meta) : null,

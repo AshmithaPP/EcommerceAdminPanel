@@ -173,6 +173,21 @@
   white-space: nowrap;
 }
 
+/* Transaction ID */
+.transactionId {
+  font-family: var(--font-inter, sans-serif);
+  font-size: 11px;
+  color: var(--muted-text, #7A89B0);
+  background: rgba(0, 0, 0, 0.03);
+  padding: 2px 6px;
+  border-radius: 4px;
+  display: inline-block;
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* ── Status Badges ── */
 .badge {
   display: inline-block;

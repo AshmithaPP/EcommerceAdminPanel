@@ -47,6 +47,12 @@ const authService = {
             throw error;
         }
 
+        if (user.status === 0) {
+            const error = new Error('Your account has been suspended. Please contact support.');
+            error.statusCode = 403;
+            throw error;
+        }
+
         const isMatch = await comparePassword(password, user.password);
         if (!isMatch) {
             const error = new Error('Invalid credentials');
@@ -64,7 +70,8 @@ const authService = {
                 user_id: user.user_id,
                 name: user.name,
                 email: user.email,
-                role: user.role
+                role: user.role,
+                permissions: typeof user.permissions === 'string' ? JSON.parse(user.permissions) : user.permissions
             },
             ...tokens
         };
@@ -104,6 +111,12 @@ const authService = {
         if (!user) {
             const error = new Error('User not found');
             error.statusCode = 404;
+            throw error;
+        }
+
+        if (user.status === 0) {
+            const error = new Error('Your account has been suspended. Please contact support.');
+            error.statusCode = 403;
             throw error;
         }
 

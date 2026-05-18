@@ -24,6 +24,21 @@ const orderService = {
     updateShippingDetails: async (orderId, shippingData) => {
         const response = await privateApi.put(`/admin/orders/${orderId}/shipping`, shippingData);
         return response.data;
+    },
+
+    updateShipmentDetails: async (orderId, shipmentData) => {
+        const response = await privateApi.put(`/admin/orders/${orderId}/shipment`, shipmentData);
+        return response.data;
+    },
+
+    downloadInvoice: async (orderId) => {
+        const response = await privateApi.get(`/invoices/order/${orderId}/download`, { responseType: 'blob' });
+        return response;
+    },
+
+    resendInvoice: async (orderId) => {
+        const response = await privateApi.post(`/invoices/order/${orderId}/resend`);
+        return response.data;
     }
 };
 

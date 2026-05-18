@@ -6,19 +6,15 @@ const { createCouponSchema, updateCouponSchema, validateCouponSchema } = require
 
 const router = express.Router();
 
-router.use(protect);
-
-// Admin routes
-router.post('/', authorize('admin'), validate(createCouponSchema), couponController.createCoupon);
-router.get('/', authorize('admin'), couponController.listCoupons);
-
-// User routes
-router.post('/validate', validate(validateCouponSchema), couponController.validateCoupon);
+// --- Public routes (no auth required, accessible by guests) ---
 router.get('/active', couponController.listActiveCoupons);
+router.post('/validate', validate(validateCouponSchema), couponController.validateCoupon);
 
-// Admin coupon management routes by ID
-router.put('/:couponId', authorize('admin'), validate(updateCouponSchema), couponController.updateCoupon);
-router.delete('/:couponId', authorize('admin'), couponController.deleteCoupon);
-router.get('/:couponId/usage', authorize('admin'), couponController.getCouponUsageHistory);
+// --- Admin-only routes (require login + admin role) ---
+router.post('/', protect, authorize('admin'), validate(createCouponSchema), couponController.createCoupon);
+router.get('/', protect, authorize('admin'), couponController.listCoupons);
+router.put('/:couponId', protect, authorize('admin'), validate(updateCouponSchema), couponController.updateCoupon);
+router.delete('/:couponId', protect, authorize('admin'), couponController.deleteCoupon);
+router.get('/:couponId/usage', protect, authorize('admin'), couponController.getCouponUsageHistory);
 
 module.exports = router;

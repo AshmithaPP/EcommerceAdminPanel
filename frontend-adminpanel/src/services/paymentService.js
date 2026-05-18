@@ -12,6 +12,13 @@ const paymentService = {
     getPaymentById: async (id) => {
         const response = await privateApi.get(`/admin/payments/${id}`);
         return response.data;
+    },
+
+    getReport: async (startDate, endDate) => {
+        const response = await privateApi.get('/admin/payments/report', {
+            params: { startDate, endDate }
+        });
+        return response.data;
     }
 };
 

@@ -118,6 +118,20 @@ const Orders = () => {
       ),
     },
     {
+      label: 'Transaction ID',
+      key: 'transaction_id',
+      width: '150px',
+      render: (row) => {
+        const isCOD = row.payment_method?.toLowerCase() === 'cod';
+        const displayId = isCOD ? 'N/A (Cash on Delivery)' : (row.transaction_id && row.transaction_id !== '[object Object]' ? row.transaction_id : 'N/A');
+        return (
+          <span className={styles.transactionId} title={displayId}>
+            {displayId}
+          </span>
+        );
+      },
+    },
+    {
       label: 'Payment Status',
       key: 'payment_status',
       width: '140px',

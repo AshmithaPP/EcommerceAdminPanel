@@ -27,6 +27,7 @@ const useEditProductFormStore = create((set, get) => ({
         brand: '',
         meta_title: '',
         meta_description: '',
+        meta_keywords: '',
         slug: '',
         gstPercent: 5,
         priceIncludesGST: true,
@@ -87,6 +88,7 @@ const useEditProductFormStore = create((set, get) => ({
                 brand: data.brand || '',
                 meta_title: data.meta_title || '',
                 meta_description: data.meta_description || '',
+                meta_keywords: data.meta_keywords || '',
                 slug: data.slug || '',
                 gstPercent: data.gstPercent || 0,
                 priceIncludesGST: data.priceIncludesGST !== undefined ? !!data.priceIncludesGST : true,
@@ -152,7 +154,7 @@ const useEditProductFormStore = create((set, get) => ({
         set({
             productData: {
                 name: '', description: '', category_id: '', sub_category_id: '',
-                brand: '', meta_title: '', meta_description: '', slug: '',
+                brand: '', meta_title: '', meta_description: '', meta_keywords: '', slug: '',
                 gstPercent: 5, priceIncludesGST: true,
                 badge: '', tagline: '', pricingMeta: { taxIncludedText: 'Inclusive of all taxes' },
                 stockMeta: { lowStockText: '', urgencyText: '', viewCount: 0 },

@@ -95,6 +95,7 @@ const Coupon = {
     },
 
     getUserUsageCount: async (couponId, userId) => {
+        if (!userId) return 0;
         const [rows] = await db.query(
             'SELECT COUNT(*) as usage_count FROM coupon_usages WHERE coupon_id = ? AND user_id = ?',
             [couponId, userId]

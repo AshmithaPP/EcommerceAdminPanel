@@ -85,6 +85,10 @@ const PaymentService = {
 
     getAllPayments: async (pagination) => {
         return await Payment.findAll(pagination);
+    },
+
+    getReportData: async (startDate, endDate) => {
+        return await Payment.getReportData(startDate, endDate);
     }
 };
 
